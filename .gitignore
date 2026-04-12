@@ -10,6 +10,7 @@ out/
 # Environment
 .env
 .env.local
+.env.local.example
 .env.production
 .env.*.local
 
