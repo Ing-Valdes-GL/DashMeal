@@ -2,12 +2,35 @@ import type { Request, Response, NextFunction } from "express";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
-import { COMMISSION_RATE_ONLINE, COMMISSION_RATE_INPERSON } from "@dash-meal/shared";
 import bcrypt from "bcryptjs";
 
 export async function applyForBrand(req: Request, res: Response, next: NextFunction) {
   try {
     const { brand_name, contact_email, contact_phone } = req.body;
+
+    const { data: existing, error: existingErr } = await supabase
+      .from("brand_applications")
+      .select("id, status")
+      .or(`contact_email.eq.${contact_email},contact_phone.eq.${contact_phone}`)
+      .limit(1);
+
+    if (existingErr) {
+      console.error("Supabase pre-check error (brand_applications):", {
+        code: existingErr.code,
+        message: existingErr.message,
+        details: existingErr.details,
+        hint: existingErr.hint,
+      });
+      throw new AppError(500, "APPLICATION_ERROR", "Error while checking existing application");
+    }
+
+    if (existing && existing.length > 0) {
+      throw new AppError(
+        409,
+        "APPLICATION_ALREADY_EXISTS",
+        "An application already exists with this email or phone"
+      );
+    }
 
     const { data, error } = await supabase
       .from("brand_applications")
@@ -15,9 +38,42 @@ export async function applyForBrand(req: Request, res: Response, next: NextFunct
       .select()
       .single();
 
-    if (error) throw new AppError(500, "APPLICATION_ERROR", "Échec de la soumission");
+    if (error) {
+      console.error("Supabase insert error (brand_applications):", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
 
-    sendCreated(res, data, "Demande soumise. Notre équipe vous contactera sous 48h.");
+      if (error.code === "23505") {
+        throw new AppError(
+          409,
+          "APPLICATION_ALREADY_EXISTS",
+          "An application already exists with this email or phone"
+        );
+      }
+
+      if (error.code === "42P01") {
+        throw new AppError(
+          500,
+          "BRAND_APPLICATIONS_TABLE_MISSING",
+          "Table brand_applications is missing in Supabase"
+        );
+      }
+
+      if (error.code === "42501") {
+        throw new AppError(
+          500,
+          "SUPABASE_PERMISSION_ERROR",
+          "Supabase permission denied on brand_applications"
+        );
+      }
+
+      throw new AppError(500, "APPLICATION_ERROR", "Failed to submit application");
+    }
+
+    sendCreated(res, data, "Application submitted. Our team will contact you soon.");
   } catch (err) {
     next(err);
   }
@@ -34,7 +90,7 @@ export async function listApplications(req: Request, res: Response, next: NextFu
     if (status) query = query.eq("status", status);
 
     const { data, error } = await query;
-    if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
+    if (error) throw new AppError(500, "FETCH_ERROR", "Error while fetching applications");
 
     sendSuccess(res, data);
   } catch (err) {
@@ -50,7 +106,7 @@ export async function getApplication(req: Request, res: Response, next: NextFunc
       .eq("id", req.params.id)
       .single();
 
-    if (error || !data) throw new AppError(404, "NOT_FOUND", "Demande introuvable");
+    if (error || !data) throw new AppError(404, "NOT_FOUND", "Application not found");
 
     sendSuccess(res, data);
   } catch (err) {
@@ -69,9 +125,9 @@ export async function reviewApplication(req: Request, res: Response, next: NextF
       .eq("id", id)
       .single();
 
-    if (!app) throw new AppError(404, "NOT_FOUND", "Demande introuvable");
+    if (!app) throw new AppError(404, "NOT_FOUND", "Application not found");
     if (app.status !== "pending") {
-      throw new AppError(400, "ALREADY_REVIEWED", "Cette demande a déjà été traitée");
+      throw new AppError(400, "ALREADY_REVIEWED", "This application has already been reviewed");
     }
 
     await supabase
@@ -85,7 +141,6 @@ export async function reviewApplication(req: Request, res: Response, next: NextF
       .eq("id", id);
 
     if (status === "approved") {
-      // Créer la marque et l'admin
       const { data: brand } = await supabase
         .from("brands")
         .insert({
@@ -95,7 +150,6 @@ export async function reviewApplication(req: Request, res: Response, next: NextF
         .select()
         .single();
 
-      // Générer un mot de passe temporaire
       const tempPassword = Math.random().toString(36).slice(-10);
       const password_hash = await bcrypt.hash(tempPassword, 12);
 
@@ -109,10 +163,9 @@ export async function reviewApplication(req: Request, res: Response, next: NextF
         is_active: true,
       });
 
-      // TODO: Envoyer les identifiants par email/SMS
-      sendSuccess(res, { brand, temp_password: tempPassword }, "Marque approuvée");
+      sendSuccess(res, { brand, temp_password: tempPassword }, "Brand approved");
     } else {
-      sendSuccess(res, { status }, "Demande rejetée");
+      sendSuccess(res, { status }, "Application rejected");
     }
   } catch (err) {
     next(err);
@@ -126,7 +179,7 @@ export async function listBrands(req: Request, res: Response, next: NextFunction
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
+    if (error) throw new AppError(500, "FETCH_ERROR", "Error while fetching brands");
     sendSuccess(res, data);
   } catch (err) {
     next(err);
@@ -135,9 +188,8 @@ export async function listBrands(req: Request, res: Response, next: NextFunction
 
 export async function getBrand(req: Request, res: Response, next: NextFunction) {
   try {
-    // Un admin ne peut voir que sa propre marque
     if (req.user?.role === "admin" && req.user.brand_id !== req.params.id) {
-      throw new AppError(403, "FORBIDDEN", "Accès refusé");
+      throw new AppError(403, "FORBIDDEN", "Access denied");
     }
 
     const { data, error } = await supabase
@@ -146,7 +198,7 @@ export async function getBrand(req: Request, res: Response, next: NextFunction) 
       .eq("id", req.params.id)
       .single();
 
-    if (error || !data) throw new AppError(404, "NOT_FOUND", "Marque introuvable");
+    if (error || !data) throw new AppError(404, "NOT_FOUND", "Brand not found");
     sendSuccess(res, data);
   } catch (err) {
     next(err);
@@ -156,7 +208,7 @@ export async function getBrand(req: Request, res: Response, next: NextFunction) 
 export async function updateBrand(req: Request, res: Response, next: NextFunction) {
   try {
     if (req.user?.role === "admin" && req.user.brand_id !== req.params.id) {
-      throw new AppError(403, "FORBIDDEN", "Accès refusé");
+      throw new AppError(403, "FORBIDDEN", "Access denied");
     }
 
     const { data, error } = await supabase
@@ -166,7 +218,7 @@ export async function updateBrand(req: Request, res: Response, next: NextFunctio
       .select()
       .single();
 
-    if (error || !data) throw new AppError(404, "NOT_FOUND", "Marque introuvable");
+    if (error || !data) throw new AppError(404, "NOT_FOUND", "Brand not found");
     sendSuccess(res, data);
   } catch (err) {
     next(err);
@@ -175,17 +227,9 @@ export async function updateBrand(req: Request, res: Response, next: NextFunctio
 
 export async function suspendBrand(req: Request, res: Response, next: NextFunction) {
   try {
-    await supabase
-      .from("brands")
-      .update({ is_active: false })
-      .eq("id", req.params.id);
-
-    await supabase
-      .from("admins")
-      .update({ is_active: false })
-      .eq("brand_id", req.params.id);
-
-    sendSuccess(res, null, "Marque suspendue");
+    await supabase.from("brands").update({ is_active: false }).eq("id", req.params.id);
+    await supabase.from("admins").update({ is_active: false }).eq("brand_id", req.params.id);
+    sendSuccess(res, null, "Brand suspended");
   } catch (err) {
     next(err);
   }

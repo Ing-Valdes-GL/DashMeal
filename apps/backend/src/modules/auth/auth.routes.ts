@@ -24,6 +24,17 @@ router.post("/user/reset-password", validate(ResetPasswordSchema), controller.re
 router.post("/admin/login", validate(LoginAdminSchema), controller.loginAdmin);
 
 // ─── Super Admin ──────────────────────────────────────────────────────────────
+router.post(
+  "/superadmin/register",
+  validate(
+    z.object({
+      email: z.string().email(),
+      phone: z.string().regex(/^\+?[1-9]\d{7,14}$/),
+      password: z.string().min(8),
+    })
+  ),
+  controller.registerSuperAdmin
+);
 router.post("/superadmin/login", validate(LoginAdminSchema), controller.loginSuperAdmin);
 
 // ─── Commun ───────────────────────────────────────────────────────────────────

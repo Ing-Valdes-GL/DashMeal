@@ -151,6 +151,44 @@ export async function loginSuperAdmin(input: LoginAdminInput): Promise<{ admin: 
   return { admin: safeSuperAdmin, tokens };
 }
 
+export async function registerSuperAdmin(input: {
+  email: string;
+  phone: string;
+  password: string;
+}): Promise<{ admin: object; tokens: AuthTokens }> {
+  const { email, phone, password } = input;
+
+  const { data: existing, error: existingError } = await supabase
+    .from("super_admins")
+    .select("id")
+    .or(`email.eq.${email},phone.eq.${phone}`)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new AppError(500, "SUPERADMIN_LOOKUP_ERROR", "Erreur de vérification superadmin");
+  }
+
+  if (existing) {
+    throw new AppError(409, "SUPERADMIN_ALREADY_EXISTS", "Email ou numéro déjà utilisé");
+  }
+
+  const password_hash = await bcrypt.hash(password, 12);
+
+  const { data: created, error } = await supabase
+    .from("super_admins")
+    .insert({ email, phone, password_hash })
+    .select("id, email, phone, password_hash")
+    .single();
+
+  if (error || !created) {
+    throw new AppError(500, "CREATE_SUPERADMIN_ERROR", "Echec de création du compte superadmin");
+  }
+
+  const { password_hash: _, ...safeSuperAdmin } = created;
+  const tokens = buildSuperAdminTokens(created);
+  return { admin: safeSuperAdmin, tokens };
+}
+
 export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
   let payload: { id: string; role: string };
   try {

@@ -46,6 +46,15 @@ export async function loginSuperAdmin(req: Request, res: Response, next: NextFun
   }
 }
 
+export async function registerSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.registerSuperAdmin(req.body);
+    res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function refreshTokens(req: Request, res: Response, next: NextFunction) {
   try {
     const { refresh_token } = req.body;
