@@ -1,16 +1,24 @@
 import { z } from "zod";
 
 export const CreateProductSchema = z.object({
-  category_id: z.string().uuid(),
+  branch_id: z.string().uuid(),
+  category_id: z.string().uuid().optional(),
   name_fr: z.string().min(1).max(200),
   name_en: z.string().min(1).max(200),
   description_fr: z.string().max(2000).optional(),
   description_en: z.string().max(2000).optional(),
   price: z.number().positive(),
+  image_url: z.string().url().optional(),
   is_active: z.boolean().default(true),
+  is_hidden: z.boolean().default(false),
 });
 
 export const UpdateProductSchema = CreateProductSchema.partial();
+
+export const SetPromoSchema = z.object({
+  promo_price: z.number().positive().nullable(),
+  promo_ends_at: z.string().datetime().nullable(),
+});
 
 export const CreateProductVariantSchema = z.object({
   product_id: z.string().uuid(),
@@ -48,6 +56,7 @@ export const ProductSearchSchema = z.object({
 
 export type CreateProductInput = z.infer<typeof CreateProductSchema>;
 export type UpdateProductInput = z.infer<typeof UpdateProductSchema>;
+export type SetPromoInput = z.infer<typeof SetPromoSchema>;
 export type CreateProductVariantInput = z.infer<typeof CreateProductVariantSchema>;
 export type UpdateStockInput = z.infer<typeof UpdateStockSchema>;
 export type CreateCategoryInput = z.infer<typeof CreateCategorySchema>;

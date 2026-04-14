@@ -8,6 +8,7 @@ import {
   UpdateStockSchema,
   CreateCategorySchema,
   ProductSearchSchema,
+  SetPromoSchema,
 } from "@dash-meal/shared";
 import * as controller from "./products.controller.js";
 
@@ -19,8 +20,11 @@ router.get("/categories", controller.listCategories);
 router.get("/:id", controller.getProduct);
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
+router.get("/branch/:branch_id", authenticate, requireRole("admin", "superadmin"), controller.listByBranch);
 router.post("/", authenticate, requireRole("admin", "superadmin"), validate(CreateProductSchema), controller.createProduct);
 router.patch("/:id", authenticate, requireRole("admin", "superadmin"), validate(UpdateProductSchema), controller.updateProduct);
+router.patch("/:id/toggle-hidden", authenticate, requireRole("admin", "superadmin"), controller.toggleHidden);
+router.patch("/:id/promo", authenticate, requireRole("admin", "superadmin"), validate(SetPromoSchema), controller.setPromo);
 router.delete("/:id", authenticate, requireRole("admin", "superadmin"), controller.deleteProduct);
 
 // Variantes

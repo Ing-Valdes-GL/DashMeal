@@ -64,6 +64,8 @@
     "loginTitle": "Welcome to Dash Meal",
     "loginSubtitle": "Sign in to your admin panel",
     "email": "Email",
+    "identifier": "Email or phone",
+    "identifierPlaceholder": "admin@example.com or +2376XXXXXXXX",
     "emailPlaceholder": "admin@example.com",
     "password": "Password",
     "passwordPlaceholder": "••••••••",
@@ -72,7 +74,22 @@
     "loginButton": "Sign in",
     "loginError": "Invalid email or password",
     "loggingIn": "Signing in...",
-    "logoutSuccess": "You have been logged out"
+    "logoutSuccess": "You have been logged out",
+    "signUpTitle": "Create your brand access",
+    "signUpSubtitle": "Submit your request and our team will contact you",
+    "brandName": "Brand name",
+    "phone": "Phone",
+    "phonePlaceholder": "+2376XXXXXXXX",
+    "confirmPassword": "Confirm password",
+    "passwordMismatch": "Passwords do not match",
+    "signUpButton": "Submit request",
+    "signingUp": "Submitting...",
+    "signUpSuccess": "Request submitted successfully",
+    "signUpError": "Unable to submit request",
+    "haveAccount": "Already have an account?",
+    "goToLogin": "Sign in",
+    "noAccount": "No account yet?",
+    "goToSignUp": "Register"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -150,6 +167,7 @@
     "title": "Branches",
     "subtitle": "Manage your points of sale",
     "addBranch": "New branch",
+    "edit": "Edit branch",
     "name": "Name",
     "address": "Address",
     "city": "City",
@@ -158,7 +176,8 @@
     "deliveryZones": "Delivery zones",
     "timeSlots": "Click & Collect slots",
     "addTimeSlot": "Add time slot",
-    "deleteConfirm": "Delete this branch?"
+    "deleteConfirm": "Delete this branch?",
+    "manageProducts": "Manage products"
   },
   "delivery": {
     "title": "Deliveries",
@@ -269,13 +288,15 @@
     "addBrand": "New brand",
     "name": "Name",
     "logo": "Logo",
+    "description": "Description",
     "status": "Status",
     "admin": "Administrator",
     "branches": "Branches",
     "suspend": "Suspend",
     "activate": "Activate",
     "suspendConfirm": "Suspend this brand?",
-    "viewBrand": "View brand"
+    "viewBrand": "View brand",
+    "createSuccess": "Brand created successfully"
   },
   "applications": {
     "title": "Access Applications",

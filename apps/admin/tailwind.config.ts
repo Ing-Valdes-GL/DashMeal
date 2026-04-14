@@ -33,6 +33,11 @@ const config: Config = {
           500: "#3d3d57",   // border
           400: "#4e4e6a",   // border hover
         },
+        border: "hsl(var(--border))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
       },
       borderRadius: {
         lg: "0.625rem",

@@ -115,6 +115,36 @@ export async function toggleAdminActive(req: Request, res: Response, next: NextF
   }
 }
 
+export async function resetAdminPassword(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { password } = req.body as { password?: string };
+    if (!password || password.length < 8) {
+      throw new AppError(400, "INVALID_PASSWORD", "Le mot de passe doit faire au moins 8 caractères");
+    }
+
+    const { data: admin } = await supabase
+      .from("admins")
+      .select("id")
+      .eq("id", req.params.id)
+      .single();
+
+    if (!admin) throw new AppError(404, "NOT_FOUND", "Admin introuvable");
+
+    const password_hash = await bcrypt.hash(password, 12);
+
+    const { error } = await supabase
+      .from("admins")
+      .update({ password_hash })
+      .eq("id", req.params.id);
+
+    if (error) throw new AppError(500, "UPDATE_ERROR", "Échec de la réinitialisation");
+
+    sendSuccess(res, { id: req.params.id }, "Mot de passe réinitialisé");
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function deleteAdmin(req: Request, res: Response, next: NextFunction) {
   try {
     // Soft delete : désactiver plutôt que supprimer

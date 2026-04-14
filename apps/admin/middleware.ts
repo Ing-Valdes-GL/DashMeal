@@ -4,10 +4,14 @@ import { routing } from "./src/i18n/routing";
 
 const intlMiddleware = createMiddleware(routing);
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/signin", "/superadmin/auth"];
 
 export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Extraire la locale du chemin
+  const localeMatch = pathname.match(/^\/(fr|en)/);
+  const locale = localeMatch ? localeMatch[1] : routing.defaultLocale;
 
   // Retirer le préfixe locale pour vérifier le chemin
   const pathnameWithoutLocale = pathname.replace(/^\/(fr|en)/, "") || "/";
@@ -20,10 +24,7 @@ export default function middleware(request: NextRequest) {
   // Vérifier le token JWT
   const token = request.cookies.get("dm_access_token")?.value;
   if (!token) {
-    const loginUrl = new URL(
-      `/${pathname.split("/")[1] || routing.defaultLocale}/login`,
-      request.url
-    );
+    const loginUrl = new URL(`/${locale}/login`, request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }

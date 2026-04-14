@@ -6,6 +6,7 @@ export const routing = defineRouting({
   pathnames: {
     "/": "/",
     "/login": "/login",
+    "/signin": "/signin",
     "/dashboard": "/dashboard",
     "/orders": "/orders",
     "/products": "/products",
@@ -16,6 +17,7 @@ export const routing = defineRouting({
     "/notifications": "/notifications",
     "/commissions": "/commissions",
     "/settings": "/settings",
+    "/superadmin/auth": "/superadmin/auth",
     "/superadmin/brands": "/superadmin/brands",
     "/superadmin/applications": "/superadmin/applications",
     "/superadmin/users": "/superadmin/users",

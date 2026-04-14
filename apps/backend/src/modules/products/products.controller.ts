@@ -53,9 +53,50 @@ export async function getProduct(req: Request, res: Response, next: NextFunction
   }
 }
 
+export async function listByBranch(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { branch_id } = req.params;
+
+    // Vérifier que l'admin a accès à cette agence
+    if (req.user!.role === "admin") {
+      const { data: branch } = await supabase
+        .from("branches")
+        .select("brand_id")
+        .eq("id", branch_id)
+        .single();
+      if (!branch || branch.brand_id !== req.user!.brand_id) {
+        throw new AppError(403, "FORBIDDEN", "Accès refusé à cette agence");
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .select("*, categories(name_fr)")
+      .eq("branch_id", branch_id)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
+    sendSuccess(res, data ?? []);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function createProduct(req: Request, res: Response, next: NextFunction) {
   try {
     const brand_id = req.user!.role === "superadmin" ? req.body.brand_id : req.user!.brand_id;
+
+    // Vérifier que l'agence appartient à la marque de l'admin
+    if (req.user!.role === "admin" && req.body.branch_id) {
+      const { data: branch } = await supabase
+        .from("branches")
+        .select("brand_id")
+        .eq("id", req.body.branch_id)
+        .single();
+      if (!branch || branch.brand_id !== brand_id) {
+        throw new AppError(403, "FORBIDDEN", "Cette agence n'appartient pas à votre marque");
+      }
+    }
 
     const { data, error } = await supabase
       .from("products")
@@ -65,6 +106,62 @@ export async function createProduct(req: Request, res: Response, next: NextFunct
 
     if (error || !data) throw new AppError(500, "CREATE_ERROR", "Échec de création");
     sendCreated(res, data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function toggleHidden(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { data: product } = await supabase
+      .from("products")
+      .select("is_hidden, brand_id")
+      .eq("id", req.params.id)
+      .single();
+
+    if (!product) throw new AppError(404, "NOT_FOUND", "Produit introuvable");
+    if (req.user!.role === "admin" && product.brand_id !== req.user!.brand_id) {
+      throw new AppError(403, "FORBIDDEN", "Accès refusé");
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .update({ is_hidden: !product.is_hidden })
+      .eq("id", req.params.id)
+      .select("id, is_hidden")
+      .single();
+
+    if (error || !data) throw new AppError(500, "UPDATE_ERROR", "Échec de mise à jour");
+    sendSuccess(res, data, `Produit ${data.is_hidden ? "masqué" : "visible"}`);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function setPromo(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { promo_price, promo_ends_at } = req.body;
+
+    const { data: product } = await supabase
+      .from("products")
+      .select("brand_id")
+      .eq("id", req.params.id)
+      .single();
+
+    if (!product) throw new AppError(404, "NOT_FOUND", "Produit introuvable");
+    if (req.user!.role === "admin" && product.brand_id !== req.user!.brand_id) {
+      throw new AppError(403, "FORBIDDEN", "Accès refusé");
+    }
+
+    const { data, error } = await supabase
+      .from("products")
+      .update({ promo_price: promo_price ?? null, promo_ends_at: promo_ends_at ?? null })
+      .eq("id", req.params.id)
+      .select("id, price, promo_price, promo_ends_at")
+      .single();
+
+    if (error || !data) throw new AppError(500, "UPDATE_ERROR", "Échec de mise à jour");
+    sendSuccess(res, data, promo_price ? "Promo activée" : "Promo retirée");
   } catch (err) {
     next(err);
   }

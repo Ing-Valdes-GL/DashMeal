@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+export const CreateBrandSchema = z.object({
+  name: z.string().min(2).max(200),
+  description: z.string().max(1000).optional(),
+  logo_url: z.string().url().optional(),
+  cover_image_url: z.string().url().optional(),
+});
+
+export type CreateBrandInput = z.infer<typeof CreateBrandSchema>;
+
 export const BrandApplicationSchema = z.object({
   brand_name: z.string().min(2).max(200),
   contact_email: z.string().email(),

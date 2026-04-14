@@ -74,19 +74,70 @@ export async function getRevenue(req: Request, res: Response, next: NextFunction
 export async function getPlatformStats(req: Request, res: Response, next: NextFunction) {
   try {
     const [
-      { count: totalBrands },
+      { count: activeBrands },
+      { count: suspendedBrands },
       { count: totalUsers },
+      { count: verifiedUsers },
       { count: totalOrders },
+      { count: todayOrders },
+      { count: deliveringOrders },
+      { data: commissionsData },
+      { count: pendingApplications },
+      { count: approvedApplications },
+      { count: rejectedApplications },
     ] = await Promise.all([
       supabase.from("brands").select("id", { count: "exact" }).eq("is_active", true),
+      supabase.from("brands").select("id", { count: "exact" }).eq("is_active", false),
       supabase.from("users").select("id", { count: "exact" }),
+      supabase.from("users").select("id", { count: "exact" }).eq("is_verified", true),
       supabase.from("orders").select("id", { count: "exact" }),
+      supabase.from("orders").select("id", { count: "exact" }).gte("created_at", new Date().toISOString().split("T")[0] + "T00:00:00"),
+      supabase.from("orders").select("id", { count: "exact" }).eq("status", "delivering"),
+      supabase.from("commissions").select("amount, is_settled, type"),
+      supabase.from("brand_applications").select("id", { count: "exact" }).eq("status", "pending"),
+      supabase.from("brand_applications").select("id", { count: "exact" }).eq("status", "approved"),
+      supabase.from("brand_applications").select("id", { count: "exact" }).eq("status", "rejected"),
     ]);
 
+    const commissions = (commissionsData ?? []) as { amount: number; is_settled: boolean; type: string }[];
+    const gmvOnline = commissions.filter(c => c.type === "online").reduce((s, c) => s + (c.amount / 0.02), 0);
+    const gmvInperson = commissions.filter(c => c.type === "inperson").reduce((s, c) => s + (c.amount / 0.015), 0);
+    const commTotal = commissions.reduce((s, c) => s + c.amount, 0);
+    const commSettled = commissions.filter(c => c.is_settled).reduce((s, c) => s + c.amount, 0);
+    const commPending = commissions.filter(c => !c.is_settled).reduce((s, c) => s + c.amount, 0);
+
     sendSuccess(res, {
-      total_brands: totalBrands ?? 0,
-      total_users: totalUsers ?? 0,
-      total_orders: totalOrders ?? 0,
+      brands: {
+        total: (activeBrands ?? 0) + (suspendedBrands ?? 0),
+        active: activeBrands ?? 0,
+        suspended: suspendedBrands ?? 0,
+      },
+      users: {
+        total: totalUsers ?? 0,
+        verified: verifiedUsers ?? 0,
+      },
+      orders: {
+        total: totalOrders ?? 0,
+        today: todayOrders ?? 0,
+        delivering: deliveringOrders ?? 0,
+      },
+      revenue: {
+        gmv_total: Math.round(gmvOnline + gmvInperson),
+        gmv_online: Math.round(gmvOnline),
+        gmv_inperson: Math.round(gmvInperson),
+      },
+      commissions: {
+        total: Math.round(commTotal),
+        pending: Math.round(commPending),
+        settled: Math.round(commSettled),
+      },
+      applications: {
+        pending: pendingApplications ?? 0,
+        approved: approvedApplications ?? 0,
+        rejected: rejectedApplications ?? 0,
+      },
+      gmv_by_day: [],
+      top_brands: [],
     });
   } catch (err) {
     next(err);

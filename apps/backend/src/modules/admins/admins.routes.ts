@@ -12,6 +12,7 @@ router.get("/:id", authenticate, requireRole("superadmin"), controller.getAdmin)
 router.post("/", authenticate, requireRole("superadmin"), validate(CreateAdminSchema), controller.createAdmin);
 router.patch("/:id", authenticate, requireRole("superadmin"), controller.updateAdmin);
 router.patch("/:id/toggle-active", authenticate, requireRole("superadmin"), controller.toggleAdminActive);
+router.patch("/:id/reset-password", authenticate, requireRole("superadmin"), controller.resetAdminPassword);
 router.delete("/:id", authenticate, requireRole("superadmin"), controller.deleteAdmin);
 
 // ─── Gestion des drivers (admin de la marque) ─────────────────────────────────

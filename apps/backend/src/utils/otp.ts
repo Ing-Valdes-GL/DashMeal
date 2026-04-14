@@ -23,7 +23,17 @@ export async function sendOtp(phone: string): Promise<void> {
     is_used: false,
   });
 
-  // Envoyer via AfricasTalking
+  // En développement : logger le code en console (pas de SMS réel)
+  if (env.NODE_ENV !== "production") {
+    console.log(`\n🔑 OTP [DEV] ──────────────────────`);
+    console.log(`   Téléphone : ${phone}`);
+    console.log(`   Code      : ${code}`);
+    console.log(`   Expire    : ${expiresAt.toLocaleTimeString()}`);
+    console.log(`───────────────────────────────────\n`);
+    return;
+  }
+
+  // Envoyer via AfricasTalking (production uniquement)
   const body = new URLSearchParams({
     username: env.AT_USERNAME,
     to: phone,

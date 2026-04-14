@@ -10,6 +10,7 @@ export interface AuthUser {
   id: string;
   email: string;
   username: string;
+  phone?: string;
   role: AdminRole;
   brand_id?: string;
   brand_name?: string;

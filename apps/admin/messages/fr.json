@@ -64,6 +64,8 @@
     "loginTitle": "Bienvenue sur Dash Meal",
     "loginSubtitle": "Connectez-vous à votre espace administration",
     "email": "Email",
+    "identifier": "Email ou téléphone",
+    "identifierPlaceholder": "admin@exemple.com ou +2376XXXXXXXX",
     "emailPlaceholder": "admin@example.com",
     "password": "Mot de passe",
     "passwordPlaceholder": "••••••••",
@@ -72,7 +74,22 @@
     "loginButton": "Se connecter",
     "loginError": "Email ou mot de passe incorrect",
     "loggingIn": "Connexion en cours...",
-    "logoutSuccess": "Vous avez été déconnecté"
+    "logoutSuccess": "Vous avez été déconnecté",
+    "signUpTitle": "Créer votre accès marque",
+    "signUpSubtitle": "Soumettez votre demande et notre équipe vous recontacte",
+    "brandName": "Nom de la marque",
+    "phone": "Téléphone",
+    "phonePlaceholder": "+2376XXXXXXXX",
+    "confirmPassword": "Confirmer le mot de passe",
+    "passwordMismatch": "Les mots de passe ne correspondent pas",
+    "signUpButton": "Envoyer la demande",
+    "signingUp": "Envoi en cours...",
+    "signUpSuccess": "Demande envoyée avec succès",
+    "signUpError": "Impossible d'envoyer la demande",
+    "haveAccount": "Vous avez déjà un compte ?",
+    "goToLogin": "Se connecter",
+    "noAccount": "Pas encore de compte ?",
+    "goToSignUp": "S'inscrire"
   },
   "dashboard": {
     "title": "Tableau de bord",
@@ -150,6 +167,7 @@
     "title": "Agences",
     "subtitle": "Gérez vos points de vente",
     "addBranch": "Nouvelle agence",
+    "edit": "Modifier l'agence",
     "name": "Nom",
     "address": "Adresse",
     "city": "Ville",
@@ -158,7 +176,8 @@
     "deliveryZones": "Zones de livraison",
     "timeSlots": "Créneaux Click & Collect",
     "addTimeSlot": "Ajouter un créneau",
-    "deleteConfirm": "Supprimer cette agence ?"
+    "deleteConfirm": "Supprimer cette agence ?",
+    "manageProducts": "Gérer les produits"
   },
   "delivery": {
     "title": "Livraisons",
@@ -269,13 +288,15 @@
     "addBrand": "Nouvelle marque",
     "name": "Nom",
     "logo": "Logo",
+    "description": "Description",
     "status": "Statut",
     "admin": "Administrateur",
     "branches": "Agences",
     "suspend": "Suspendre",
     "activate": "Réactiver",
     "suspendConfirm": "Suspendre cette marque ?",
-    "viewBrand": "Voir la marque"
+    "viewBrand": "Voir la marque",
+    "createSuccess": "Marque créée avec succès"
   },
   "applications": {
     "title": "Demandes d'accès",

@@ -172,11 +172,36 @@ export async function reviewApplication(req: Request, res: Response, next: NextF
   }
 }
 
+export async function createBrand(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { name, description, logo_url, cover_image_url } = req.body;
+
+    const { data: existing } = await supabase
+      .from("brands")
+      .select("id")
+      .eq("name", name)
+      .maybeSingle();
+
+    if (existing) throw new AppError(409, "ALREADY_EXISTS", "Une marque avec ce nom existe déjà");
+
+    const { data, error } = await supabase
+      .from("brands")
+      .insert({ name, description, logo_url, cover_image_url, is_active: true })
+      .select()
+      .single();
+
+    if (error || !data) throw new AppError(500, "CREATE_ERROR", "Échec de création");
+    sendCreated(res, data, "Marque créée avec succès");
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function listBrands(req: Request, res: Response, next: NextFunction) {
   try {
     const { data, error } = await supabase
       .from("brands")
-      .select("*")
+      .select("*, admins(username, email), branches(id)")
       .order("created_at", { ascending: false });
 
     if (error) throw new AppError(500, "FETCH_ERROR", "Error while fetching brands");

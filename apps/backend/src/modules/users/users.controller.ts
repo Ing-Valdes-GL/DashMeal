@@ -228,7 +228,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
 
     let query = supabase
       .from("users")
-      .select("id, name, phone, is_verified, preferred_locale, is_active, created_at", { count: "exact" })
+      .select("id, name, phone, is_verified, preferred_locale, created_at", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limitNum - 1);
 
@@ -247,7 +247,7 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, phone, is_verified, preferred_locale, is_active, created_at")
+      .select("id, name, phone, is_verified, preferred_locale, created_at")
       .eq("id", req.params.id)
       .single();
 

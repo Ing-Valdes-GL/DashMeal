@@ -42,7 +42,7 @@ app.use(
 // ─── Rate limiting global ─────────────────────────────────────────────────────
 app.use(
   rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 4 * 60 * 1000, // 4 minutes
     max: 200,
     standardHeaders: true,
     legacyHeaders: false,
@@ -52,7 +52,7 @@ app.use(
 
 // ─── Rate limiting strict pour auth ──────────────────────────────────────────
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: 4 * 60 * 1000, // 4 minutes
   max: 20,
   message: { success: false, error: { code: "RATE_LIMIT", message: "Trop de tentatives" } },
 });
@@ -68,6 +68,9 @@ if (env.NODE_ENV !== "test") {
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
+  res.json({ status: "ok", env: env.NODE_ENV, timestamp: new Date().toISOString() });
+});
+app.get(`${API_PREFIX}/health`, (_req, res) => {
   res.json({ status: "ok", env: env.NODE_ENV, timestamp: new Date().toISOString() });
 });
 
