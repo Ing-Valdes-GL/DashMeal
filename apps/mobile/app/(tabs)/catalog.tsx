@@ -1,8 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   View, Text, StyleSheet, FlatList, TextInput,
-  TouchableOpacity, ActivityIndicator,
+  TouchableOpacity, ActivityIndicator, Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -10,22 +10,34 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { apiGet } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
+import { useCartStore } from "@/stores/cart";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const BRANCH_TYPE_LABEL: Record<string, { fr: string; en: string; icon: string }> = {
+  supermarket: { fr: "Supermarché", en: "Supermarket", icon: "🏪" },
+  superette:   { fr: "Supérette",   en: "Convenience store", icon: "🏬" },
+  restaurant:  { fr: "Restaurant",  en: "Restaurant", icon: "🍽️" },
+  cafe:        { fr: "Café",        en: "Café", icon: "☕" },
+  bakery:      { fr: "Boulangerie", en: "Bakery", icon: "🥖" },
+  pharmacy:    { fr: "Pharmacie",   en: "Pharmacy", icon: "💊" },
+  other:       { fr: "Autre",       en: "Other", icon: "🏪" },
+};
+
 interface Branch {
-  id: string; name: string; city: string; address: string;
+  id: string; name: string; city: string; address: string; type?: string;
   brands?: { id: string; name: string; logo_url: string | null };
 }
 
 interface Product {
   id: string; name_fr: string; name_en: string; price: number;
   image_url: string | null; promo_price: number | null; is_hidden: boolean;
-  categories?: { name_fr: string };
+  category_id: string | null;
+  categories?: { name_fr: string; name_en: string };
   product_images?: { url: string; is_primary: boolean }[];
 }
 
-interface Category { id: string; name_fr: string; name_en: string }
+interface Category { id: string; name_fr: string; name_en: string; icon: string | null }
 
 // apiGet mobile returns the full { success, data } envelope
 type ApiResponse<T> = { success: boolean; data: T };
@@ -44,10 +56,11 @@ export default function CatalogScreen() {
   });
   const branches = branchesRes?.data ?? [];
 
-  // Catégories
+  // Catégories de l'agence sélectionnée
   const { data: categoriesRes } = useQuery<ApiResponse<Category[]>>({
-    queryKey: ["categories"],
-    queryFn: () => apiGet("/products/categories"),
+    queryKey: ["branch-categories-mobile", selectedBranch?.id],
+    queryFn: () => apiGet(`/products/categories?branch_id=${selectedBranch!.id}`),
+    enabled: !!selectedBranch,
   });
   const categories = categoriesRes?.data ?? [];
 
@@ -59,10 +72,9 @@ export default function CatalogScreen() {
   });
   const allProducts = productsRes?.data ?? [];
 
-  // Filtrer localement
+  // Filtrer localement (is_hidden déjà filtré côté serveur, mais sécurité côté client)
   const products = allProducts.filter((p) => {
-    if (p.is_hidden) return false;
-    if (category !== "all" && p.categories?.name_fr !== category) return false;
+    if (category !== "all" && p.category_id !== category) return false;
     if (search) {
       const q = search.toLowerCase();
       return p.name_fr.toLowerCase().includes(q) || p.name_en.toLowerCase().includes(q);
@@ -70,8 +82,44 @@ export default function CatalogScreen() {
     return true;
   });
 
+  const { addItem, setBranch, branch_id: cartBranchId, clear: clearCart } = useCartStore();
+  const cartCount = useCartStore((s) => s.getCount());
+
   const getName = (p: Product) => i18n.language === "en" ? p.name_en : p.name_fr;
   const getImage = (p: Product) => p.image_url ?? p.product_images?.[0]?.url ?? null;
+
+  const handleAddToCart = useCallback((item: Product) => {
+    if (!selectedBranch) return;
+
+    const doAdd = () => {
+      setBranch(selectedBranch.id, selectedBranch.name);
+      addItem({
+        product_id: item.id,
+        product_name: getName(item),
+        product_image: getImage(item) ?? undefined,
+        unit_price: item.promo_price ?? item.price,
+        quantity: 1,
+      });
+    };
+
+    // Si le panier contient déjà des articles d'une autre agence → demander confirmation
+    if (cartBranchId && cartBranchId !== selectedBranch.id) {
+      Alert.alert(
+        "Changer d'agence ?",
+        "Votre panier contient des articles d'une autre agence. Le vider pour continuer ?",
+        [
+          { text: "Annuler", style: "cancel" },
+          {
+            text: "Vider et continuer",
+            style: "destructive",
+            onPress: () => { clearCart(); doAdd(); },
+          },
+        ]
+      );
+    } else {
+      doAdd();
+    }
+  }, [selectedBranch, cartBranchId, addItem, setBranch, clearCart, i18n.language]);
 
   // Affichage sélection d'agence
   if (!selectedBranch) {
@@ -105,7 +153,10 @@ export default function CatalogScreen() {
                 <View style={styles.branchInfo}>
                   <Text style={styles.branchName}>{item.name}</Text>
                   <Text style={styles.branchCity}>
-                    {item.brands?.name ? `${item.brands.name} · ` : ""}{item.city}
+                    {BRANCH_TYPE_LABEL[item.type ?? "other"]?.icon ?? "🏪"}{" "}
+                    {BRANCH_TYPE_LABEL[item.type ?? "other"]?.[i18n.language === "en" ? "en" : "fr"] ?? "Autre"}
+                    {item.brands?.name ? ` · ${item.brands.name}` : ""}
+                    {" · "}{item.city}
                   </Text>
                   <Text style={styles.branchAddress} numberOfLines={1}>{item.address}</Text>
                 </View>
@@ -146,26 +197,25 @@ export default function CatalogScreen() {
       </View>
 
       {/* Catégories */}
-      {categories.length > 0 && (
-        <FlatList
-          data={[{ id: "all", name_fr: "Tout", name_en: "All" } as Category, ...categories]}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(i) => i.id}
-          style={styles.categories}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.pill, category === item.id && styles.pillActive]}
-              onPress={() => setCategory(item.id)}
-            >
-              <Text style={[styles.pillText, category === item.id && styles.pillTextActive]}>
-                {i18n.language === "en" ? item.name_en : item.name_fr}
-              </Text>
-            </TouchableOpacity>
-          )}
-        />
-      )}
+      <FlatList
+        data={[{ id: "all", name_fr: "Tout", name_en: "All", icon: null } as Category, ...categories]}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(i) => i.id}
+        style={styles.categories}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={[styles.pill, category === item.id && styles.pillActive]}
+            onPress={() => setCategory(item.id)}
+          >
+            <Text style={[styles.pillText, category === item.id && styles.pillTextActive]}>
+              {item.icon ? `${item.icon} ` : ""}
+              {i18n.language === "en" ? item.name_en : item.name_fr}
+            </Text>
+          </TouchableOpacity>
+        )}
+      />
 
       {/* Produits */}
       {productsLoading ? (
@@ -213,7 +263,14 @@ export default function CatalogScreen() {
                       <Text style={styles.price}>{formatCurrency(item.price)}</Text>
                     )}
                   </View>
-                  <TouchableOpacity style={styles.addBtn}>
+                  <TouchableOpacity
+                    style={styles.addBtn}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleAddToCart(item);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
                     <Ionicons name="add" size={16} color="#fff" />
                   </TouchableOpacity>
                 </View>
@@ -229,6 +286,21 @@ export default function CatalogScreen() {
             </View>
           }
         />
+      )}
+
+      {/* Badge panier flottant */}
+      {cartCount > 0 && (
+        <TouchableOpacity
+          style={styles.cartFab}
+          onPress={() => router.push("/(tabs)/cart")}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="cart" size={20} color="#fff" />
+          <Text style={styles.cartFabText}>{cartCount} article{cartCount > 1 ? "s" : ""}</Text>
+          <View style={styles.cartFabBadge}>
+            <Text style={styles.cartFabBadgeText}>{cartCount}</Text>
+          </View>
+        </TouchableOpacity>
       )}
     </SafeAreaView>
   );
@@ -301,4 +373,20 @@ const styles = StyleSheet.create({
   },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { color: "#334155", fontSize: 15 },
+  // Panier flottant
+  cartFab: {
+    position: "absolute", bottom: 24, left: 20, right: 20,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    backgroundColor: "#f97316", borderRadius: 16,
+    paddingVertical: 14, paddingHorizontal: 20,
+    shadowColor: "#f97316", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
+  },
+  cartFabText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  cartFabBadge: {
+    position: "absolute", right: 16, top: -6,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: "#fff", alignItems: "center", justifyContent: "center",
+  },
+  cartFabBadgeText: { color: "#f97316", fontSize: 11, fontWeight: "800" },
 });

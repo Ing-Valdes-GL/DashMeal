@@ -20,6 +20,29 @@ export const ReviewApplicationSchema = z.object({
   rejection_reason: z.string().max(1000).optional(),
 });
 
+export const BRANCH_TYPES = ["supermarket", "superette", "restaurant", "cafe", "bakery", "pharmacy", "other"] as const;
+export type BranchType = (typeof BRANCH_TYPES)[number];
+
+const DayScheduleSchema = z.object({
+  open: z.string().regex(/^\d{2}:\d{2}$/),
+  close: z.string().regex(/^\d{2}:\d{2}$/),
+  enabled: z.boolean().default(true),
+});
+
+const OpeningHoursSchema = z.object({
+  slot_duration: z.number().int().min(15).max(120).default(30),
+  slot_capacity: z.number().int().min(1).max(100).default(5),
+  days: z.object({
+    monday:    DayScheduleSchema,
+    tuesday:   DayScheduleSchema,
+    wednesday: DayScheduleSchema,
+    thursday:  DayScheduleSchema,
+    friday:    DayScheduleSchema,
+    saturday:  DayScheduleSchema,
+    sunday:    DayScheduleSchema,
+  }).optional(),
+});
+
 export const CreateBranchSchema = z.object({
   name: z.string().min(2).max(200),
   address: z.string().min(5).max(500),
@@ -27,14 +50,8 @@ export const CreateBranchSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   phone: z.string().optional(),
-  hours: z.record(
-    z.enum(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]),
-    z.object({
-      open: z.string().regex(/^\d{2}:\d{2}$/),
-      close: z.string().regex(/^\d{2}:\d{2}$/),
-      is_closed: z.boolean().optional(),
-    })
-  ).optional(),
+  type: z.enum(BRANCH_TYPES).default("other"),
+  opening_hours: OpeningHoursSchema.optional(),
 });
 
 export const UpdateBranchSchema = CreateBranchSchema.partial();

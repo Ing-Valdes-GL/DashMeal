@@ -3,6 +3,40 @@ import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess } from "../../utils/response.js";
 
+export async function getSlots(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { branchId } = req.params;
+    const date = (req.query.date as string) || new Date().toISOString().slice(0, 10);
+
+    // Vérifier si des créneaux existent déjà pour cette date
+    const { data: existing, error } = await supabase
+      .from("time_slots")
+      .select("id, date, start_time, end_time, capacity, booked")
+      .eq("branch_id", branchId)
+      .eq("date", date)
+      .order("start_time");
+
+    if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération des créneaux");
+
+    if (existing && existing.length > 0) {
+      return sendSuccess(res, existing);
+    }
+
+    // Aucun créneau → générer automatiquement depuis les horaires d'ouverture
+    const { data: generated, error: genErr } = await supabase
+      .rpc("generate_branch_slots", { p_branch_id: branchId, p_date: date });
+
+    if (genErr) {
+      // La fonction RPC n'existe pas encore ou erreur — retourner vide sans crash
+      return sendSuccess(res, []);
+    }
+
+    sendSuccess(res, generated ?? []);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function scanQrCode(req: Request, res: Response, next: NextFunction) {
   try {
     const { qr_code } = req.body;

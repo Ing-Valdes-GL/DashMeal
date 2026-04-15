@@ -39,7 +39,7 @@ export const CreateCategorySchema = z.object({
   name_fr: z.string().min(1).max(100),
   name_en: z.string().min(1).max(100),
   icon: z.string().optional(),
-  parent_id: z.string().uuid().optional(),
+  branch_id: z.string().uuid().optional(),
   sort_order: z.number().int().min(0).default(0),
 });
 

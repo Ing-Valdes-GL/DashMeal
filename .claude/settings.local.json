@@ -11,7 +11,13 @@
       "Bash(curl -s \"http://localhost:3001/api/v1/products/search?q=test&brand_id=123\")",
       "Bash(curl -s http://localhost:3001/api/v1/branches)",
       "Bash(timeout 20 pnpm --filter @dash-meal/admin dev)",
-      "Bash(cmd.exe /c \"taskkill /F /PID 9512 && echo killed\")"
+      "Bash(cmd.exe /c \"taskkill /F /PID 9512 && echo killed\")",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:www.campay.net)",
+      "WebFetch(domain:demo.campay.net)",
+      "WebFetch(domain:documenter.getpostman.com)",
+      "WebFetch(domain:www.postman.com)"
     ]
   }
 }

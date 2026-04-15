@@ -175,7 +175,7 @@ export default function DashboardPage({ params }: { params: Promise<{ locale: st
           <CardContent className="space-y-3">
             {topProducts ? (
               topProducts.slice(0, 5).map((p, i) => (
-                <div key={p.name_fr} className="flex items-center gap-3">
+                <div key={`${p.name_fr ?? ""}-${i}`} className="flex items-center gap-3">
                   <span className="text-xs font-bold text-slate-600 w-4">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white truncate">

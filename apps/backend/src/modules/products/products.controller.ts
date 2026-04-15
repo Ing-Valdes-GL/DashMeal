@@ -1,7 +1,35 @@
 import type { Request, Response, NextFunction } from "express";
+import path from "path";
+import { randomUUID } from "crypto";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated, sendPaginated } from "../../utils/response.js";
+import { env } from "../../config/env.js";
+
+export async function uploadImage(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) throw new AppError(400, "NO_FILE", "Aucun fichier reçu");
+
+    const ext = path.extname(req.file.originalname).toLowerCase() || ".jpg";
+    const allowed = [".jpg", ".jpeg", ".png", ".webp"];
+    if (!allowed.includes(ext)) throw new AppError(400, "INVALID_TYPE", "Type de fichier non supporté (jpg/png/webp)");
+
+    const brand_id = req.user!.brand_id ?? "superadmin";
+    const filename = `${brand_id}/${randomUUID()}${ext}`;
+    const bucket = env.STORAGE_BUCKET_PRODUCTS ?? "product-images";
+
+    const { error } = await supabase.storage
+      .from(bucket)
+      .upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+
+    if (error) throw new AppError(500, "UPLOAD_ERROR", "Échec de l'upload : " + error.message);
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
+    sendSuccess(res, { url: data.publicUrl });
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function searchProducts(req: Request, res: Response, next: NextFunction) {
   try {
@@ -56,25 +84,32 @@ export async function getProduct(req: Request, res: Response, next: NextFunction
 export async function listByBranch(req: Request, res: Response, next: NextFunction) {
   try {
     const { branch_id } = req.params;
+    const isAdmin = req.user?.role === "admin" || req.user?.role === "superadmin";
 
-    // Vérifier que l'admin a accès à cette agence
-    if (req.user!.role === "admin") {
+    // Les admins vérifient l'accès à leur agence
+    if (req.user?.role === "admin") {
       const { data: branch } = await supabase
         .from("branches")
         .select("brand_id")
         .eq("id", branch_id)
         .single();
-      if (!branch || branch.brand_id !== req.user!.brand_id) {
+      if (!branch || branch.brand_id !== req.user.brand_id) {
         throw new AppError(403, "FORBIDDEN", "Accès refusé à cette agence");
       }
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("products")
-      .select("*, categories(name_fr)")
+      .select("*, categories(name_fr, name_en), product_images(url, is_primary)")
       .eq("branch_id", branch_id)
       .order("created_at", { ascending: false });
 
+    // Utilisateurs mobiles et non-authentifiés : seulement les produits visibles
+    if (!isAdmin) {
+      query = query.eq("is_hidden", false).eq("is_active", true);
+    }
+
+    const { data, error } = await query;
     if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
     sendSuccess(res, data ?? []);
   } catch (err) {
@@ -104,7 +139,7 @@ export async function createProduct(req: Request, res: Response, next: NextFunct
       .select()
       .single();
 
-    if (error || !data) throw new AppError(500, "CREATE_ERROR", "Échec de création");
+    if (error || !data) throw new AppError(500, "CREATE_ERROR", error?.message ?? "Échec de création");
     sendCreated(res, data);
   } catch (err) {
     next(err);
@@ -240,11 +275,12 @@ export async function getStockByBranch(req: Request, res: Response, next: NextFu
 
 export async function listCategories(req: Request, res: Response, next: NextFunction) {
   try {
-    const { brand_id } = req.query;
+    const { branch_id } = req.query;
     let query = supabase.from("categories").select("*").order("sort_order");
 
-    if (brand_id) {
-      query = query.or(`brand_id.eq.${brand_id},brand_id.is.null`);
+    if (branch_id) {
+      // Catégories de l'agence + catégories globales (branch_id null)
+      query = query.or(`branch_id.eq.${branch_id},branch_id.is.null`);
     }
 
     const { data, error } = await query;
@@ -257,15 +293,32 @@ export async function listCategories(req: Request, res: Response, next: NextFunc
 
 export async function createCategory(req: Request, res: Response, next: NextFunction) {
   try {
-    const brand_id = req.user!.role === "superadmin" ? null : req.user!.brand_id;
     const { data, error } = await supabase
       .from("categories")
-      .insert({ ...req.body, brand_id })
+      .insert(req.body)
       .select()
       .single();
 
     if (error || !data) throw new AppError(500, "CREATE_ERROR", "Échec de création");
     sendCreated(res, data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteCategory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { data: cat } = await supabase
+      .from("categories")
+      .select("branch_id")
+      .eq("id", req.params.id)
+      .single();
+
+    if (!cat) throw new AppError(404, "NOT_FOUND", "Catégorie introuvable");
+    if (!cat.branch_id) throw new AppError(403, "FORBIDDEN", "Impossible de supprimer une catégorie globale");
+
+    await supabase.from("categories").delete().eq("id", req.params.id);
+    sendSuccess(res, null, "Catégorie supprimée");
   } catch (err) {
     next(err);
   }

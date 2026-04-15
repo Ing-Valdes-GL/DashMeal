@@ -4,6 +4,9 @@ import * as controller from "./collect.controller.js";
 
 const router: import("express").Router = Router();
 
+// ─── Créneaux disponibles (public) ───────────────────────────────────────────
+router.get("/slots/:branchId", controller.getSlots);
+
 // ─── Côté caisse / admin : scanner le QR code pour valider le retrait ─────────
 router.post("/scan", authenticate, requireRole("admin", "superadmin"), controller.scanQrCode);
 

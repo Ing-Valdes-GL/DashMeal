@@ -6,6 +6,9 @@ import * as controller from "./branches.controller.js";
 
 const router: import("express").Router = Router();
 
+// ─── Admin : liste des agences de la marque ───────────────────────────────────
+router.get("/", authenticate, requireRole("admin", "superadmin"), controller.listBranches);
+
 // ─── Public : agences proches (pour l'app mobile) ─────────────────────────────
 router.get("/nearby", controller.getNearbyBranches);
 router.get("/:id", controller.getBranch);

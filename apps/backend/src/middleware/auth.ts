@@ -55,6 +55,20 @@ export function requireRole(...roles: string[]) {
   };
 }
 
+// Auth optionnelle — attache req.user si token présent, passe sinon
+export function optionalAuthenticate(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) return next();
+  const token = authHeader.slice(7);
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET) as AuthUser;
+    req.user = payload;
+  } catch {
+    // token invalide → on ignore simplement
+  }
+  next();
+}
+
 // Vérifie que l'admin accède uniquement à sa propre marque
 export function requireOwnBrand(req: Request, res: Response, next: NextFunction) {
   const brandId = req.params.brandId ?? req.body.brand_id;

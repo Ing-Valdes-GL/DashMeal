@@ -30,12 +30,12 @@ export default function OrdersScreen() {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { data, isLoading, refetch, isRefetching } = useQuery<{ data: Order[]; pagination: any }>({
+  const { data: resp, isLoading, refetch, isRefetching } = useQuery<{ success: boolean; data: Order[] }>({
     queryKey: ["my-orders"],
-    queryFn: () => apiGet("/orders/my", { limit: 50 }) as any,
+    queryFn: () => apiGet("/orders/my-orders"),
   });
 
-  const orders = data?.data ?? [];
+  const orders = resp?.data ?? [];
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>

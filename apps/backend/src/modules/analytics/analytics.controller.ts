@@ -71,6 +71,54 @@ export async function getRevenue(req: Request, res: Response, next: NextFunction
   }
 }
 
+export async function getBranchStats(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { branch_id } = req.params;
+
+    // Vérifier l'accès : admin ne peut voir que ses propres agences
+    if (req.user!.role === "admin") {
+      const { data: branch } = await supabase.from("branches").select("brand_id").eq("id", branch_id).single();
+      if (!branch || branch.brand_id !== req.user!.brand_id) {
+        throw new AppError(403, "FORBIDDEN", "Accès refusé à cette agence");
+      }
+    }
+
+    const [
+      { count: totalOrders },
+      { count: pendingOrders },
+      { count: todayOrders },
+      { data: revenueData },
+      { data: statusData },
+    ] = await Promise.all([
+      supabase.from("orders").select("id", { count: "exact" }).eq("branch_id", branch_id),
+      supabase.from("orders").select("id", { count: "exact" }).eq("branch_id", branch_id).eq("status", "pending"),
+      supabase.from("orders").select("id", { count: "exact" })
+        .eq("branch_id", branch_id)
+        .gte("created_at", new Date().toISOString().split("T")[0] + "T00:00:00"),
+      supabase.from("orders").select("total").eq("branch_id", branch_id).eq("status", "delivered"),
+      supabase.from("orders").select("status").eq("branch_id", branch_id),
+    ]);
+
+    const totalRevenue = (revenueData ?? []).reduce((s: number, o: any) => s + (o.total ?? 0), 0);
+
+    // Compter par statut
+    const byStatus: Record<string, number> = {};
+    for (const o of (statusData ?? [])) {
+      byStatus[o.status] = (byStatus[o.status] ?? 0) + 1;
+    }
+
+    sendSuccess(res, {
+      total_orders: totalOrders ?? 0,
+      pending_orders: pendingOrders ?? 0,
+      today_orders: todayOrders ?? 0,
+      total_revenue: Math.round(totalRevenue),
+      by_status: byStatus,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getPlatformStats(req: Request, res: Response, next: NextFunction) {
   try {
     const [

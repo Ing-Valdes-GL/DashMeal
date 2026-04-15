@@ -10,6 +10,9 @@ router.get("/orders-stats", authenticate, requireRole("admin", "superadmin"), co
 router.get("/top-products", authenticate, requireRole("admin", "superadmin"), controller.getTopProducts);
 router.get("/revenue", authenticate, requireRole("admin", "superadmin"), controller.getRevenue);
 
+// ─── Analytiques par agence ───────────────────────────────────────────────────
+router.get("/branch/:branch_id", authenticate, requireRole("admin", "superadmin"), controller.getBranchStats);
+
 // ─── Super Admin uniquement ───────────────────────────────────────────────────
 router.get("/platform", authenticate, requireRole("superadmin"), controller.getPlatformStats);
 router.get("/commissions", authenticate, requireRole("superadmin"), controller.getCommissionsOverview);

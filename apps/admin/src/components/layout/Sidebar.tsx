@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, ShoppingCart, Package, Store, Truck, QrCode,
+  LayoutDashboard, ShoppingCart, Store, Truck, QrCode,
   BarChart2, Bell, DollarSign, Settings, Building2, FileText,
   Users, Activity, Globe, ChevronRight, LogOut, Zap,
 } from "lucide-react";
@@ -40,7 +40,6 @@ export function Sidebar({ locale }: { locale: string }) {
   const adminNav: NavItem[] = [
     { href: "/dashboard",     label: t("dashboard"),     icon: LayoutDashboard },
     { href: "/orders",        label: t("orders"),        icon: ShoppingCart },
-    { href: "/products",      label: t("products"),      icon: Package },
     { href: "/branches",      label: t("branches"),      icon: Store },
     { href: "/delivery",      label: t("delivery"),      icon: Truck },
     { href: "/collect",       label: t("collect"),       icon: QrCode },

@@ -14,6 +14,8 @@
   "dependencies": {
     "@dash-meal/shared": "workspace:*",
     "@supabase/supabase-js": "^2.47.10",
+    "@types/uuid": "^11.0.0",
+    "axios": "^1.15.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "express": "^4.21.2",
@@ -23,6 +25,7 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.2",
     "pdfkit": "^0.15.1",
+    "uuid": "^13.0.0",
     "zod": "^3.24.1",
     "zod-validation-error": "^3.4.0"
   },

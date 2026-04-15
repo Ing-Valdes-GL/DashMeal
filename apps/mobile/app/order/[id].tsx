@@ -35,10 +35,11 @@ export default function OrderDetailScreen() {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { data: order, isLoading } = useQuery<OrderDetail>({
+  const { data: resp, isLoading } = useQuery<{ success: boolean; data: OrderDetail }>({
     queryKey: ["order", id],
     queryFn: () => apiGet(`/orders/${id}`),
   });
+  const order = resp?.data;
 
   if (isLoading || !order) {
     return (

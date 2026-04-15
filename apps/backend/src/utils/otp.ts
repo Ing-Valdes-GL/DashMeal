@@ -23,22 +23,24 @@ export async function sendOtp(phone: string): Promise<void> {
     is_used: false,
   });
 
-  // En développement : logger le code en console (pas de SMS réel)
-  if (env.NODE_ENV !== "production") {
-    console.log(`\n🔑 OTP [DEV] ──────────────────────`);
-    console.log(`   Téléphone : ${phone}`);
-    console.log(`   Code      : ${code}`);
-    console.log(`   Expire    : ${expiresAt.toLocaleTimeString()}`);
-    console.log(`───────────────────────────────────\n`);
+  // Toujours logger en console (utile pour debug)
+  console.log(`\n🔑 OTP ──────────────────────────────`);
+  console.log(`   Téléphone : ${phone}`);
+  console.log(`   Code      : ${code}`);
+  console.log(`   Expire    : ${expiresAt.toLocaleTimeString()}`);
+  console.log(`─────────────────────────────────────\n`);
+
+  // Envoyer via AfricasTalking si la clé est configurée
+  if (!env.AT_API_KEY || !env.AT_USERNAME) {
+    console.warn("⚠️  AT_API_KEY ou AT_USERNAME manquant — SMS non envoyé");
     return;
   }
 
-  // Envoyer via AfricasTalking (production uniquement)
   const body = new URLSearchParams({
     username: env.AT_USERNAME,
     to: phone,
     message: `Votre code de vérification Dash Meal : ${code}. Valable ${OTP_EXPIRES_IN_MINUTES} minutes.`,
-    from: env.AT_SENDER_ID,
+    ...(env.AT_SENDER_ID ? { from: env.AT_SENDER_ID } : {}),
   });
 
   const response = await fetch(
@@ -55,8 +57,13 @@ export async function sendOtp(phone: string): Promise<void> {
   );
 
   if (!response.ok) {
+    const errText = await response.text();
+    console.error(`❌ Échec envoi SMS OTP (${response.status}): ${errText}`);
     throw new Error(`Échec envoi SMS OTP: ${response.statusText}`);
   }
+
+  const result = await response.json() as { SMSMessageData?: { Recipients?: { status: string; number: string }[] } };
+  console.log("✅ SMS envoyé:", JSON.stringify(result.SMSMessageData?.Recipients));
 }
 
 export async function verifyOtp(

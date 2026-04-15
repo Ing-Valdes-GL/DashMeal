@@ -31,10 +31,11 @@ export default function ProductDetailScreen() {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
-  const { data: product, isLoading } = useQuery<ProductDetail>({
+  const { data: resp, isLoading } = useQuery<{ success: boolean; data: ProductDetail }>({
     queryKey: ["product", id],
     queryFn: () => apiGet(`/products/${id}`),
   });
+  const product = resp?.data;
 
   if (isLoading) {
     return (

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, TextInput,
+  View, Text, StyleSheet, ScrollView,
   TouchableOpacity, FlatList, RefreshControl, ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -9,48 +9,44 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useAuthStore } from "@/stores/auth";
 import { apiGet } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-interface Brand {
-  id: string; name: string; logo_url: string | null;
-  branches?: { name: string; city: string }[];
+const BRANCH_TYPE_LABEL: Record<string, { fr: string; en: string; icon: string }> = {
+  supermarket: { fr: "Supermarché", en: "Supermarket", icon: "🏪" },
+  superette:   { fr: "Supérette",   en: "Convenience store", icon: "🏬" },
+  restaurant:  { fr: "Restaurant",  en: "Restaurant", icon: "🍽️" },
+  cafe:        { fr: "Café",        en: "Café", icon: "☕" },
+  bakery:      { fr: "Boulangerie", en: "Bakery", icon: "🥖" },
+  pharmacy:    { fr: "Pharmacie",   en: "Pharmacy", icon: "💊" },
+  other:       { fr: "Autre",       en: "Other", icon: "🏪" },
+};
+
+interface Branch {
+  id: string; name: string; city: string; address: string; type?: string;
+  brands?: { id: string; name: string; logo_url: string | null };
 }
 
-interface Product {
-  id: string; name_fr: string; name_en: string; price: number;
-  is_active: boolean;
-  categories?: { name_fr: string };
-  product_images?: { url: string; is_primary: boolean }[];
-}
+type ApiResponse<T> = { success: boolean; data: T };
 
 export default function HomeScreen() {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const { user } = useAuthStore();
-  const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const { data: brands, isLoading: brandsLoading, refetch: refetchBrands } = useQuery<Brand[]>({
-    queryKey: ["brands-home"],
-    queryFn: () => apiGet("/brands"),
+  const { data: branchesRes, isLoading: branchesLoading, refetch } = useQuery<ApiResponse<Branch[]>>({
+    queryKey: ["branches-home"],
+    queryFn: () => apiGet("/branches/nearby"),
   });
-
-  const { data: featuredProducts, isLoading: productsLoading, refetch: refetchProducts } = useQuery<{ data: Product[] }>({
-    queryKey: ["featured-products"],
-    queryFn: () => apiGet("/products", { limit: 10, page: 1 }) as any,
-  });
+  const branches = branchesRes?.data ?? [];
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([refetchBrands(), refetchProducts()]);
+    await refetch();
     setRefreshing(false);
   };
-
-  const getProductName = (p: Product) =>
-    i18n.language === "en" ? p.name_en : p.name_fr;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -63,7 +59,9 @@ export default function HomeScreen() {
         <LinearGradient colors={["#0a0f1e", "#0f172a"]} style={styles.header}>
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.greeting}>{t("home.greeting")}, {user?.name?.split(" ")[0] ?? ""} 👋</Text>
+              <Text style={styles.greeting}>
+                {t("home.greeting")}{user?.name ? `, ${user.name.split(" ")[0]}` : ""} 👋
+              </Text>
               <Text style={styles.headerSub}>Que voulez-vous commander ?</Text>
             </View>
             <TouchableOpacity style={styles.notifBtn}>
@@ -71,7 +69,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Search */}
+          {/* Search — taps through to catalog */}
           <TouchableOpacity
             style={styles.searchBar}
             onPress={() => router.push("/(tabs)/catalog")}
@@ -82,33 +80,40 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </LinearGradient>
 
-        {/* Brands */}
+        {/* Nearby branches */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{t("home.nearbyBranches")}</Text>
-            <TouchableOpacity><Text style={styles.seeAll}>{t("common.seeAll")}</Text></TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/(tabs)/catalog")}>
+              <Text style={styles.seeAll}>{t("common.seeAll")}</Text>
+            </TouchableOpacity>
           </View>
-          {brandsLoading ? (
+          {branchesLoading ? (
             <ActivityIndicator color="#f97316" style={{ margin: 20 }} />
+          ) : branches.length === 0 ? (
+            <Text style={styles.emptyText}>Aucune agence disponible pour le moment</Text>
           ) : (
             <FlatList
-              data={brands ?? []}
+              data={branches}
               horizontal
               showsHorizontalScrollIndicator={false}
-              keyExtractor={(i) => i.id}
+              keyExtractor={(b) => b.id}
               contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
               renderItem={({ item }) => (
-                <TouchableOpacity style={styles.brandCard} onPress={() => {}}>
-                  <View style={styles.brandLogo}>
-                    {item.logo_url ? (
-                      <Image source={{ uri: item.logo_url }} style={styles.brandLogoImg} contentFit="cover" />
+                <TouchableOpacity
+                  style={styles.branchCard}
+                  onPress={() => router.push("/(tabs)/catalog")}
+                >
+                  <View style={styles.branchLogo}>
+                    {item.brands?.logo_url ? (
+                      <Image source={{ uri: item.brands.logo_url }} style={styles.branchLogoImg} contentFit="cover" />
                     ) : (
                       <Ionicons name="storefront-outline" size={24} color="#f97316" />
                     )}
                   </View>
-                  <Text style={styles.brandName} numberOfLines={1}>{item.name}</Text>
-                  <Text style={styles.brandCity} numberOfLines={1}>
-                    {item.branches?.[0]?.city ?? ""}
+                  <Text style={styles.branchName} numberOfLines={1}>{item.brands?.name ?? item.name}</Text>
+                  <Text style={styles.branchCity} numberOfLines={1}>
+                    {BRANCH_TYPE_LABEL[item.type ?? "other"]?.icon ?? "🏪"} {item.city}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -116,43 +121,37 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Featured products */}
+        {/* Explore catalog CTA */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t("home.featured")}</Text>
-          </View>
-          {productsLoading ? (
-            <ActivityIndicator color="#f97316" style={{ margin: 20 }} />
-          ) : (
-            <FlatList
-              data={featuredProducts?.data ?? []}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={(i) => i.id}
-              contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.productCard}
-                  onPress={() => router.push({ pathname: "/product/[id]", params: { id: item.id } })}
-                >
-                  <View style={styles.productImg}>
-                    {item.product_images?.[0] ? (
-                      <Image source={{ uri: item.product_images[0].url }} style={styles.productImgEl} contentFit="cover" />
-                    ) : (
-                      <Ionicons name="cube-outline" size={32} color="#334155" />
-                    )}
-                  </View>
-                  <View style={styles.productInfo}>
-                    <Text style={styles.productName} numberOfLines={1}>{getProductName(item)}</Text>
-                    <Text style={styles.productCategory} numberOfLines={1}>
-                      {item.categories?.name_fr ?? ""}
-                    </Text>
-                    <Text style={styles.productPrice}>{formatCurrency(item.price)}</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
-          )}
+          <TouchableOpacity
+            style={styles.ctaCard}
+            onPress={() => router.push("/(tabs)/catalog")}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={["rgba(249,115,22,0.15)", "rgba(249,115,22,0.05)"]}
+              style={styles.ctaGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.ctaContent}>
+                <View style={styles.ctaIcon}>
+                  <Ionicons name="grid-outline" size={26} color="#f97316" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ctaTitle}>
+                    {i18n.language === "en" ? "Explore the catalog" : "Explorer le catalogue"}
+                  </Text>
+                  <Text style={styles.ctaSubtitle}>
+                    {i18n.language === "en"
+                      ? "Choose a branch and browse its products"
+                      : "Choisissez une agence et parcourez ses produits"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#f97316" />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
 
         <View style={{ height: 80 }} />
@@ -165,7 +164,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0a0f1e" },
   scroll: { flex: 1 },
   header: { paddingHorizontal: 20, paddingBottom: 20, paddingTop: 8 },
-  headerTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
+  headerTop: {
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "flex-start", marginBottom: 16,
+  },
   greeting: { fontSize: 18, fontWeight: "700", color: "#fff" },
   headerSub: { fontSize: 13, color: "#475569", marginTop: 2 },
   notifBtn: {
@@ -178,30 +180,38 @@ const styles = StyleSheet.create({
     borderRadius: 14, paddingHorizontal: 16, height: 48,
   },
   searchPlaceholder: { color: "#475569", fontSize: 14 },
-  section: { marginTop: 24 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, marginBottom: 14 },
+  section: { marginTop: 24, paddingHorizontal: 20 },
+  sectionHeader: {
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "center", marginBottom: 14,
+  },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: "#fff" },
   seeAll: { fontSize: 13, color: "#f97316", fontWeight: "500" },
-  brandCard: { width: 100, alignItems: "center", gap: 8 },
-  brandLogo: {
-    width: 72, height: 72, borderRadius: 20,
+  emptyText: { color: "#475569", fontSize: 13, paddingLeft: 4 },
+  // Branch cards
+  branchCard: { width: 90, alignItems: "center", gap: 8 },
+  branchLogo: {
+    width: 68, height: 68, borderRadius: 18,
     backgroundColor: "#0f172a", borderWidth: 1, borderColor: "#1e293b",
     alignItems: "center", justifyContent: "center", overflow: "hidden",
   },
-  brandLogoImg: { width: "100%", height: "100%" },
-  brandName: { fontSize: 12, fontWeight: "600", color: "#e2e8f0", textAlign: "center" },
-  brandCity: { fontSize: 10, color: "#475569", textAlign: "center" },
-  productCard: {
-    width: 160, backgroundColor: "#0f172a", borderRadius: 16,
-    borderWidth: 1, borderColor: "#1e293b", overflow: "hidden",
+  branchLogoImg: { width: "100%", height: "100%" },
+  branchName: { fontSize: 11, fontWeight: "600", color: "#e2e8f0", textAlign: "center" },
+  branchCity: { fontSize: 10, color: "#475569", textAlign: "center" },
+  // CTA card
+  ctaCard: { borderRadius: 18, overflow: "hidden" },
+  ctaGradient: {
+    borderWidth: 1, borderColor: "rgba(249,115,22,0.2)", borderRadius: 18,
   },
-  productImg: {
-    height: 120, backgroundColor: "#1e293b",
+  ctaContent: {
+    flexDirection: "row", alignItems: "center", gap: 14,
+    paddingHorizontal: 18, paddingVertical: 18,
+  },
+  ctaIcon: {
+    width: 48, height: 48, borderRadius: 14,
+    backgroundColor: "rgba(249,115,22,0.12)",
     alignItems: "center", justifyContent: "center",
   },
-  productImgEl: { width: "100%", height: "100%" },
-  productInfo: { padding: 12, gap: 3 },
-  productName: { fontSize: 13, fontWeight: "600", color: "#fff" },
-  productCategory: { fontSize: 11, color: "#475569" },
-  productPrice: { fontSize: 14, fontWeight: "700", color: "#f97316", marginTop: 4 },
+  ctaTitle: { fontSize: 15, fontWeight: "700", color: "#fff", marginBottom: 3 },
+  ctaSubtitle: { fontSize: 12, color: "#64748b", lineHeight: 17 },
 });

@@ -27,6 +27,34 @@ export const CreateDeliveryOrderSchema = z.object({
   promotion_code: z.string().optional(),
 });
 
+// ─── Création commande unifiée (mobile) ──────────────────────────────────────
+export const CreateOrderSchema = z.object({
+  branch_id: z.string().uuid(),
+  type: z.enum(["collect", "delivery"]),
+  items: z.array(z.object({
+    product_id: z.string().uuid(),
+    quantity: z.number().int().positive(),
+    variant_id: z.string().uuid().optional(),
+  })).min(1),
+  // collect
+  slot_id: z.string().uuid().optional(),
+  // delivery
+  delivery_address: z.string().min(5).max(500).optional(),
+  delivery_lat: z.number().optional(),
+  delivery_lng: z.number().optional(),
+  delivery_phone: z.string().regex(/^\+?[1-9]\d{7,14}$/).optional(),
+  // payment
+  payment_method: z.enum(["orange_money", "mtn_mobile_money"]),
+  payment_phone: z.string().regex(/^\+?[1-9]\d{7,14}$/),
+  // optional
+  notes: z.string().max(500).optional(),
+}).refine(
+  (d) => (d.type === "collect" ? !!d.slot_id : !!d.delivery_address),
+  { message: "slot_id requis pour collect, delivery_address requis pour delivery" }
+);
+
+export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
+
 export const UpdateOrderStatusSchema = z.object({
   status: z.enum([
     "confirmed",

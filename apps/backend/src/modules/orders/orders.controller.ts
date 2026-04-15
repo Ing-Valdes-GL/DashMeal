@@ -3,6 +3,106 @@ import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 import { generateQrCode } from "../../utils/qrcode.js";
+import { campayCollect } from "../../services/campay.js";
+import { notifyOrderStatus } from "../../utils/push.js";
+
+// ─── Création unifiée avec items + paiement Campay ───────────────────────────
+export async function createOrder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const {
+      branch_id, type, items,
+      slot_id, delivery_address, delivery_lat, delivery_lng, delivery_phone,
+      payment_method, payment_phone, notes,
+    } = req.body;
+
+    const user_id = req.user!.id;
+
+    // ── Calculer le total depuis les produits ─────────────────────────────────
+    let subtotal = 0;
+    const orderItems: Array<{ product_id: string; variant_id: string | null; quantity: number; unit_price: number; subtotal: number }> = [];
+
+    for (const item of items as Array<{ product_id: string; quantity: number; variant_id?: string }>) {
+      const { data: product } = await supabase
+        .from("products")
+        .select("price")
+        .eq("id", item.product_id)
+        .single();
+
+      if (!product) throw new AppError(404, "PRODUCT_NOT_FOUND", `Produit introuvable: ${item.product_id}`);
+
+      const unit_price = product.price;
+      const sub = unit_price * item.quantity;
+      subtotal += sub;
+      orderItems.push({ product_id: item.product_id, variant_id: item.variant_id ?? null, quantity: item.quantity, unit_price, subtotal: sub });
+    }
+
+    const delivery_fee = type === "delivery" ? 500 : 0;
+    const total = subtotal + delivery_fee;
+
+    // ── Créer la commande ─────────────────────────────────────────────────────
+    const { data: order, error: orderErr } = await supabase
+      .from("orders")
+      .insert({ user_id, branch_id, type, status: "pending", subtotal, delivery_fee, total, notes: notes ?? null })
+      .select()
+      .single();
+
+    if (orderErr || !order) throw new AppError(500, "CREATE_ORDER_ERROR", "Échec création commande");
+
+    // ── Insérer les articles ──────────────────────────────────────────────────
+    await supabase.from("order_items").insert(orderItems.map((i) => ({ ...i, order_id: order.id })));
+
+    // ── Enregistrements type-spécifiques ─────────────────────────────────────
+    if (type === "collect" && slot_id) {
+      const qr_code = await generateQrCode(order.id);
+      await supabase.rpc("increment_slot_booking", { slot_id });
+      await supabase.from("collect_orders").insert({ order_id: order.id, slot_id, qr_code, pickup_status: "waiting" });
+    } else if (type === "delivery") {
+      await supabase.from("deliveries").insert({
+        order_id: order.id,
+        address: delivery_address,
+        lat: delivery_lat ?? null,
+        lng: delivery_lng ?? null,
+        phone: delivery_phone ?? null,
+        status: "pending",
+      });
+    }
+
+    // ── Initier le paiement Campay ────────────────────────────────────────────
+    let payment_reference: string | null = null;
+    let ussd_code: string | null = null;
+    let operator: string | null = null;
+
+    try {
+      const campayData = await campayCollect({
+        amount: total,
+        phone: payment_phone,
+        description: `DashMeal #${order.id.slice(0, 8)}`,
+        externalReference: order.id,
+      });
+
+      payment_reference = campayData.reference;
+      ussd_code = campayData.ussd_code ?? null;
+      operator = campayData.operator ?? null;
+
+      await supabase.from("payments").insert({
+        order_id: order.id,
+        method: payment_method,
+        amount: total,
+        status: "pending",
+        provider_ref: payment_reference,
+        provider: "campay",
+        operator,
+      });
+    } catch (campayErr) {
+      console.error("Campay initiation failed:", campayErr);
+      // Commande créée même si Campay échoue — l'utilisateur peut réessayer
+    }
+
+    sendCreated(res, { order_id: order.id, total, payment_reference, ussd_code, operator });
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function createCollectOrder(req: Request, res: Response, next: NextFunction) {
   try {
@@ -122,21 +222,27 @@ export async function getUserOrders(req: Request, res: Response, next: NextFunct
 export async function updateOrderStatus(req: Request, res: Response, next: NextFunction) {
   try {
     const { status, note } = req.body;
+    const orderId = req.params.id as string;
 
-    await supabase
+    const { data: order } = await supabase
       .from("orders")
       .update({ status, updated_at: new Date().toISOString() })
-      .eq("id", req.params.id);
+      .eq("id", orderId)
+      .select("id, user_id")
+      .single();
 
     await supabase.from("order_status_history").insert({
-      order_id: req.params.id,
+      order_id: orderId,
       status,
       changed_by: req.user!.id,
       changed_by_role: req.user!.role,
       note: note ?? null,
     });
 
-    // TODO: Envoyer notification push à l'utilisateur
+    // Notification push selon le nouveau statut
+    if (order?.user_id) {
+      notifyOrderStatus(order.user_id, orderId, status, orderId).catch(() => {});
+    }
 
     sendSuccess(res, { status }, "Statut mis à jour");
   } catch (err) {

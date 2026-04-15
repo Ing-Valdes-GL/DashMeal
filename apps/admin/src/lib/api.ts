@@ -91,3 +91,12 @@ export async function apiDelete<T>(url: string): Promise<T> {
   const { data } = await api.delete<{ success: true; data: T }>(url);
   return data.data;
 }
+
+export async function apiUpload<T>(url: string, file: File, fieldName = "image"): Promise<T> {
+  const form = new FormData();
+  form.append(fieldName, file);
+  const { data } = await api.post<{ success: true; data: T }>(url, form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return data.data;
+}

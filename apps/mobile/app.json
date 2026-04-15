@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Dash Meal",
-    "slug": "dash-meal",
+    "slug": "dashmeal-maps-api",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -32,7 +32,11 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "USE_BIOMETRIC",
-        "USE_FINGERPRINT"
+        "USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -57,6 +61,12 @@
           "cameraPermission": "L'application a besoin d'accéder à la caméra pour scanner les QR codes."
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "DashMeal utilise votre position pour faciliter la saisie de votre adresse de livraison."
+        }
+      ],
       "expo-font",
       "expo-localization"
     ],
@@ -68,8 +78,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "be8c7c0d-8c03-4729-8f39-b9c906cb03b1"
       }
-    }
+    },
+    "owner": "valdes237"
   }
 }
