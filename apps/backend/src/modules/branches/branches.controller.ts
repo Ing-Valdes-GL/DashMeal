@@ -74,12 +74,23 @@ export async function listBranches(req: Request, res: Response, next: NextFuncti
   }
 }
 
+/** Haversine distance in km between two lat/lng points */
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export async function getNearbyBranches(req: Request, res: Response, next: NextFunction) {
   try {
-    const { lat, lng, radius_km = 20, brand_id } = req.query;
+    const { lat, lng, radius_km = "50", brand_id } = req.query;
 
-    // TODO: Utiliser PostGIS ou calcul Haversine pour filtrer par distance
-    // Pour l'instant, retourner toutes les agences actives
     let query = supabase
       .from("branches")
       .select("*, brands(id, name, logo_url)")
@@ -90,7 +101,43 @@ export async function getNearbyBranches(req: Request, res: Response, next: NextF
     const { data, error } = await query;
     if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
 
-    sendSuccess(res, data);
+    let branches = data ?? [];
+
+    // Sort by distance if GPS coordinates are provided and branches have lat/lng
+    if (lat && lng) {
+      const userLat = parseFloat(String(lat));
+      const userLng = parseFloat(String(lng));
+      const maxKm = parseFloat(String(radius_km));
+
+      if (!isNaN(userLat) && !isNaN(userLng)) {
+        // Add distance_km to each branch (if it has coordinates)
+        const withDistance = branches.map((b: any) => {
+          const bLat = b.lat ?? b.latitude;
+          const bLng = b.lng ?? b.longitude;
+          const distance_km = (bLat != null && bLng != null)
+            ? haversineKm(userLat, userLng, bLat, bLng)
+            : null;
+          return { ...b, distance_km };
+        });
+
+        // Filter by radius if branches have coordinates; keep those without coords too
+        const filtered = withDistance.filter((b: any) =>
+          b.distance_km === null || b.distance_km <= maxKm
+        );
+
+        // Sort: branches with coords first (nearest first), then those without
+        filtered.sort((a: any, b: any) => {
+          if (a.distance_km === null && b.distance_km === null) return 0;
+          if (a.distance_km === null) return 1;
+          if (b.distance_km === null) return -1;
+          return a.distance_km - b.distance_km;
+        });
+
+        branches = filtered;
+      }
+    }
+
+    sendSuccess(res, branches);
   } catch (err) {
     next(err);
   }

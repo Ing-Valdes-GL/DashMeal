@@ -64,6 +64,7 @@ export default function OrdersPage() {
         ...(status !== "all" && { status }),
         ...(search && { search }),
       }) as any,
+    staleTime: 0,
   });
 
   const { data: drivers } = useQuery<Driver[]>({

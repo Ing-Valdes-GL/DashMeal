@@ -29,10 +29,21 @@ async function sendToExpo(messages: ExpoPushMessage[]): Promise<void> {
       body: JSON.stringify(messages),
     });
 
+    const result = await response.json() as { data?: { status: string; id?: string; message?: string; details?: unknown }[] };
+
     if (!response.ok) {
-      const text = await response.text();
-      console.error(`[Push] Expo API error (${response.status}):`, text);
+      console.error(`[Push] Expo API error (${response.status}):`, JSON.stringify(result));
+      return;
     }
+
+    // Expo renvoie { data: [{ status: "ok"|"error", ... }] } même en HTTP 200
+    result.data?.forEach((r, i) => {
+      if (r.status === "error") {
+        console.error(`[Push] Message ${i} rejeté par Expo:`, r.message, r.details ?? "");
+      } else {
+        console.log(`[Push] Message ${i} envoyé OK (id: ${r.id ?? "—"})`);
+      }
+    });
   } catch (err) {
     // Ne jamais faire crasher l'app pour une notif ratée
     console.error("[Push] Network error:", err);
@@ -47,12 +58,22 @@ export async function notifyUser(
   body: string,
   data?: Record<string, unknown>
 ): Promise<void> {
-  const { data: tokens } = await supabase
+  const { data: tokens, error } = await supabase
     .from("push_tokens")
     .select("token")
     .eq("user_id", userId);
 
-  if (!tokens || tokens.length === 0) return;
+  if (error) {
+    console.error(`[Push] Erreur récupération tokens pour user ${userId}:`, error.message);
+    return;
+  }
+
+  if (!tokens || tokens.length === 0) {
+    console.log(`[Push] Aucun token pour user ${userId} — notification ignorée`);
+    return;
+  }
+
+  console.log(`[Push] Envoi notif à user ${userId} (${tokens.length} appareil(s)): "${title}"`);
 
   const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
     to: token,

@@ -1,47 +1,77 @@
 import { useRef, useState } from "react";
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  Dimensions, Animated,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
+import { Colors, Radius, Shadow } from "@/lib/theme";
 
 const { width, height } = Dimensions.get("window");
 
 const SLIDES = [
   {
-    key: "welcome",
-    title: "Bienvenue sur\nDash Meal",
-    subtitle: "Vos courses livrées à domicile ou disponibles en Click & Collect dans votre supermarché préféré.",
-    icon: null,
-    isLogo: true,
-  },
-  {
-    key: "catalog",
-    title: "Parcourez\nle catalogue",
-    subtitle: "Des milliers de produits frais et épicerie, classés par catégorie pour trouver facilement ce que vous cherchez.",
-    icon: "grid-outline",
-    color: "#3b82f6",
+    key: "favorites",
+    title: "Vos favoris,\ntous au même endroit",
+    subtitle: "Des milliers de produits frais et épicerie disponibles près de chez vous.",
+    icon: "heart-outline" as const,
+    iconColor: "#FF7A2F",
+    iconBg: "#FFF0E8",
   },
   {
     key: "order",
-    title: "Commandez\nen un clic",
-    subtitle: "Choisissez entre la livraison à domicile ou le Click & Collect. Payez avec Mobile Money (MTN, Orange).",
-    icon: "flash-outline",
-    color: "#f97316",
+    title: "Commandez\nchez votre agence",
+    subtitle: "Click & Collect ou livraison à domicile — vous choisissez. Paiement Mobile Money simple et sécurisé.",
+    icon: "restaurant-outline" as const,
+    iconColor: "#FF7A2F",
+    iconBg: "#FFF0E8",
   },
   {
     key: "track",
-    title: "Suivez votre\ncommande",
-    subtitle: "Recevez des notifications en temps réel. Scannez votre QR code en agence pour retirer votre commande.",
-    icon: "location-outline",
-    color: "#22c55e",
+    title: "Offres de livraison\ngratuite",
+    subtitle: "Suivez votre commande en temps réel et récupérez-la avec votre QR code en agence.",
+    icon: "bicycle-outline" as const,
+    iconColor: "#FF7A2F",
+    iconBg: "#FFF0E8",
   },
 ];
+
+// ─── Fan decoration ───────────────────────────────────────────────────────────
+function FanDecoration() {
+  return (
+    <View style={fan.container} pointerEvents="none">
+      {[...Array(8)].map((_, i) => (
+        <View
+          key={i}
+          style={[
+            fan.stripe,
+            {
+              transform: [{ rotate: `${i * 11 - 40}deg` }],
+              opacity: 0.08 + i * 0.025,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+const fan = StyleSheet.create({
+  container: {
+    position: "absolute", bottom: -60, right: -60,
+    width: 280, height: 280,
+    alignItems: "center", justifyContent: "center",
+  },
+  stripe: {
+    position: "absolute",
+    width: 280, height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primary,
+    transformOrigin: "left center",
+  } as any,
+});
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -66,15 +96,22 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-      <LinearGradient colors={["#0a0f1e", "#0c1428"]} style={StyleSheet.absoluteFill} />
+      <StatusBar style="dark" />
+      <FanDecoration />
 
-      {/* Skip button */}
-      {!isLast && (
-        <TouchableOpacity style={styles.skip} onPress={finish}>
-          <Text style={styles.skipText}>Passer</Text>
-        </TouchableOpacity>
-      )}
+      {/* Logo */}
+      <View style={styles.logoRow}>
+        <Image
+          source={require("../assets/logo.png")}
+          style={styles.logo}
+          contentFit="contain"
+        />
+        {!isLast && (
+          <TouchableOpacity onPress={finish}>
+            <Text style={styles.skipText}>Passer</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Slides */}
       <FlatList
@@ -85,127 +122,87 @@ export default function OnboardingScreen() {
         showsHorizontalScrollIndicator={false}
         scrollEnabled={false}
         keyExtractor={(i) => i.key}
-        onMomentumScrollEnd={(e) => {
-          setCurrent(Math.round(e.nativeEvent.contentOffset.x / width));
-        }}
+        style={{ flex: 1 }}
         renderItem={({ item }) => (
           <View style={styles.slide}>
             {/* Illustration */}
-            <View style={styles.illustrationWrap}>
-              {item.isLogo ? (
-                <Image
-                  source={require("../assets/logo.png")}
-                  style={styles.logo}
-                  contentFit="contain"
+            <View style={[styles.illustrationCircle, { backgroundColor: item.iconBg }]}>
+              <Ionicons name={item.icon} size={100} color={item.iconColor} />
+            </View>
+            {/* Dots */}
+            <View style={styles.dots}>
+              {SLIDES.map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dot, i === current && styles.dotActive]}
                 />
-              ) : (
-                <View style={[styles.iconCircle, { borderColor: item.color + "40", backgroundColor: item.color + "15" }]}>
-                  <Ionicons name={item.icon as any} size={80} color={item.color} />
-                </View>
-              )}
+              ))}
             </View>
-
             {/* Text */}
-            <View style={styles.textBlock}>
-              <Text style={styles.slideTitle}>{item.title}</Text>
-              <Text style={styles.slideSubtitle}>{item.subtitle}</Text>
-            </View>
+            <Text style={styles.slideTitle}>{item.title}</Text>
+            <Text style={styles.slideSubtitle}>{item.subtitle}</Text>
           </View>
         )}
       />
 
-      {/* Bottom controls */}
+      {/* Bottom */}
       <View style={styles.bottom}>
-        {/* Dots */}
-        <View style={styles.dots}>
-          {SLIDES.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                i === current && styles.dotActive,
-              ]}
-            />
-          ))}
-        </View>
-
-        {/* CTA button */}
-        <TouchableOpacity style={styles.btn} onPress={goNext}>
-          <LinearGradient
-            colors={["#f97316", "#ea580c"]}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={styles.btnGrad}
-          >
-            <Text style={styles.btnText}>
-              {isLast ? "Commencer" : "Suivant"}
-            </Text>
-            <Ionicons name="arrow-forward" size={18} color="#fff" />
-          </LinearGradient>
+        <TouchableOpacity style={styles.btn} onPress={goNext} activeOpacity={0.85}>
+          <Text style={styles.btnText}>
+            {isLast ? "COMMENCER" : "SUIVANT"}
+          </Text>
         </TouchableOpacity>
+        {!isLast && (
+          <TouchableOpacity onPress={finish} style={styles.skipBottom}>
+            <Text style={styles.skipBottomText}>Passer</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0f1e" },
-  skip: {
-    position: "absolute", top: 56, right: 24, zIndex: 10,
-    paddingHorizontal: 14, paddingVertical: 6,
-    backgroundColor: "#0f172a", borderRadius: 20, borderWidth: 1, borderColor: "#1e293b",
+  container: { flex: 1, backgroundColor: Colors.bg },
+  logoRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 24, paddingTop: 56, paddingBottom: 8,
   },
-  skipText: { color: "#64748b", fontSize: 13, fontWeight: "500" },
+  logo: { width: 120, height: 48 },
+  skipText: { fontSize: 14, color: Colors.text2 },
   slide: {
     width,
     alignItems: "center",
-    justifyContent: "center",
     paddingHorizontal: 32,
-    paddingBottom: 120,
+    paddingTop: 20,
   },
-  illustrationWrap: {
-    width: width * 0.72,
-    height: height * 0.38,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 40,
-  },
-  logo: {
-    width: width * 0.72,
-    height: height * 0.38,
-  },
-  iconCircle: {
-    width: 180, height: 180, borderRadius: 90,
+  illustrationCircle: {
+    width: 260, height: 260, borderRadius: 130,
     alignItems: "center", justifyContent: "center",
-    borderWidth: 2,
+    marginBottom: 32,
   },
-  textBlock: { alignItems: "center", gap: 14 },
+  dots: { flexDirection: "row", gap: 6, marginBottom: 28 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.border },
+  dotActive: { width: 24, borderRadius: 3, backgroundColor: Colors.primary },
   slideTitle: {
-    fontSize: 32, fontWeight: "800", color: "#fff",
-    textAlign: "center", lineHeight: 40,
-    letterSpacing: -0.5,
+    fontSize: 26, fontWeight: "800", color: Colors.text,
+    textAlign: "center", lineHeight: 34, marginBottom: 14,
   },
   slideSubtitle: {
-    fontSize: 15, color: "#64748b", textAlign: "center",
-    lineHeight: 23, maxWidth: 300,
+    fontSize: 14, color: Colors.text2, textAlign: "center",
+    lineHeight: 22, maxWidth: 300,
   },
   bottom: {
-    position: "absolute", bottom: 0, left: 0, right: 0,
-    paddingHorizontal: 24, paddingBottom: 48, paddingTop: 20,
-    gap: 20, alignItems: "center",
-    backgroundColor: "transparent",
+    paddingHorizontal: 24, paddingBottom: 52, paddingTop: 16,
+    alignItems: "center", gap: 14,
   },
-  dots: { flexDirection: "row", gap: 6 },
-  dot: {
-    width: 6, height: 6, borderRadius: 3,
-    backgroundColor: "#1e293b",
+  btn: {
+    width: "100%", height: 52, borderRadius: Radius.full,
+    backgroundColor: Colors.primary,
+    alignItems: "center", justifyContent: "center",
+    ...Shadow.primary,
   },
-  dotActive: {
-    width: 24, backgroundColor: "#f97316",
-  },
-  btn: { width: "100%", borderRadius: 16, overflow: "hidden" },
-  btnGrad: {
-    height: 56, flexDirection: "row", alignItems: "center",
-    justifyContent: "center", gap: 10,
-  },
-  btnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  btnText: { color: "#fff", fontSize: 15, fontWeight: "700", letterSpacing: 1 },
+  skipBottom: { paddingVertical: 4 },
+  skipBottomText: { fontSize: 14, color: Colors.text2 },
 });

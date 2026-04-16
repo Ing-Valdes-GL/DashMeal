@@ -7,6 +7,7 @@ export interface AuthUser {
   name: string;
   phone: string;
   is_verified: boolean;
+  role?: string;
 }
 
 interface AuthState {

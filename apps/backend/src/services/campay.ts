@@ -154,6 +154,16 @@ export async function campayCollect(params: {
 
   if (!res.ok) {
     const body = await res.text();
+    // Essayer de parser le message d'erreur CamPay pour un message lisible
+    try {
+      const errJson = JSON.parse(body) as { message?: string; error_code?: string };
+      if (errJson.message) {
+        throw new Error(errJson.message); // ex: "Minimum amount for Orange is 10.00"
+      }
+    } catch (parseErr) {
+      if (parseErr instanceof SyntaxError) { /* corps non-JSON */ }
+      else throw parseErr;
+    }
     throw new Error(`CamPay collect failed (${res.status}): ${body}`);
   }
 

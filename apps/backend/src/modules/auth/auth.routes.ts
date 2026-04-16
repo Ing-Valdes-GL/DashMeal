@@ -20,6 +20,13 @@ router.post("/user/login", validate(LoginUserSchema), controller.loginUser);
 router.post("/user/request-reset", validate(z.object({ phone: z.string().min(8) })), controller.requestReset);
 router.post("/user/reset-password", validate(ResetPasswordSchema), controller.resetPassword);
 
+// ─── Livreur (mobile driver) ──────────────────────────────────────────────────
+router.post(
+  "/driver/login",
+  validate(z.object({ phone: z.string().min(8), pin: z.string().min(4).max(8) })),
+  controller.loginDriver,
+);
+
 // ─── Admin (marque) ───────────────────────────────────────────────────────────
 router.post("/admin/login", validate(LoginAdminSchema), controller.loginAdmin);
 

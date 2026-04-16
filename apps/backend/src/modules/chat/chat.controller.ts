@@ -1,7 +1,60 @@
 import type { Request, Response, NextFunction } from "express";
+import multer from "multer";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
+import { notifyUser } from "../../utils/push.js";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ConvType = "client_driver" | "client_support";
+
+// ─── Récupérer ou créer une conversation pour une commande ───────────────────
+
+export async function getOrCreateConversation(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { orderId } = req.params;
+    const type = (req.query.type === "driver" ? "client_driver" : "client_support") as ConvType;
+
+    // Vérifier que la commande appartient à l'utilisateur (ou est accessible)
+    const { data: order, error: orderErr } = await supabase
+      .from("orders")
+      .select("id, user_id, branch_id, branches(name, brand_id)")
+      .eq("id", orderId)
+      .single();
+
+    if (orderErr || !order) throw new AppError(404, "NOT_FOUND", "Commande introuvable");
+    if (order.user_id !== req.user!.id && req.user!.role !== "admin" && req.user!.role !== "driver")
+      throw new AppError(403, "FORBIDDEN", "Accès refusé");
+
+    // Chercher une conversation existante
+    const { data: existing } = await supabase
+      .from("conversations")
+      .select("*")
+      .eq("order_id", orderId)
+      .eq("type", type)
+      .maybeSingle();
+
+    if (existing) {
+      sendSuccess(res, existing);
+      return;
+    }
+
+    // Créer la conversation
+    const { data: conv, error: createErr } = await supabase
+      .from("conversations")
+      .insert({ order_id: orderId, type })
+      .select()
+      .single();
+
+    if (createErr || !conv) throw new AppError(500, "CREATE_ERROR", "Impossible de créer la conversation");
+    sendCreated(res, conv);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Lister les conversations d'une commande ─────────────────────────────────
 
 export async function getConversations(req: Request, res: Response, next: NextFunction) {
   try {
@@ -19,37 +72,44 @@ export async function getConversations(req: Request, res: Response, next: NextFu
   }
 }
 
+// ─── Messages d'une conversation ─────────────────────────────────────────────
+
 export async function getMessages(req: Request, res: Response, next: NextFunction) {
   try {
     const { conversationId } = req.params;
     const { page = "1", limit = "50" } = req.query as Record<string, string>;
-
     const pageNum = Number(page);
     const limitNum = Number(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    const { data, count, error } = await supabase
+    const { data, error } = await supabase
       .from("messages")
-      .select("*", { count: "exact" })
+      .select("*")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: true })
       .range(offset, offset + limitNum - 1);
 
     if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
-    sendSuccess(res, { messages: data, total: count });
+    sendSuccess(res, data ?? []);
   } catch (err) {
     next(err);
   }
 }
 
+// ─── Envoyer un message (texte, image, voix) ─────────────────────────────────
+
 export async function sendMessage(req: Request, res: Response, next: NextFunction) {
   try {
     const { conversationId } = req.params;
-    const { content } = req.body;
+    const { content, message_type = "text", media_url, duration_s } = req.body as {
+      content?: string;
+      message_type?: "text" | "image" | "voice";
+      media_url?: string;
+      duration_s?: number;
+    };
 
-    if (!content?.trim()) {
+    if (message_type === "text" && !content?.trim())
       throw new AppError(400, "EMPTY_MESSAGE", "Le message ne peut pas être vide");
-    }
 
     const { data, error } = await supabase
       .from("messages")
@@ -57,7 +117,10 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
         conversation_id: conversationId,
         sender_id: req.user!.id,
         sender_role: req.user!.role,
-        content: content.trim(),
+        content: content?.trim() ?? null,
+        message_type,
+        media_url: media_url ?? null,
+        duration_s: duration_s ?? null,
         is_read: false,
       })
       .select()
@@ -65,12 +128,71 @@ export async function sendMessage(req: Request, res: Response, next: NextFunctio
 
     if (error || !data) throw new AppError(500, "SEND_ERROR", "Échec d'envoi du message");
 
-    // Supabase Realtime diffuse automatiquement le changement aux abonnés
+    // Notifier l'autre participant
+    const conv = await supabase
+      .from("conversations")
+      .select("order_id, orders(user_id)")
+      .eq("id", conversationId)
+      .single();
+
+    if (conv.data?.order_id) {
+      const orderId = conv.data.order_id;
+      const orderUserId = (conv.data.orders as any)?.user_id;
+      if (orderUserId && orderUserId !== req.user!.id) {
+        await notifyUser(
+          orderUserId,
+          "Nouveau message 💬",
+          content?.trim() ?? (message_type === "image" ? "📷 Photo" : "🎙️ Note vocale"),
+          { screen: "chat", conversationId, orderId }
+        );
+      }
+    }
+
     sendCreated(res, data);
   } catch (err) {
     next(err);
   }
 }
+
+// ─── Upload média (photo ou audio) ───────────────────────────────────────────
+
+export const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15 Mo max
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/webp", "audio/mpeg", "audio/mp4", "audio/wav", "audio/aac", "audio/m4a", "audio/x-m4a", "audio/3gpp", "audio/webm"];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Type non supporté (image JPEG/PNG/WEBP ou audio MP3/M4A/WAV)"));
+  },
+});
+
+export async function uploadChatMedia(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) throw new AppError(400, "NO_FILE", "Aucun fichier fourni");
+
+    const isAudio = req.file.mimetype.startsWith("audio/");
+    const bucket = isAudio ? "chat-audio" : "chat-images";
+    const ext = req.file.originalname.split(".").pop() ?? (isAudio ? "m4a" : "jpg");
+    const path = `${req.user!.id}/${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(path, req.file.buffer, { contentType: req.file.mimetype });
+
+    if (uploadError) throw new AppError(500, "UPLOAD_ERROR", "Échec upload: " + uploadError.message);
+
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+
+    sendCreated(res, {
+      url: urlData.publicUrl,
+      type: isAudio ? "voice" : "image",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Marquer comme lus ────────────────────────────────────────────────────────
 
 export async function markAsRead(req: Request, res: Response, next: NextFunction) {
   try {

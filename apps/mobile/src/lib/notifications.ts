@@ -50,17 +50,23 @@ export async function registerForPushNotifications(): Promise<string | null> {
   const projectId = Constants.expoConfig?.extra?.eas?.projectId
     ?? Constants.easConfig?.projectId;
 
+  if (!projectId) {
+    console.warn("[Push] projectId manquant dans app.json (eas.projectId) — token ne sera pas lié au bon projet");
+  }
+
   const tokenData = await Notifications.getExpoPushTokenAsync(
     projectId ? { projectId } : undefined
   );
   const token = tokenData.data;
+  console.log("[Push] Token obtenu:", token);
 
-  // Enregistrer côté backend (fire-and-forget)
-  apiPost("/users/me/push-token", {
-    token,
-    platform: Platform.OS,
-    locale: "fr",
-  }).catch(() => {});
+  // Enregistrer côté backend
+  try {
+    await apiPost("/users/me/push-token", { token, platform: Platform.OS });
+    console.log("[Push] Token enregistré côté backend");
+  } catch (err) {
+    console.error("[Push] Échec enregistrement token:", err);
+  }
 
   return token;
 }

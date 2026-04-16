@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, ShoppingCart, Store, Truck, QrCode,
   BarChart2, Bell, DollarSign, Settings, Building2, FileText,
-  Users, Activity, Globe, ChevronRight, LogOut, Zap,
+  Users, Activity, Globe, ChevronRight, LogOut, Zap, UserCheck,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
@@ -42,6 +42,7 @@ export function Sidebar({ locale }: { locale: string }) {
     { href: "/orders",        label: t("orders"),        icon: ShoppingCart },
     { href: "/branches",      label: t("branches"),      icon: Store },
     { href: "/delivery",      label: t("delivery"),      icon: Truck },
+    { href: "/drivers",       label: t("drivers"),       icon: UserCheck },
     { href: "/collect",       label: t("collect"),       icon: QrCode },
     { href: "/analytics",     label: t("analytics"),     icon: BarChart2 },
     { href: "/notifications", label: t("notifications"), icon: Bell },

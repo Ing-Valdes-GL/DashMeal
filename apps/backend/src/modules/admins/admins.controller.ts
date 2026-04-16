@@ -170,17 +170,14 @@ export async function listDrivers(req: Request, res: Response, next: NextFunctio
 
     let query = supabase
       .from("drivers")
-      .select("id, name, phone, branch_id, is_active, created_at, branches(name)")
+      .select("id, name, phone, branch_id, brand_id, is_active, created_at, branches(name)")
       .order("created_at", { ascending: false });
 
-    if (brand_id) {
-      // Joindre via admin pour filtrer par marque
-      query = query.eq("admins.brand_id", brand_id);
-    }
+    if (brand_id) query = query.eq("brand_id", brand_id);
 
     const { data, error } = await query;
     if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
-    sendSuccess(res, data);
+    sendSuccess(res, data ?? []);
   } catch (err) {
     next(err);
   }
@@ -203,17 +200,19 @@ export async function getDriver(req: Request, res: Response, next: NextFunction)
 
 export async function createDriver(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, phone, branch_id } = req.body;
+    const { name, phone, branch_id, pin } = req.body;
 
     const { data: existing } = await supabase
       .from("drivers")
       .select("id")
       .eq("phone", phone)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       throw new AppError(409, "ALREADY_EXISTS", "Ce numéro est déjà enregistré");
     }
+
+    const pin_hash = pin ? await bcrypt.hash(String(pin), 12) : null;
 
     const { data, error } = await supabase
       .from("drivers")
@@ -221,14 +220,40 @@ export async function createDriver(req: Request, res: Response, next: NextFuncti
         name,
         phone,
         admin_id: req.user!.id,
+        brand_id: req.user!.brand_id ?? null,
         branch_id: branch_id ?? null,
         is_active: true,
+        pin_hash,
       })
-      .select()
+      .select("id, name, phone, branch_id, brand_id, is_active, created_at")
       .single();
 
     if (error || !data) throw new AppError(500, "CREATE_ERROR", "Échec de création");
     sendCreated(res, data, "Livreur créé avec succès");
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function setDriverPin(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { pin } = req.body as { pin?: string };
+    if (!pin || pin.length < 4 || pin.length > 8) {
+      throw new AppError(400, "INVALID_PIN", "Le PIN doit faire entre 4 et 8 chiffres");
+    }
+
+    const { data: driver } = await supabase
+      .from("drivers")
+      .select("id")
+      .eq("id", req.params.id)
+      .single();
+
+    if (!driver) throw new AppError(404, "NOT_FOUND", "Livreur introuvable");
+
+    const pin_hash = await bcrypt.hash(pin, 12);
+    await supabase.from("drivers").update({ pin_hash }).eq("id", req.params.id);
+
+    sendSuccess(res, { id: req.params.id }, "PIN mis à jour");
   } catch (err) {
     next(err);
   }

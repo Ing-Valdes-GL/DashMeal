@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { authenticate, requireRole } from "../../middleware/auth.js";
 import { validate } from "../../middleware/validate.js";
 import { CreateAdminSchema, CreateDriverSchema } from "@dash-meal/shared";
@@ -21,5 +22,6 @@ router.get("/drivers/:id", authenticate, requireRole("admin", "superadmin"), con
 router.post("/drivers", authenticate, requireRole("admin", "superadmin"), validate(CreateDriverSchema), controller.createDriver);
 router.patch("/drivers/:id", authenticate, requireRole("admin", "superadmin"), controller.updateDriver);
 router.patch("/drivers/:id/toggle-active", authenticate, requireRole("admin", "superadmin"), controller.toggleDriverActive);
+router.patch("/drivers/:id/pin",           authenticate, requireRole("admin", "superadmin"), validate(z.object({ pin: z.string().min(4).max(8) })), controller.setDriverPin);
 
 export default router;

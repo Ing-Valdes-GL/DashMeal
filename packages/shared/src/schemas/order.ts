@@ -71,6 +71,15 @@ export const AssignDriverSchema = z.object({
   driver_id: z.string().uuid(),
 });
 
+// ─── Conversion click & collect → livraison ──────────────────────────────────
+export const ConvertToDeliverySchema = z.object({
+  delivery_address: z.string().min(5).max(500),
+  delivery_lat: z.number().optional(),
+  delivery_lng: z.number().optional(),
+  payment_phone: z.string().regex(/^\+?[1-9]\d{7,14}$/),
+  payment_method: z.enum(["orange_money", "mtn_mobile_money"]),
+});
+
 export const CreateTimeSlotSchema = z.object({
   branch_id: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -86,3 +95,4 @@ export type CreateDeliveryOrderInput = z.infer<typeof CreateDeliveryOrderSchema>
 export type UpdateOrderStatusInput = z.infer<typeof UpdateOrderStatusSchema>;
 export type AssignDriverInput = z.infer<typeof AssignDriverSchema>;
 export type CreateTimeSlotInput = z.infer<typeof CreateTimeSlotSchema>;
+export type ConvertToDeliveryInput = z.infer<typeof ConvertToDeliverySchema>;

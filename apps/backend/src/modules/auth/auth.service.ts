@@ -206,6 +206,13 @@ export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
       .eq("id", payload.id)
       .single();
     user = data;
+  } else if (payload.role === "driver") {
+    const { data } = await supabase
+      .from("drivers")
+      .select("id, name, phone, branch_id, brand_id, is_active")
+      .eq("id", payload.id)
+      .single();
+    user = data ? { ...data, role: "driver" } : null;
   } else if (payload.role === "superadmin") {
     const { data } = await supabase
       .from("super_admins")
@@ -262,6 +269,48 @@ export async function resetPassword(input: ResetPasswordInput) {
   }
 
   return { message: "Mot de passe mis à jour avec succès" };
+}
+
+// ─── Driver login ─────────────────────────────────────────────────────────────
+
+export async function loginDriver(input: { phone: string; pin: string }): Promise<{ driver: object; tokens: AuthTokens }> {
+  const { phone, pin } = input;
+
+  const { data: driver } = await supabase
+    .from("drivers")
+    .select("id, name, phone, branch_id, brand_id, is_active, pin_hash")
+    .eq("phone", phone)
+    .single();
+
+  if (!driver) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+  if (!driver.is_active) {
+    throw new AppError(403, "ACCOUNT_SUSPENDED", "Ce compte a été suspendu");
+  }
+  if (!driver.pin_hash) {
+    throw new AppError(401, "NO_PIN", "PIN non configuré. Contactez votre administrateur.");
+  }
+
+  const valid = await bcrypt.compare(pin, driver.pin_hash);
+  if (!valid) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "PIN incorrect");
+  }
+
+  const { pin_hash: _, ...safeDriver } = driver;
+  const payload = {
+    id: driver.id,
+    role: "driver",
+    name: driver.name,
+    phone: driver.phone,
+    branch_id: driver.branch_id,
+  };
+  const tokens: AuthTokens = {
+    access_token: signAccessToken(payload),
+    refresh_token: signRefreshToken({ id: driver.id, role: "driver" }),
+    expires_in: 15 * 60,
+  };
+  return { driver: safeDriver, tokens };
 }
 
 // ─── Helpers privés ───────────────────────────────────────────────────────────

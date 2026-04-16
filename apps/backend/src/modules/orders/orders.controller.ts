@@ -36,7 +36,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       orderItems.push({ product_id: item.product_id, variant_id: item.variant_id ?? null, quantity: item.quantity, unit_price, subtotal: sub });
     }
 
-    const delivery_fee = type === "delivery" ? 500 : 0;
+    const delivery_fee = type === "delivery" ? 5 : 0;
     const total = subtotal + delivery_fee;
 
     // ── Créer la commande ─────────────────────────────────────────────────────
@@ -158,14 +158,15 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
     const limitNum = Number(limit);
     const offset = (pageNum - 1) * limitNum;
 
+    // !inner force un INNER JOIN → les orders sans branche correspondante sont exclus
     let query = supabase
       .from("orders")
-      .select("*, users(name, phone), branches(name), order_items(*, products(name_fr))", { count: "exact" })
+      .select("*, users(name, phone), branches!inner(name, brand_id), order_items(*, products(name_fr))", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limitNum - 1);
 
-    if (req.user?.role === "admin") {
-      query = query.eq("branches.brand_id", req.user.brand_id!);
+    if (req.user?.role === "admin" && req.user.brand_id) {
+      query = query.eq("branches.brand_id", req.user.brand_id);
     }
     if (status) query = query.eq("status", status);
     if (branch_id) query = query.eq("branch_id", branch_id);
@@ -292,6 +293,104 @@ export async function cancelOrder(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function convertToDelivery(req: Request, res: Response, next: NextFunction) {
+  try {
+    const orderId = req.params.id as string;
+    const { delivery_address, delivery_lat, delivery_lng, payment_phone } = req.body;
+    const user_id = req.user!.id;
+
+    // ── Vérifications ─────────────────────────────────────────────────────────
+    const { data: order } = await supabase
+      .from("orders")
+      .select("id, user_id, type, status, subtotal")
+      .eq("id", orderId)
+      .single();
+
+    if (!order) throw new AppError(404, "NOT_FOUND", "Commande introuvable");
+    if (order.user_id !== user_id) throw new AppError(403, "FORBIDDEN", "Accès refusé");
+    if (order.type !== "collect") throw new AppError(400, "INVALID_TYPE", "Cette commande n'est pas un click & collect");
+    if (!["pending", "confirmed"].includes(order.status)) {
+      throw new AppError(400, "CANNOT_CONVERT", "Cette commande est déjà en préparation ou livrée — conversion impossible");
+    }
+
+    const delivery_fee = 5;
+
+    // ── Libérer le créneau collect ────────────────────────────────────────────
+    const { data: collectOrder } = await supabase
+      .from("collect_orders")
+      .select("id, slot_id")
+      .eq("order_id", orderId)
+      .single();
+
+    if (collectOrder?.slot_id) {
+      // Décrémenter le compteur (RPC optionnelle — la conversion continue si elle n'existe pas)
+      try {
+        await supabase.rpc("decrement_slot_booking", { slot_id: collectOrder.slot_id });
+      } catch { /* ignoré */ }
+    }
+    await supabase.from("collect_orders").delete().eq("order_id", orderId);
+
+    // ── Mettre à jour la commande → livraison ────────────────────────────────
+    await supabase
+      .from("orders")
+      .update({ type: "delivery", delivery_fee, total: Number(order.subtotal) + delivery_fee })
+      .eq("id", orderId);
+
+    // ── Créer le dossier de livraison ─────────────────────────────────────────
+    await supabase.from("deliveries").insert({
+      order_id: orderId,
+      address: delivery_address,
+      lat: delivery_lat ?? null,
+      lng: delivery_lng ?? null,
+      status: "pending",
+    });
+
+    // ── Créer un enregistrement de paiement (pending) ─────────────────────────
+    const { data: payment, error: paymentErr } = await supabase
+      .from("payments")
+      .insert({
+        order_id: orderId,
+        method: "mobile_money",
+        amount: delivery_fee,
+        status: "pending",
+        provider: "campay",
+        provider_ref: null,
+      })
+      .select()
+      .single();
+
+    if (paymentErr || !payment) throw new AppError(500, "PAYMENT_ERROR", "Erreur lors de la création du paiement");
+
+    // ── Initier le paiement Campay pour les frais de livraison ───────────────
+    let campayData;
+    try {
+      campayData = await campayCollect({
+        amount: delivery_fee,
+        phone: payment_phone,
+        description: `DashMeal livraison #${orderId.slice(0, 8)}`,
+        externalReference: orderId,
+      });
+    } catch (campayErr) {
+      await supabase.from("payments").delete().eq("id", payment.id);
+      throw campayErr;
+    }
+
+    await supabase
+      .from("payments")
+      .update({ provider_ref: campayData.reference, operator: campayData.operator ?? null })
+      .eq("id", payment.id);
+
+    sendSuccess(res, {
+      reference: campayData.reference,
+      ussd_code: campayData.ussd_code ?? null,
+      operator: campayData.operator ?? null,
+      delivery_fee,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ─── Helper privé ─────────────────────────────────────────────────────────────
 
 async function buildAndCreateOrder(
@@ -342,8 +441,8 @@ async function buildAndCreateOrder(
       type,
       status: "pending",
       subtotal,
-      delivery_fee: type === "delivery" ? 500 : 0, // TODO: calculer selon zone
-      total: subtotal + (type === "delivery" ? 500 : 0),
+      delivery_fee: type === "delivery" ? 5 : 0,
+      total: subtotal + (type === "delivery" ? 5 : 0),
       notes: notes ?? null,
     })
     .select()
@@ -360,4 +459,38 @@ async function buildAndCreateOrder(
   await supabase.from("cart_items").delete().eq("cart_id", cart.id);
 
   return order;
+}
+
+// ─── Notation d'une commande / agence ─────────────────────────────────────────
+
+export async function rateOrder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const orderId = req.params.id as string;
+    const { rating, comment } = req.body as { rating: number; comment?: string };
+
+    // Vérifier que la commande appartient à l'utilisateur et est livrée/retirée
+    const { data: order, error: orderErr } = await supabase
+      .from("orders")
+      .select("id, user_id, status, rated_at")
+      .eq("id", orderId)
+      .single();
+
+    if (orderErr || !order) throw new AppError(404, "NOT_FOUND", "Commande introuvable");
+    if (order.user_id !== req.user!.id) throw new AppError(403, "FORBIDDEN", "Accès refusé");
+    if (!["delivered", "ready"].includes(order.status))
+      throw new AppError(400, "INVALID_STATUS", "Seules les commandes livrées ou prêtes peuvent être notées");
+    if (order.rated_at) throw new AppError(409, "ALREADY_RATED", "Cette commande a déjà été notée");
+
+    const { data, error } = await supabase
+      .from("orders")
+      .update({ rating, rating_comment: comment ?? null, rated_at: new Date().toISOString() })
+      .eq("id", orderId)
+      .select("id, rating, rating_comment, rated_at")
+      .single();
+
+    if (error || !data) throw new AppError(500, "UPDATE_ERROR", "Impossible d'enregistrer la note");
+    sendSuccess(res, data, "Merci pour votre avis !");
+  } catch (err) {
+    next(err);
+  }
 }

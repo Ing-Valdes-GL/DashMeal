@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { authenticate, requireRole } from "../../middleware/auth.js";
 import { validate } from "../../middleware/validate.js";
 import {
@@ -7,6 +8,7 @@ import {
   CreateOrderSchema,
   UpdateOrderStatusSchema,
   AssignDriverSchema,
+  ConvertToDeliverySchema,
 } from "@dash-meal/shared";
 import * as controller from "./orders.controller.js";
 
@@ -28,5 +30,7 @@ router.get("/", authenticate, requireRole("admin", "superadmin", "driver"), cont
 router.patch("/:id/status", authenticate, requireRole("admin", "superadmin"), validate(UpdateOrderStatusSchema), controller.updateOrderStatus);
 router.post("/:id/assign-driver", authenticate, requireRole("admin", "superadmin"), validate(AssignDriverSchema), controller.assignDriver);
 router.post("/:id/cancel", authenticate, controller.cancelOrder);
+router.post("/:id/convert-to-delivery", authenticate, requireRole("user"), validate(ConvertToDeliverySchema), controller.convertToDelivery);
+router.post("/:id/rate", authenticate, requireRole("user"), validate(z.object({ rating: z.number().int().min(1).max(5), comment: z.string().max(500).optional() })), controller.rateOrder);
 
 export default router;

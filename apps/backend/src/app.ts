@@ -7,6 +7,7 @@ import rateLimit from "express-rate-limit";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { API_PREFIX } from "@dash-meal/shared";
+import { startStaleOrderNotifier } from "./services/staleOrderNotifier.js";
 
 // Routes
 import authRoutes from "./modules/auth/auth.routes.js";
@@ -27,6 +28,7 @@ import notificationsRoutes from "./modules/notifications/notifications.routes.js
 import commissionsRoutes from "./modules/commissions/commissions.routes.js";
 import documentsRoutes from "./modules/documents/documents.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
+import mapsRoutes from "./modules/maps/maps.routes.js";
 
 const app: Application = express();
 
@@ -93,6 +95,7 @@ app.use(`${API_PREFIX}/notifications`, notificationsRoutes);
 app.use(`${API_PREFIX}/commissions`, commissionsRoutes);
 app.use(`${API_PREFIX}/documents`, documentsRoutes);
 app.use(`${API_PREFIX}/audit`, auditRoutes);
+app.use(`${API_PREFIX}/maps`,  mapsRoutes);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -110,6 +113,7 @@ app.listen(env.PORT, () => {
   console.log(`🚀 Dash Meal Backend démarré sur le port ${env.PORT}`);
   console.log(`   Environnement : ${env.NODE_ENV}`);
   console.log(`   API : http://localhost:${env.PORT}${API_PREFIX}`);
+  startStaleOrderNotifier();
 });
 
 export default app as Application;

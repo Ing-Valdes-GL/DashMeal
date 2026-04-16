@@ -55,6 +55,12 @@ export const apiGet = <T = any>(url: string, params?: Record<string, any>) =>
 export const apiPost = <T = any>(url: string, data?: any) =>
   api.post<T>(url, data).then((r) => r.data);
 
+/** Pour les uploads multipart/form-data */
+export const apiPostForm = <T = any>(url: string, formData: FormData) =>
+  api.post<T>(url, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  }).then((r) => r.data);
+
 export const apiPatch = <T = any>(url: string, data?: any) =>
   api.patch<T>(url, data).then((r) => r.data);
 

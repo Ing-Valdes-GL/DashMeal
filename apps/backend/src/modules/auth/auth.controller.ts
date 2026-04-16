@@ -28,6 +28,15 @@ export async function loginUser(req: Request, res: Response, next: NextFunction)
   }
 }
 
+export async function loginDriver(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.loginDriver(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function loginAdmin(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await authService.loginAdmin(req.body);

@@ -4,6 +4,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useCartStore } from "@/stores/cart";
 import { Ionicons } from "@expo/vector-icons";
 import { View, Text, StyleSheet } from "react-native";
+import { Colors, Shadow } from "@/lib/theme";
 
 function CartBadge({ count }: { count: number }) {
   if (!count) return null;
@@ -18,7 +19,8 @@ const badge = StyleSheet.create({
   wrap: {
     position: "absolute", top: -4, right: -8,
     minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: "#f97316", alignItems: "center", justifyContent: "center",
+    backgroundColor: Colors.primary,
+    alignItems: "center", justifyContent: "center",
     paddingHorizontal: 3,
   },
   text: { color: "#fff", fontSize: 9, fontWeight: "700" },
@@ -38,21 +40,22 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "#0f172a",
-          borderTopColor: "#1e293b",
+          backgroundColor: Colors.bg,
+          borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 62,
-          paddingBottom: 8,
+          height: 64,
+          paddingBottom: 10,
+          paddingTop: 6,
+          ...Shadow.sm,
         },
-        tabBarActiveTintColor: "#f97316",
-        tabBarInactiveTintColor: "#475569",
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "500" },
+        tabBarActiveTintColor:   Colors.tabActive,
+        tabBarInactiveTintColor: Colors.tabInactive,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: t("common.search"),
           tabBarLabel: "Accueil",
           tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
         }}
@@ -60,7 +63,6 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="catalog"
         options={{
-          title: "Catalogue",
           tabBarLabel: "Catalogue",
           tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} />,
         }}
@@ -68,7 +70,6 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="cart"
         options={{
-          title: t("cart.title"),
           tabBarLabel: t("cart.title"),
           tabBarIcon: ({ color, size }) => (
             <View>
@@ -81,16 +82,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="orders"
         options={{
-          title: t("orders.title"),
-          tabBarLabel: t("orders.title"),
+          tabBarLabel: "Commandes",
           tabBarIcon: ({ color, size }) => <Ionicons name="receipt-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: t("profile.title"),
-          tabBarLabel: t("profile.title"),
+          tabBarLabel: "Profil",
           tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
         }}
       />

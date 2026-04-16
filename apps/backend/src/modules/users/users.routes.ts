@@ -1,10 +1,20 @@
 import { Router } from "express";
+import multer from "multer";
 import { authenticate, requireRole } from "../../middleware/auth.js";
 import { validate } from "../../middleware/validate.js";
 import { z } from "zod";
 import * as controller from "./users.controller.js";
 
 const router: import("express").Router = Router();
+
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) cb(null, true);
+    else cb(new Error("JPEG, PNG ou WEBP uniquement"));
+  },
+});
 
 const UpdateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
@@ -28,6 +38,12 @@ const SavedAddressSchema = z.object({
 router.get("/me", authenticate, requireRole("user"), controller.getMyProfile);
 router.patch("/me", authenticate, requireRole("user"), validate(UpdateProfileSchema), controller.updateMyProfile);
 router.post("/me/change-password", authenticate, requireRole("user"), validate(ChangePasswordSchema), controller.changePassword);
+router.post("/me/avatar", authenticate, requireRole("user"), avatarUpload.single("avatar"), controller.uploadAvatar);
+router.patch("/me/default-payment", authenticate, requireRole("user"), validate(z.object({ phone: z.string().min(8), method: z.enum(["orange_money", "mtn_mobile_money"]) })), controller.updateDefaultPayment);
+
+// ─── Favoris agences ─────────────────────────────────────────────────────────
+router.get("/me/favorites", authenticate, requireRole("user"), controller.getFavorites);
+router.post("/me/favorites/:branchId", authenticate, requireRole("user"), controller.toggleFavorite);
 
 // ─── Adresses sauvegardées ────────────────────────────────────────────────────
 router.get("/me/addresses", authenticate, requireRole("user"), controller.listAddresses);

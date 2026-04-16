@@ -3,6 +3,21 @@ import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess } from "../../utils/response.js";
 
+export async function getDriverProfile(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { data, error } = await supabase
+      .from("drivers")
+      .select("id, name, phone, branch_id, brand_id, is_active, created_at, branches(name, address)")
+      .eq("id", req.user!.id)
+      .single();
+
+    if (error || !data) throw new AppError(404, "NOT_FOUND", "Livreur introuvable");
+    sendSuccess(res, data);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getMyDeliveries(req: Request, res: Response, next: NextFunction) {
   try {
     const { status } = req.query as Record<string, string>;

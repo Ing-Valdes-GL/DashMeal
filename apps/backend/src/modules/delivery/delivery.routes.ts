@@ -16,6 +16,9 @@ const UpdatePositionSchema = z.object({
   lng: z.number().min(-180).max(180),
 });
 
+// ─── Livreur : profil ─────────────────────────────────────────────────────────
+router.get("/me", authenticate, requireRole("driver"), controller.getDriverProfile);
+
 // ─── Livreur : ses livraisons assignées ──────────────────────────────────────
 router.get("/my-deliveries", authenticate, requireRole("driver"), controller.getMyDeliveries);
 router.get("/my-deliveries/:id", authenticate, requireRole("driver"), controller.getDeliveryDetail);

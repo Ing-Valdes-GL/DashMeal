@@ -12,6 +12,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/stores/cart";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { Colors, Radius, Shadow } from "@/lib/theme";
 
 const { width } = Dimensions.get("window");
 
@@ -27,7 +29,7 @@ export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { addItem, items } = useCartStore();
+  const { addItem } = useCartStore();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
@@ -40,19 +42,16 @@ export default function ProductDetailScreen() {
   if (isLoading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator color="#f97316" size="large" />
+        <ActivityIndicator color={Colors.primary} size="large" />
       </View>
     );
   }
-
   if (!product) return null;
 
   const name = i18n.language === "en" ? product.name_en : product.name_fr;
   const description = i18n.language === "en" ? product.description_en : product.description_fr;
   const images = product.product_images ?? [];
   const primaryImage = images.find((i) => i.is_primary) ?? images[0];
-
-  const inCart = items.find((i) => i.product_id === product.id);
 
   const handleAddToCart = () => {
     addItem({
@@ -68,16 +67,19 @@ export default function ProductDetailScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Image */}
+      <StatusBar style="light" />
+
+      {/* ── Image hero ───────────────────────────────────────────────────────── */}
       <View style={styles.imgWrap}>
         {primaryImage ? (
           <Image source={{ uri: primaryImage.url }} style={styles.img} contentFit="cover" />
         ) : (
-          <View style={styles.imgPlaceholder}>
-            <Ionicons name="cube-outline" size={64} color="#1e293b" />
+          <View style={styles.imgFallback}>
+            <Ionicons name="cube-outline" size={72} color={Colors.border} />
           </View>
         )}
-        {/* Back btn */}
+        {/* Overlay gradient */}
+        <View style={styles.imgOverlay} />
         <SafeAreaView style={styles.backArea} edges={["top"]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={20} color="#fff" />
@@ -85,28 +87,40 @@ export default function ProductDetailScreen() {
         </SafeAreaView>
       </View>
 
-      {/* Content */}
-      <View style={styles.content}>
+      {/* ── Fiche produit ────────────────────────────────────────────────────── */}
+      <View style={styles.sheet}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-          {/* Category */}
+          {/* Catégorie */}
           {product.categories && (
-            <Text style={styles.category}>
-              {i18n.language === "en" ? product.categories.name_en : product.categories.name_fr}
-            </Text>
+            <View style={styles.catRow}>
+              <View style={styles.catPill}>
+                <Text style={styles.catText}>
+                  {i18n.language === "en" ? product.categories.name_en : product.categories.name_fr}
+                </Text>
+              </View>
+            </View>
           )}
 
-          {/* Name + Price */}
+          {/* Nom + Prix */}
           <View style={styles.nameRow}>
             <Text style={styles.name}>{name}</Text>
             <Text style={styles.price}>{formatCurrency(product.price)}</Text>
           </View>
 
-          {/* Stock status */}
+          {/* Disponibilité */}
           <View style={styles.stockRow}>
-            <View style={[styles.dot, product.is_active && styles.dotGreen]} />
-            <Text style={[styles.stock, product.is_active && styles.stockGreen]}>
+            <View style={[styles.dot, product.is_active ? styles.dotGreen : styles.dotRed]} />
+            <Text style={[styles.stockText, product.is_active ? { color: Colors.success } : { color: Colors.error }]}>
               {product.is_active ? t("products.inStock") : t("products.outOfStock")}
             </Text>
+          </View>
+
+          {/* Rating décoratif */}
+          <View style={styles.ratingRow}>
+            {[1,2,3,4,5].map((s) => (
+              <Ionicons key={s} name={s <= 4 ? "star" : "star-half"} size={14} color="#FFC107" />
+            ))}
+            <Text style={styles.ratingText}>4.5  •  120+ commandes</Text>
           </View>
 
           {/* Description */}
@@ -119,34 +133,35 @@ export default function ProductDetailScreen() {
         </ScrollView>
       </View>
 
-      {/* Bottom bar */}
+      {/* ── Barre bas : quantité + bouton ────────────────────────────────────── */}
       <View style={styles.bottomBar}>
-        {/* Quantity */}
+        {/* Quantité */}
         <View style={styles.qtyControl}>
           <TouchableOpacity
             style={styles.qtyBtn}
             onPress={() => setQty(Math.max(1, qty - 1))}
           >
-            <Ionicons name="remove" size={16} color="#fff" />
+            <Ionicons name="remove" size={16} color={Colors.primary} />
           </TouchableOpacity>
           <Text style={styles.qtyVal}>{qty}</Text>
           <TouchableOpacity
-            style={[styles.qtyBtn, styles.qtyAdd]}
+            style={[styles.qtyBtn, styles.qtyBtnAdd]}
             onPress={() => setQty(qty + 1)}
           >
             <Ionicons name="add" size={16} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        {/* Add to cart */}
+        {/* Ajouter */}
         <TouchableOpacity
-          style={[styles.addBtn, !product.is_active && styles.addBtnDisabled, added && styles.addBtnSuccess]}
+          style={[styles.addBtn, !product.is_active && styles.addBtnOff, added && styles.addBtnOk]}
           onPress={handleAddToCart}
           disabled={!product.is_active}
+          activeOpacity={0.85}
         >
           <Ionicons name={added ? "checkmark" : "cart-outline"} size={18} color="#fff" />
           <Text style={styles.addBtnText}>
-            {added ? "Ajouté !" : t("products.addToCart")}
+            {added ? "Ajouté !" : `${t("products.addToCart")} — ${formatCurrency(product.price * qty)}`}
           </Text>
         </TouchableOpacity>
       </View>
@@ -155,49 +170,67 @@ export default function ProductDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0a0f1e" },
-  loader: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0a0f1e" },
-  imgWrap: { width, height: 300, backgroundColor: "#0f172a" },
-  img: { width: "100%", height: "100%" },
-  imgPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center" },
+  container: { flex: 1, backgroundColor: Colors.bg },
+  loader:    { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: Colors.bg },
+  imgWrap:   { width, height: 320, backgroundColor: Colors.inputBg },
+  img:       { width: "100%", height: "100%" },
+  imgFallback: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: Colors.pageBg },
+  imgOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.12)",
+  },
   backArea: { position: "absolute", top: 0, left: 0, right: 0 },
   backBtn: {
-    margin: 16,
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: "rgba(15,23,42,0.8)", alignItems: "center", justifyContent: "center",
+    margin: 16, width: 40, height: 40, borderRadius: Radius.full,
+    backgroundColor: "rgba(0,0,0,0.35)", alignItems: "center", justifyContent: "center",
   },
-  content: { flex: 1, backgroundColor: "#0a0f1e", borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20, padding: 20 },
-  category: { fontSize: 12, color: "#f97316", fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
-  nameRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 8 },
-  name: { flex: 1, fontSize: 22, fontWeight: "800", color: "#fff", lineHeight: 28 },
-  price: { fontSize: 22, fontWeight: "800", color: "#f97316" },
-  stockRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 16 },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#ef4444" },
-  dotGreen: { backgroundColor: "#22c55e" },
-  stock: { fontSize: 13, color: "#ef4444", fontWeight: "500" },
-  stockGreen: { color: "#22c55e" },
-  descSection: { gap: 8 },
-  descTitle: { fontSize: 15, fontWeight: "700", color: "#fff" },
-  desc: { fontSize: 14, color: "#64748b", lineHeight: 22 },
+  sheet: {
+    flex: 1, backgroundColor: Colors.bg,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    marginTop: -24, padding: 22,
+  },
+  catRow:   { marginBottom: 10 },
+  catPill:  { backgroundColor: Colors.primaryLight, borderRadius: Radius.full, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 4 },
+  catText:  { fontSize: 12, fontWeight: "600", color: Colors.primary },
+  nameRow:  { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10 },
+  name:     { flex: 1, fontSize: 22, fontWeight: "800", color: Colors.text, lineHeight: 28 },
+  price:    { fontSize: 22, fontWeight: "800", color: Colors.primary },
+  stockRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
+  dot:      { width: 7, height: 7, borderRadius: 4 },
+  dotGreen: { backgroundColor: Colors.success },
+  dotRed:   { backgroundColor: Colors.error },
+  stockText:{ fontSize: 13, fontWeight: "500" },
+  ratingRow:{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 18 },
+  ratingText: { fontSize: 12, color: Colors.text2, marginLeft: 4 },
+  descSection:{ gap: 8 },
+  descTitle: { fontSize: 16, fontWeight: "700", color: Colors.text },
+  desc:      { fontSize: 14, color: Colors.text2, lineHeight: 22 },
+  // Bottom bar
   bottomBar: {
     position: "absolute", bottom: 0, left: 0, right: 0,
     flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: "#0f172a", borderTopWidth: 1, borderTopColor: "#1e293b",
+    backgroundColor: Colors.bg,
+    borderTopWidth: 1, borderTopColor: Colors.border,
     paddingHorizontal: 20, paddingVertical: 16, paddingBottom: 32,
+    ...Shadow.sm,
   },
   qtyControl: {
-    flexDirection: "row", alignItems: "center", gap: 10,
-    backgroundColor: "#1e293b", borderRadius: 12, padding: 6,
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: Colors.inputBg, borderRadius: Radius.full, padding: 6,
   },
-  qtyBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#334155", alignItems: "center", justifyContent: "center" },
-  qtyAdd: { backgroundColor: "#f97316" },
-  qtyVal: { fontSize: 16, fontWeight: "700", color: "#fff", minWidth: 24, textAlign: "center" },
+  qtyBtn: {
+    width: 34, height: 34, borderRadius: Radius.full,
+    backgroundColor: Colors.bg, borderWidth: 1, borderColor: Colors.border,
+    alignItems: "center", justifyContent: "center",
+  },
+  qtyBtnAdd: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  qtyVal: { fontSize: 16, fontWeight: "700", color: Colors.text, minWidth: 26, textAlign: "center" },
   addBtn: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: "#f97316", borderRadius: 14, height: 52,
-    shadowColor: "#f97316", shadowOpacity: 0.35, shadowRadius: 10, elevation: 5,
+    backgroundColor: Colors.primary, borderRadius: Radius.full, height: 52,
+    ...Shadow.primary,
   },
-  addBtnDisabled: { backgroundColor: "#1e293b" },
-  addBtnSuccess: { backgroundColor: "#22c55e" },
-  addBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  addBtnOff: { backgroundColor: Colors.border },
+  addBtnOk:  { backgroundColor: Colors.success },
+  addBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 });
