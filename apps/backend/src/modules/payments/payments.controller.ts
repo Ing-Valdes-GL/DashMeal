@@ -88,6 +88,7 @@ export async function initiateOrderPayment(req: Request, res: Response, next: Ne
         phone: payment_phone,
         description: `DashMeal commande`,
         externalReference: intent.id,
+        paymentMethod: payment_method,
       });
     } catch (campayErr) {
       // CamPay a échoué → supprimer l'intent pour ne pas bloquer l'utilisateur
@@ -140,6 +141,7 @@ export async function initiatePayment(req: Request, res: Response, next: NextFun
         phone,
         description: `DashMeal #${order_id.slice(0, 8)}`,
         externalReference: order_id,
+        paymentMethod: method,
       });
 
       const { data: payment } = await supabase
@@ -332,7 +334,7 @@ async function createOrderFromIntent(
     throw new AppError(500, "CREATE_ITEMS_ERROR", `Échec items: ${itemsErr.message}`);
   }
 
-  // ── 3. Collect ou livraison ──────────────────────────────────────────────
+  // ── 3. Click & Collect ────────────────────────────────────────────────────
   if (d.type === "collect" && d.slot_id) {
     const qr_code = await generateQrCode(order.id);
     await supabase.rpc("increment_slot_booking", { slot_id: d.slot_id });
@@ -340,20 +342,26 @@ async function createOrderFromIntent(
       order_id: order.id, slot_id: d.slot_id, qr_code, pickup_status: "waiting",
     });
     if (collectErr) console.error("[createOrderFromIntent] Erreur collect_orders:", collectErr.message);
-  } else if (d.type === "delivery") {
-    const { error: deliveryErr } = await supabase.from("deliveries").insert({
-      order_id: order.id,
-      address: d.delivery_address,
-      lat: Number(d.delivery_lat ?? 0),   // NOT NULL dans la DB
-      lng: Number(d.delivery_lng ?? 0),
-      status: "assigned",                  // enum: 'assigned'|'picked_up'|'on_the_way'|'delivered'|'failed'
-    });
-    if (deliveryErr) console.error("[createOrderFromIntent] Erreur deliveries:", deliveryErr.message);
   }
 
   // ── 4. Enregistrer le paiement ────────────────────────────────────────────
   const { data: branch } = await supabase
     .from("branches").select("brand_id").eq("id", d.branch_id as string).single();
+
+  // Créer la livraison ici pour avoir accès à branch.brand_id (notification drivers)
+  if (d.type === "delivery") {
+    const { error: deliveryErr } = await supabase.from("deliveries").insert({
+      order_id: order.id,
+      address: d.delivery_address,
+      lat: d.delivery_lat != null ? Number(d.delivery_lat) : null,
+      lng: d.delivery_lng != null ? Number(d.delivery_lng) : null,
+      status: "pending",
+      brand_id: branch?.brand_id ?? null,
+    });
+    if (deliveryErr) {
+      console.error("[createOrderFromIntent] Erreur deliveries:", deliveryErr.message);
+    }
+  }
 
   // Mapper vers l'enum payment_method de la DB ('mobile_money', 'cash_on_delivery', 'wallet')
   const dbPaymentMethod = (d.payment_method === "orange_money" || d.payment_method === "mtn_mobile_money")

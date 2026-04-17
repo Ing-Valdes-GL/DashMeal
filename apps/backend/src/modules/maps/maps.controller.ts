@@ -140,26 +140,33 @@ export async function staticMap(req: Request, res: Response, next: NextFunction)
   try {
     const {
       driverlat, driverlng,   // livreur (optionnel)
-      destlat, destlng,       // destination de livraison
+      destlat, destlng,       // destination (optionnel)
       zoom = "14",
-      size = "600x300",
+      w, h,                   // dimensions en pixels (priorité sur size)
+      size,                   // fallback legacy "WxH"
     } = req.query;
 
-    if (!destlat || !destlng) {
-      throw new AppError(400, "MISSING_PARAM", "destlat et destlng sont requis");
+    const hasDriver = !!(driverlat && driverlng);
+    const hasDest   = !!(destlat && destlng);
+
+    if (!hasDriver && !hasDest) {
+      throw new AppError(400, "MISSING_PARAM", "Au moins driverlat/driverlng ou destlat/destlng est requis");
     }
 
-    const hasDriver = driverlat && driverlng;
-
-    // Center: on driver if available, else destination
+    // Center: driver first, then destination
     const centerLat = hasDriver ? driverlat : destlat;
     const centerLng = hasDriver ? driverlng : destlng;
+
+    // Google Static Maps max size is 640x640; scale=2 already doubles pixel density
+    const imgW = w ? Math.min(Number(w), 640) : 600;
+    const imgH = h ? Math.min(Number(h), 640) : 300;
+    const imgSize = size ? String(size) : `${imgW}x${imgH}`;
 
     // Build query string manually (duplicate keys not supported by URLSearchParams)
     const parts: string[] = [
       `center=${centerLat},${centerLng}`,
       `zoom=${zoom}`,
-      `size=${size}`,
+      `size=${imgSize}`,
       `scale=2`,
       `language=fr`,
       `maptype=roadmap`,
@@ -167,9 +174,11 @@ export async function staticMap(req: Request, res: Response, next: NextFunction)
     ];
 
     // Destination marker — red pin
-    parts.push(`markers=color:red%7Clabel:D%7C${destlat},${destlng}`);
+    if (hasDest) {
+      parts.push(`markers=color:red%7Clabel:D%7C${destlat},${destlng}`);
+    }
 
-    // Driver marker — blue pin (only when position known)
+    // Driver marker — blue pin
     if (hasDriver) {
       parts.push(`markers=color:blue%7Clabel:L%7C${driverlat},${driverlng}`);
     }

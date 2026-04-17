@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
+import path from "path";
+import { randomUUID } from "crypto";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
@@ -170,7 +172,7 @@ export async function listDrivers(req: Request, res: Response, next: NextFunctio
 
     let query = supabase
       .from("drivers")
-      .select("id, name, phone, branch_id, brand_id, is_active, created_at, branches(name)")
+      .select("id, name, phone, branch_id, brand_id, is_active, photo_url, created_at, branches(name)")
       .order("created_at", { ascending: false });
 
     if (brand_id) query = query.eq("brand_id", brand_id);
@@ -198,9 +200,28 @@ export async function getDriver(req: Request, res: Response, next: NextFunction)
   }
 }
 
+export async function uploadDriverPhoto(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) throw new AppError(400, "NO_FILE", "Aucun fichier reçu");
+    const ext = path.extname(req.file.originalname).toLowerCase() || ".jpg";
+    if (![".jpg", ".jpeg", ".png", ".webp"].includes(ext))
+      throw new AppError(400, "INVALID_TYPE", "Type non supporté (jpg/png/webp)");
+    const brand_id = req.user!.brand_id ?? "shared";
+    const filename = `${brand_id}/${randomUUID()}${ext}`;
+    const { error } = await supabase.storage
+      .from("driver-photos")
+      .upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+    if (error) throw new AppError(500, "UPLOAD_ERROR", "Échec de l'upload : " + error.message);
+    const { data } = supabase.storage.from("driver-photos").getPublicUrl(filename);
+    sendSuccess(res, { url: data.publicUrl });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function createDriver(req: Request, res: Response, next: NextFunction) {
   try {
-    const { name, phone, branch_id, pin } = req.body;
+    const { name, phone, branch_id, pin, photo_url } = req.body;
 
     const { data: existing } = await supabase
       .from("drivers")
@@ -222,10 +243,11 @@ export async function createDriver(req: Request, res: Response, next: NextFuncti
         admin_id: req.user!.id,
         brand_id: req.user!.brand_id ?? null,
         branch_id: branch_id ?? null,
-        is_active: true,
+        is_active: false,
         pin_hash,
+        photo_url: photo_url ?? null,
       })
-      .select("id, name, phone, branch_id, brand_id, is_active, created_at")
+      .select("id, name, phone, branch_id, brand_id, is_active, photo_url, created_at")
       .single();
 
     if (error || !data) throw new AppError(500, "CREATE_ERROR", "Échec de création");

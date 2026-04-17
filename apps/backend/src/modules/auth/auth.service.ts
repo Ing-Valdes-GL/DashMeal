@@ -285,9 +285,6 @@ export async function loginDriver(input: { phone: string; pin: string }): Promis
   if (!driver) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
   }
-  if (!driver.is_active) {
-    throw new AppError(403, "ACCOUNT_SUSPENDED", "Ce compte a été suspendu");
-  }
   if (!driver.pin_hash) {
     throw new AppError(401, "NO_PIN", "PIN non configuré. Contactez votre administrateur.");
   }
@@ -303,6 +300,7 @@ export async function loginDriver(input: { phone: string; pin: string }): Promis
     role: "driver",
     name: driver.name,
     phone: driver.phone,
+    brand_id: driver.brand_id,
     branch_id: driver.branch_id,
   };
   const tokens: AuthTokens = {

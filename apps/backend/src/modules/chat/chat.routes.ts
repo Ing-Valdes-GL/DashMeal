@@ -4,6 +4,9 @@ import * as controller from "./chat.controller.js";
 
 const router: import("express").Router = Router();
 
+// ─── Conversations du livreur ─────────────────────────────────────────────────
+router.get("/conversations/driver/list", authenticate, controller.getDriverConversations);
+
 // ─── Conversation (créer ou récupérer) ───────────────────────────────────────
 // GET /chat/conversations/order/:orderId?type=driver|support
 router.get("/conversations/order/:orderId", authenticate, controller.getOrCreateConversation);

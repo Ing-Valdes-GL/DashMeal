@@ -11,6 +11,7 @@
  */
 
 import { env } from "../config/env.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,39 @@ export interface CamPayWithdrawResponse {
   status: string;
   operator?: string;
 }
+
+// ─── Operator detection & minimums ───────────────────────────────────────────
+
+/**
+ * Cameroon mobile prefixes (9-digit local format, first 3 digits):
+ *   MTN:    650-654, 658-659, 670-679, 680-689
+ *   Orange: 655-657, 690-699
+ */
+function detectOperator(phone: string): "MTN" | "Orange" | "unknown" {
+  const digits = normalizePhone(phone); // 237XXXXXXXXX
+  // Extract the 3 digits after country code 237 (positions 3-5)
+  const prefix = parseInt(digits.slice(3, 6), 10);
+  if (isNaN(prefix)) return "unknown";
+
+  if (
+    (prefix >= 650 && prefix <= 654) ||
+    (prefix >= 658 && prefix <= 659) ||
+    (prefix >= 670 && prefix <= 689)
+  ) return "MTN";
+
+  if (
+    (prefix >= 655 && prefix <= 657) ||
+    (prefix >= 690 && prefix <= 699)
+  ) return "Orange";
+
+  return "unknown";
+}
+
+const CAMPAY_MIN_AMOUNT: Record<"MTN" | "Orange" | "unknown", number> = {
+  MTN:     100, // MTN Mobile Money minimum
+  Orange:   10, // Orange Money minimum
+  unknown: 100, // conservative fallback
+};
 
 // ─── Token cache (module-level singleton) ────────────────────────────────────
 
@@ -137,7 +171,28 @@ export async function campayCollect(params: {
   phone: string;
   description: string;
   externalReference: string;
+  paymentMethod?: string; // e.g. "orange_money" | "mtn_mobile_money" | "mobile_money"
 }): Promise<CamPayCollectResponse> {
+  // Trust explicit payment method selection over phone-prefix detection
+  let operator: "MTN" | "Orange" | "unknown";
+  if (params.paymentMethod === "orange_money") {
+    operator = "Orange";
+  } else if (params.paymentMethod === "mtn_mobile_money") {
+    operator = "MTN";
+  } else {
+    operator = detectOperator(params.phone);
+  }
+  const minAmount = CAMPAY_MIN_AMOUNT[operator];
+
+  if (params.amount < minAmount) {
+    const operatorLabel = operator === "unknown" ? "Mobile Money" : `${operator} Mobile Money`;
+    throw new AppError(
+      400,
+      "AMOUNT_TOO_LOW",
+      `Le montant minimum pour ${operatorLabel} est de ${minAmount} FCFA. Montant actuel : ${params.amount} FCFA.`,
+    );
+  }
+
   const headers = await authHeader();
 
   const res = await fetch(`${baseUrl()}/api/collect/`, {
@@ -154,17 +209,16 @@ export async function campayCollect(params: {
 
   if (!res.ok) {
     const body = await res.text();
-    // Essayer de parser le message d'erreur CamPay pour un message lisible
     try {
       const errJson = JSON.parse(body) as { message?: string; error_code?: string };
       if (errJson.message) {
-        throw new Error(errJson.message); // ex: "Minimum amount for Orange is 10.00"
+        throw new AppError(400, "CAMPAY_ERROR", errJson.message);
       }
     } catch (parseErr) {
       if (parseErr instanceof SyntaxError) { /* corps non-JSON */ }
       else throw parseErr;
     }
-    throw new Error(`CamPay collect failed (${res.status}): ${body}`);
+    throw new AppError(502, "CAMPAY_ERROR", `Échec du paiement Mobile Money (${res.status})`);
   }
 
   return res.json() as Promise<CamPayCollectResponse>;

@@ -4,7 +4,7 @@ import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 import { generateQrCode } from "../../utils/qrcode.js";
 import { campayCollect } from "../../services/campay.js";
-import { notifyOrderStatus } from "../../utils/push.js";
+import { notifyOrderStatus, notifyDriversNewDelivery } from "../../utils/push.js";
 
 // ─── Création unifiée avec items + paiement Campay ───────────────────────────
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
@@ -57,14 +57,17 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       await supabase.rpc("increment_slot_booking", { slot_id });
       await supabase.from("collect_orders").insert({ order_id: order.id, slot_id, qr_code, pickup_status: "waiting" });
     } else if (type === "delivery") {
-      await supabase.from("deliveries").insert({
+      const { data: branch } = await supabase.from("branches").select("brand_id").eq("id", branch_id).single();
+      const { error: deliveryErr } = await supabase.from("deliveries").insert({
         order_id: order.id,
         address: delivery_address,
         lat: delivery_lat ?? null,
         lng: delivery_lng ?? null,
         phone: delivery_phone ?? null,
         status: "pending",
+        brand_id: branch?.brand_id ?? null,
       });
+      if (deliveryErr) console.error("[createOrder] delivery insert failed:", deliveryErr.message);
     }
 
     // ── Initier le paiement Campay ────────────────────────────────────────────
@@ -78,6 +81,7 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
         phone: payment_phone,
         description: `DashMeal #${order.id.slice(0, 8)}`,
         externalReference: order.id,
+        paymentMethod: payment_method,
       });
 
       payment_reference = campayData.reference;
@@ -137,13 +141,16 @@ export async function createDeliveryOrder(req: Request, res: Response, next: Nex
 
     const order = await buildAndCreateOrder(user_id, branch_id, "delivery", notes, promotion_code);
 
-    await supabase.from("deliveries").insert({
+    const { data: branch } = await supabase.from("branches").select("brand_id").eq("id", branch_id).single();
+    const { error: deliveryErr } = await supabase.from("deliveries").insert({
       order_id: order.id,
       address: delivery_address,
-      lat: delivery_lat,
-      lng: delivery_lng,
-      status: "assigned",
+      lat: delivery_lat ?? null,
+      lng: delivery_lng ?? null,
+      status: "pending",
+      brand_id: branch?.brand_id ?? null,
     });
+    if (deliveryErr) console.error("[createDeliveryOrder] delivery insert failed:", deliveryErr.message);
 
     sendCreated(res, order);
   } catch (err) {
@@ -158,16 +165,26 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
     const limitNum = Number(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // !inner force un INNER JOIN → les orders sans branche correspondante sont exclus
+    // Resolve allowed branch IDs for brand-scoped admins (avoids unreliable nested PostgREST filters)
+    let allowedBranchIds: string[] | null = null;
+    if (req.user?.role === "admin" && req.user.brand_id) {
+      const { data: branches } = await supabase
+        .from("branches")
+        .select("id")
+        .eq("brand_id", req.user.brand_id);
+      allowedBranchIds = (branches ?? []).map((b) => b.id);
+      if (!allowedBranchIds.length) {
+        return res.json({ success: true, data: [], pagination: { page: pageNum, limit: limitNum, total: 0, total_pages: 0 } });
+      }
+    }
+
     let query = supabase
       .from("orders")
-      .select("*, users(name, phone), branches!inner(name, brand_id), order_items(*, products(name_fr))", { count: "exact" })
+      .select("*, users(name, phone), branches(name), order_items(*, products(name_fr))", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limitNum - 1);
 
-    if (req.user?.role === "admin" && req.user.brand_id) {
-      query = query.eq("branches.brand_id", req.user.brand_id);
-    }
+    if (allowedBranchIds) query = query.in("branch_id", allowedBranchIds);
     if (status) query = query.eq("status", status);
     if (branch_id) query = query.eq("branch_id", branch_id);
 
@@ -229,7 +246,7 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
       .from("orders")
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", orderId)
-      .select("id, user_id")
+      .select("id, user_id, type, branch_id")
       .single();
 
     await supabase.from("order_status_history").insert({
@@ -240,9 +257,33 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
       note: note ?? null,
     });
 
-    // Notification push selon le nouveau statut
+    // Notification push vers l'utilisateur
     if (order?.user_id) {
       notifyOrderStatus(order.user_id, orderId, status, orderId).catch(() => {});
+    }
+
+    // Quand la commande est prête → rendre la livraison visible aux livreurs
+    if (status === "ready" && order?.type === "delivery") {
+      const { data: delivery } = await supabase
+        .from("deliveries")
+        .update({ status: "assigned" })
+        .eq("order_id", orderId)
+        .select("id, address, brand_id")
+        .single();
+
+      if (delivery?.brand_id) {
+        notifyDriversNewDelivery(delivery.brand_id, delivery.id, delivery.address).catch(() => {});
+      } else if (delivery && order.branch_id) {
+        // fallback: look up brand_id from branch
+        const { data: branch } = await supabase
+          .from("branches")
+          .select("brand_id")
+          .eq("id", order.branch_id)
+          .single();
+        if (branch?.brand_id) {
+          notifyDriversNewDelivery(branch.brand_id, delivery.id, delivery.address).catch(() => {});
+        }
+      }
     }
 
     sendSuccess(res, { status }, "Statut mis à jour");

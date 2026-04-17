@@ -46,16 +46,17 @@ export function Sidebar({ locale }: { locale: string }) {
     { href: "/collect",       label: t("collect"),       icon: QrCode },
     { href: "/analytics",     label: t("analytics"),     icon: BarChart2 },
     { href: "/notifications", label: t("notifications"), icon: Bell },
-    { href: "/commissions",   label: t("commissions"),   icon: DollarSign },
     { href: "/settings",      label: t("settings"),      icon: Settings },
   ];
 
   const superadminNav: NavItem[] = [
+    { href: "/superadmin/platform",     label: t("platform"),     icon: Globe },
     { href: "/superadmin/brands",       label: t("brands"),       icon: Building2 },
     { href: "/superadmin/applications", label: t("applications"), icon: FileText },
     { href: "/superadmin/users",        label: t("users"),        icon: Users },
+    { href: "/superadmin/commissions",  label: t("commissions"),  icon: DollarSign },
     { href: "/superadmin/audit",        label: t("audit"),        icon: Activity },
-    { href: "/superadmin/platform",     label: t("platform"),     icon: Globe },
+    { href: "/settings",                label: t("settings"),     icon: Settings },
   ];
 
   return (
@@ -67,7 +68,9 @@ export function Sidebar({ locale }: { locale: string }) {
         </div>
         <div>
           <span className="text-base font-bold text-white">Dash Meal</span>
-          <p className="text-[10px] text-slate-500 -mt-0.5">Admin Panel</p>
+          <p className="text-[10px] text-slate-500 -mt-0.5">
+            {user?.role === "superadmin" ? "Super Admin" : "Admin Panel"}
+          </p>
         </div>
       </div>
 
@@ -81,23 +84,9 @@ export function Sidebar({ locale }: { locale: string }) {
 
       {/* Navigation principale */}
       <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
-        {adminNav.map((item) => (
+        {(user?.role === "superadmin" ? superadminNav : adminNav).map((item) => (
           <NavLink key={item.href} item={item} locale={locale} active={isActive(item.href)} />
         ))}
-
-        {/* Section Superadmin */}
-        {user?.role === "superadmin" && (
-          <>
-            <div className="pt-4 pb-1 px-2">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-600">
-                Super Admin
-              </p>
-            </div>
-            {superadminNav.map((item) => (
-              <NavLink key={item.href} item={item} locale={locale} active={isActive(item.href)} />
-            ))}
-          </>
-        )}
       </nav>
 
       {/* User footer */}

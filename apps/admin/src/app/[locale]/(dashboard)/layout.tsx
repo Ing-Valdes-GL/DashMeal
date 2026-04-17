@@ -26,8 +26,18 @@ export default function DashboardLayout({
       return;
     }
 
-    if (pathname.includes("/superadmin/") && user.role !== "superadmin") {
-      router.push(`/${locale}/dashboard`);
+    const isSuperadmin = user.role === "superadmin";
+
+    // Superadmin trying to access admin-only routes → send to platform
+    const adminOnlyPaths = ["/dashboard", "/orders", "/branches", "/delivery", "/drivers", "/collect", "/analytics", "/notifications", "/commissions"];
+    if (isSuperadmin && adminOnlyPaths.some((p) => pathname.includes(p) && !pathname.includes("/superadmin"))) {
+      router.replace(`/${locale}/superadmin/platform`);
+      return;
+    }
+
+    // Admin trying to access superadmin routes → send to dashboard
+    if (!isSuperadmin && pathname.includes("/superadmin/")) {
+      router.replace(`/${locale}/dashboard`);
     }
   }, [isAuthenticated, user, locale, pathname, router]);
 

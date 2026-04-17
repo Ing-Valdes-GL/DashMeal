@@ -70,3 +70,38 @@ export async function registerForPushNotifications(): Promise<string | null> {
 
   return token;
 }
+
+export async function registerDriverPushToken(): Promise<void> {
+  const isDevice = Constants.isDevice ?? true;
+  if (!isDevice) return;
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "Dash Meal Livreur",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#f97316",
+    });
+  }
+
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  let finalStatus = existing;
+  if (existing !== "granted") {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== "granted") return;
+
+  const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+  const tokenData = await Notifications.getExpoPushTokenAsync(
+    projectId ? { projectId } : undefined
+  );
+  const token = tokenData.data;
+
+  try {
+    await apiPost("/delivery/push-token", { token });
+    console.log("[Push] Token livreur enregistré");
+  } catch (err) {
+    console.error("[Push] Échec enregistrement token livreur:", err);
+  }
+}

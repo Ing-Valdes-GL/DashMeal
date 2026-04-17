@@ -132,6 +132,40 @@ export async function notifyOrderStatus(
   await notifyUser(userId, msg.title, msg.body, data);
 }
 
+// ─── Notifier tous les livreurs actifs d'une marque ─────────────────────────
+
+export async function notifyDriversNewDelivery(
+  brandId: string,
+  deliveryId: string,
+  address: string,
+): Promise<void> {
+  const { data: drivers } = await supabase
+    .from("drivers")
+    .select("push_token")
+    .eq("brand_id", brandId)
+    .eq("is_active", true)
+    .not("push_token", "is", null);
+
+  if (!drivers || drivers.length === 0) return;
+
+  const tokens = drivers.map((d) => d.push_token as string).filter(Boolean);
+  if (tokens.length === 0) return;
+
+  console.log(`[Push] Nouvelle livraison → ${tokens.length} livreur(s) de la marque ${brandId}`);
+
+  const messages: ExpoPushMessage[] = tokens.map((token) => ({
+    to: token,
+    title: "Nouvelle livraison disponible 📦",
+    body: `Adresse : ${address}`,
+    data: { deliveryId, screen: "delivery", type: "new_delivery" },
+    sound: "default",
+    priority: "high",
+    channelId: "default",
+  }));
+
+  await sendToExpo(messages);
+}
+
 export async function notifyPaymentFailed(
   userId: string,
   orderId: string,

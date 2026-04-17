@@ -125,6 +125,14 @@ export default function LoginScreen() {
                 <Text style={styles.registerLink}>S'inscrire</Text>
               </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+              style={styles.driverRow}
+              onPress={() => router.push("/(driver)/login")}
+            >
+              <Ionicons name="bicycle-outline" size={16} color={Colors.textDark2} />
+              <Text style={styles.driverText}>Accès livreur</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -161,4 +169,11 @@ const styles = StyleSheet.create({
   registerRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 20 },
   registerText: { color: Colors.textDark2, fontSize: 14 },
   registerLink: { color: Colors.primary, fontWeight: "700", fontSize: 14 },
+  driverRow: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, marginTop: 16, padding: 10,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 12,
+  },
+  driverText: { color: Colors.textDark2, fontSize: 13, fontWeight: "600" },
 });

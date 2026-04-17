@@ -8,6 +8,7 @@ import * as SecureStore from "expo-secure-store";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "@/stores/auth";
 import { apiPost } from "@/lib/api";
+import { registerDriverPushToken } from "@/lib/notifications";
 import { Colors, Radius, Shadow } from "@/lib/theme";
 
 export default function DriverLoginScreen() {
@@ -35,14 +36,15 @@ export default function DriverLoginScreen() {
     setLoading(true);
     try {
       const res = await apiPost("/auth/driver/login", { phone: cleanPhone, pin: cleanPin });
-      const { access_token, refresh_token, driver } = res.data as {
-        access_token: string;
-        refresh_token: string;
+      const { driver, tokens } = res.data as {
         driver: { id: string; name: string; phone: string };
+        tokens: { access_token: string; refresh_token: string };
       };
+      const { access_token, refresh_token } = tokens;
 
       await SecureStore.setItemAsync("dm_user_role", "driver");
       await login({ ...driver, is_verified: true, role: "driver" }, access_token, refresh_token);
+      registerDriverPushToken().catch(() => {});
       router.replace("/(driver)/deliveries");
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? "Numéro ou PIN incorrect.";

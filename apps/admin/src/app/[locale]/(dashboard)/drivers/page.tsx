@@ -1,10 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { apiGet, apiPost, apiPatch } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiUpload } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   UserCheck, Plus, MoreHorizontal, RefreshCw, Phone, Store,
-  Power, Key, Pencil, Bike,
+  Power, Key, Pencil, Bike, Camera, Loader2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ interface Driver {
   id: string; name: string; phone: string;
   branch_id: string | null; brand_id: string | null;
   is_active: boolean; created_at: string;
+  photo_url: string | null;
   branches: { name: string } | null;
 }
 
@@ -56,6 +57,9 @@ export default function DriversPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [pinTarget, setPinTarget] = useState<Driver | null>(null);
   const [editTarget, setEditTarget] = useState<Driver | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // ── Données ─────────────────────────────────────────────────────────────────
   const { data: drivers = [], isLoading, refetch } = useQuery<Driver[]>({
@@ -73,12 +77,27 @@ export default function DriversPage() {
   // ── Création ────────────────────────────────────────────────────────────────
   const createForm = useForm<CreateDriverInput>({ resolver: zodResolver(CreateDriverSchema) });
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      const result = await apiUpload<{ url: string }>("/admins/drivers/upload-photo", file, "photo");
+      setPhotoUrl(result.url);
+    } catch {
+      toast.error("Erreur lors de l'upload de la photo");
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
   const createMutation = useMutation({
-    mutationFn: (data: CreateDriverInput) => apiPost("/admins/drivers", data),
+    mutationFn: (data: CreateDriverInput) => apiPost("/admins/drivers", { ...data, photo_url: photoUrl }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["drivers"] });
       toast.success("Livreur créé avec succès");
       setShowCreate(false);
+      setPhotoUrl(null);
       createForm.reset();
     },
     onError: (e: any) => toast.error(e?.response?.data?.error?.message ?? "Erreur de création"),
@@ -205,9 +224,14 @@ export default function DriversPage() {
                     {/* Nom */}
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-brand-500/20 flex items-center justify-center text-brand-400 font-bold text-xs">
-                          {driver.name.slice(0, 2).toUpperCase()}
-                        </div>
+                        {driver.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={driver.photo_url} alt={driver.name} className="h-8 w-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="h-8 w-8 rounded-full bg-brand-500/20 flex items-center justify-center text-brand-400 font-bold text-xs">
+                            {driver.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
                         <span className="font-medium text-white">{driver.name}</span>
                       </div>
                     </TableCell>
@@ -275,7 +299,7 @@ export default function DriversPage() {
       </Card>
 
       {/* ── Modal création ──────────────────────────────────────────────────── */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={(o) => { setShowCreate(o); if (!o) { setPhotoUrl(null); createForm.reset(); } }}>
         <DialogContent className="bg-surface-800 border-surface-700 text-white max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -284,6 +308,32 @@ export default function DriversPage() {
             </DialogTitle>
           </DialogHeader>
           <form onSubmit={createForm.handleSubmit((d) => createMutation.mutate(d))} className="space-y-4">
+            {/* Photo */}
+            <div className="flex flex-col items-center gap-3">
+              <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                className="relative group"
+                disabled={photoUploading}
+              >
+                {photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoUrl} alt="Photo livreur" className="h-20 w-20 rounded-full object-cover ring-2 ring-brand-500" />
+                ) : (
+                  <div className="h-20 w-20 rounded-full bg-surface-700 border-2 border-dashed border-surface-500 flex flex-col items-center justify-center gap-1 group-hover:border-brand-500 transition-colors">
+                    {photoUploading ? <Loader2 className="h-5 w-5 text-brand-400 animate-spin" /> : <Camera className="h-5 w-5 text-slate-500" />}
+                    {!photoUploading && <span className="text-xs text-slate-500">Photo</span>}
+                  </div>
+                )}
+                {photoUrl && (
+                  <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Camera className="h-5 w-5 text-white" />
+                  </div>
+                )}
+              </button>
+              <p className="text-xs text-slate-500">Photo du livreur (optionnel)</p>
+            </div>
             <div>
               <Label className="text-slate-300">Nom complet</Label>
               <Input {...createForm.register("name")} placeholder="Jean Dupont" className="mt-1.5 bg-surface-700 border-surface-600 text-white" />

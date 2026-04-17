@@ -19,7 +19,7 @@ export async function getOrCreateConversation(req: Request, res: Response, next:
     // Vérifier que la commande appartient à l'utilisateur (ou est accessible)
     const { data: order, error: orderErr } = await supabase
       .from("orders")
-      .select("id, user_id, branch_id, branches(name, brand_id)")
+      .select("id, user_id, branch_id, branches(name, brand_id, phone)")
       .eq("id", orderId)
       .single();
 
@@ -35,20 +35,46 @@ export async function getOrCreateConversation(req: Request, res: Response, next:
       .eq("type", type)
       .maybeSingle();
 
-    if (existing) {
-      sendSuccess(res, existing);
-      return;
+    const conv = existing ?? await (async () => {
+      const { data, error: createErr } = await supabase
+        .from("conversations")
+        .insert({ order_id: orderId, type })
+        .select()
+        .single();
+      if (createErr || !data) throw new AppError(500, "CREATE_ERROR", "Impossible de créer la conversation");
+      return data;
+    })();
+
+    // Enrich with counterpart info
+    let counterpart_name: string | null = null;
+    let counterpart_phone: string | null = null;
+    let counterpart_avatar: string | null = null;
+    const branch = order.branches as unknown as { name: string; phone: string | null } | null;
+
+    if (type === "client_driver") {
+      const { data: delivery } = await supabase
+        .from("deliveries")
+        .select("driver_id, drivers(name, phone, photo_url)")
+        .eq("order_id", orderId)
+        .maybeSingle();
+      const driver = delivery?.drivers as unknown as { name: string; phone: string; photo_url: string | null } | null;
+      if (driver) {
+        counterpart_name = driver.name;
+        counterpart_phone = driver.phone;
+        counterpart_avatar = driver.photo_url ?? null;
+      }
+    } else {
+      counterpart_name = branch?.name ?? null;
+      counterpart_phone = branch?.phone ?? null;
     }
 
-    // Créer la conversation
-    const { data: conv, error: createErr } = await supabase
-      .from("conversations")
-      .insert({ order_id: orderId, type })
-      .select()
-      .single();
-
-    if (createErr || !conv) throw new AppError(500, "CREATE_ERROR", "Impossible de créer la conversation");
-    sendCreated(res, conv);
+    sendSuccess(res, {
+      ...conv,
+      counterpart_name,
+      counterpart_phone,
+      counterpart_avatar,
+      order_ref: orderId,
+    });
   } catch (err) {
     next(err);
   }
@@ -203,6 +229,70 @@ export async function markAsRead(req: Request, res: Response, next: NextFunction
       .neq("sender_id", req.user!.id);
 
     sendSuccess(res, null, "Messages marqués comme lus");
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Conversations du livreur ─────────────────────────────────────────────────
+// Returns all client_driver conversations for deliveries the driver owns
+
+export async function getDriverConversations(req: Request, res: Response, next: NextFunction) {
+  try {
+    const driverId = req.user!.id;
+
+    // Step 1: get order_ids for this driver's deliveries
+    const { data: deliveries } = await supabase
+      .from("deliveries")
+      .select("order_id, status, address")
+      .eq("driver_id", driverId);
+
+    if (!deliveries || deliveries.length === 0) return sendSuccess(res, []);
+
+    const orderIds = deliveries.map((d) => d.order_id);
+    const deliveryByOrder = Object.fromEntries(deliveries.map((d) => [d.order_id, d]));
+
+    // Step 2: get client_driver conversations for those orders
+    const { data: conversations, error } = await supabase
+      .from("conversations")
+      .select(`
+        id, order_id, created_at,
+        orders(id, status, users(name, phone)),
+        messages(id, content, message_type, created_at, sender_id, is_read)
+      `)
+      .eq("type", "client_driver")
+      .in("order_id", orderIds)
+      .order("created_at", { ascending: false });
+
+    if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
+
+    const enriched = (conversations ?? []).map((conv: any) => {
+      const msgs: any[] = conv.messages ?? [];
+      const lastMsg = [...msgs].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0] ?? null;
+      const unread = msgs.filter((m) => !m.is_read && m.sender_id !== driverId).length;
+      const user = conv.orders?.users;
+      const delivery = deliveryByOrder[conv.order_id];
+
+      return {
+        id: conv.id,
+        order_id: conv.order_id,
+        counterpart_name: user?.name ?? "Client",
+        counterpart_phone: user?.phone ?? null,
+        delivery_status: delivery?.status ?? null,
+        delivery_address: delivery?.address ?? null,
+        last_message: lastMsg ? {
+          content: lastMsg.content,
+          message_type: lastMsg.message_type,
+          created_at: lastMsg.created_at,
+          is_mine: lastMsg.sender_id === driverId,
+        } : null,
+        unread_count: unread,
+      };
+    });
+
+    sendSuccess(res, enriched);
   } catch (err) {
     next(err);
   }

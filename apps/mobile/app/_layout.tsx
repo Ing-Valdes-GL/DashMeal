@@ -182,7 +182,8 @@ function RootLayoutNav() {
         const savedRole = await SecureStore.getItemAsync("dm_user_role");
         if (savedRole === "driver") {
           const res = await apiGet("/delivery/me");
-          setUser({ ...res.data, role: "driver" });
+          const d = res.data;
+          setUser({ id: d.id, name: d.name, phone: d.phone, is_verified: true, role: "driver" });
         } else {
           const res = await apiGet("/users/me");
           setUser(res.data);
@@ -217,6 +218,11 @@ function RootLayoutNav() {
       // Navigate to chat (legacy: conversationId param)
       if (data?.screen === "chat" && typeof data.conversationId === "string") {
         router.push({ pathname: "/chat/[id]", params: { id: data.conversationId } });
+        return;
+      }
+      // Driver: new delivery available
+      if (data?.type === "new_delivery" && typeof data.deliveryId === "string") {
+        router.push({ pathname: "/(driver)/delivery/[id]", params: { id: data.deliveryId, mode: "available" } });
       }
     });
 

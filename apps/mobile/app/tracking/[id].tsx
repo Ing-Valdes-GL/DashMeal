@@ -57,18 +57,15 @@ function buildStaticMapUrl(
   driverLat?: number | null,
   driverLng?: number | null,
 ): string | null {
-  if (destLat == null || destLng == null) return null;
-  const params: string[] = [
-    `destlat=${destLat}`,
-    `destlng=${destLng}`,
-    `size=${MAP_W}x${MAP_H}`,
-    `zoom=14`,
-  ];
-  if (driverLat != null && driverLng != null) {
-    params.push(`driverlat=${driverLat}`);
-    params.push(`driverlng=${driverLng}`);
-  }
-  return `${API_BASE}/api/v1/maps/staticmap?${params.join("&")}`;
+  // Need at least driver position or destination to show a map
+  const hasDriver = driverLat != null && driverLng != null;
+  const hasDest = destLat != null && destLng != null;
+  if (!hasDriver && !hasDest) return null;
+
+  const params = new URLSearchParams({ w: String(MAP_W), h: String(MAP_H), zoom: "14" });
+  if (hasDest) { params.set("destlat", String(destLat)); params.set("destlng", String(destLng)); }
+  if (hasDriver) { params.set("driverlat", String(driverLat)); params.set("driverlng", String(driverLng)); }
+  return `${API_BASE}/api/v1/maps/staticmap?${params.toString()}`;
 }
 
 // ─── Libellés statut livraison ────────────────────────────────────────────────
@@ -220,7 +217,7 @@ export default function TrackingScreen() {
             <View style={styles.mapPlaceholder}>
               <Ionicons name="map-outline" size={40} color={Colors.border} />
               <Text style={styles.mapPlaceholderText}>
-                {driverPos ? "Carte indisponible" : "En attente de la position du livreur…"}
+                {driverPos ? "Carte indisponible" : "En attente de la position GPS du livreur…"}
               </Text>
             </View>
           )}
