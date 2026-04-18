@@ -1,7 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/stores/auth";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
@@ -25,17 +24,12 @@ export default function DashboardLayout({
       router.push(`/${locale}/login`);
       return;
     }
-
     const isSuperadmin = user.role === "superadmin";
-
-    // Superadmin trying to access admin-only routes → send to platform
     const adminOnlyPaths = ["/dashboard", "/orders", "/branches", "/delivery", "/drivers", "/collect", "/analytics", "/notifications", "/commissions"];
     if (isSuperadmin && adminOnlyPaths.some((p) => pathname.includes(p) && !pathname.includes("/superadmin"))) {
       router.replace(`/${locale}/superadmin/platform`);
       return;
     }
-
-    // Admin trying to access superadmin routes → send to dashboard
     if (!isSuperadmin && pathname.includes("/superadmin/")) {
       router.replace(`/${locale}/dashboard`);
     }
@@ -50,7 +44,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-surface-850">
+    <div className="flex min-h-screen bg-surface-950">
       <Sidebar locale={locale} />
       <div className="flex-1 flex flex-col ml-64">
         <Header locale={locale} />

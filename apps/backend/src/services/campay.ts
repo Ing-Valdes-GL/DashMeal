@@ -50,8 +50,8 @@ export interface CamPayWithdrawResponse {
 
 /**
  * Cameroon mobile prefixes (9-digit local format, first 3 digits):
- *   MTN:    650-654, 658-659, 670-679, 680-689
- *   Orange: 655-657, 690-699
+ *   MTN:    650-654, 658-659, 670-679, 680-687
+ *   Orange: 655-657, 688-689, 690-699
  */
 function detectOperator(phone: string): "MTN" | "Orange" | "unknown" {
   const digits = normalizePhone(phone); // 237XXXXXXXXX
@@ -62,11 +62,13 @@ function detectOperator(phone: string): "MTN" | "Orange" | "unknown" {
   if (
     (prefix >= 650 && prefix <= 654) ||
     (prefix >= 658 && prefix <= 659) ||
-    (prefix >= 670 && prefix <= 689)
+    (prefix >= 670 && prefix <= 679) ||
+    (prefix >= 680 && prefix <= 687)
   ) return "MTN";
 
   if (
     (prefix >= 655 && prefix <= 657) ||
+    (prefix >= 688 && prefix <= 689) ||
     (prefix >= 690 && prefix <= 699)
   ) return "Orange";
 
@@ -256,25 +258,92 @@ export async function campayWithdraw(params: {
   description: string;
   externalReference: string;
 }): Promise<CamPayWithdrawResponse> {
+  const normalized = normalizePhone(params.phone);
+  const operator = detectOperator(params.phone);
+
+  // Validation montant minimum avant d'appeler Campay
+  const minAmount = CAMPAY_MIN_AMOUNT[operator];
+  if (params.amount < minAmount) {
+    const label = operator === "unknown" ? "Mobile Money" : `${operator} Mobile Money`;
+    throw new AppError(
+      400,
+      "AMOUNT_TOO_LOW",
+      `Montant minimum pour ${label} : ${minAmount} FCFA. Montant demandé : ${params.amount} FCFA.`,
+    );
+  }
+
   const headers = await authHeader();
+
+  const body: Record<string, string> = {
+    amount:             String(params.amount),
+    currency:           "XAF",
+    to:                 normalized,
+    description:        params.description,
+    external_reference: params.externalReference,
+  };
+
+  // Orange Money nécessite le champ operator explicite
+  if (operator === "Orange") body.operator = "Orange";
+  if (operator === "MTN")    body.operator = "MTN";
 
   const res = await fetch(`${baseUrl()}/api/withdraw/`, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      amount: String(params.amount),
-      to: normalizePhone(params.phone),
-      description: params.description,
-      external_reference: params.externalReference,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`CamPay withdraw failed (${res.status}): ${body}`);
+    const raw = await res.text();
+    // Essayer de parser le message d'erreur JSON de Campay
+    try {
+      const errJson = JSON.parse(raw) as { message?: string; detail?: string; error?: string };
+      const msg = errJson.message ?? errJson.detail ?? errJson.error ?? raw;
+      throw new AppError(502, "CAMPAY_WITHDRAW_ERROR", `Campay : ${msg}`);
+    } catch (e) {
+      if (e instanceof AppError) throw e;
+    }
+    throw new AppError(502, "CAMPAY_WITHDRAW_ERROR", `Échec du virement Campay (${res.status})`);
   }
 
   return res.json() as Promise<CamPayWithdrawResponse>;
+}
+
+/**
+ * Lookup subscriber name for a phone number.
+ * Returns null if Campay doesn't support it or the lookup fails.
+ */
+export async function campayGetSubscriberName(phone: string): Promise<{
+  name: string;
+  operator: "MTN" | "Orange" | "unknown";
+} | null> {
+  const normalized = normalizePhone(phone);
+  const operator = detectOperator(phone);
+  const headers = await authHeader();
+
+  const res = await fetch(`${baseUrl()}/api/get-name/`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ phone: normalized }),
+  });
+
+  const raw = await res.text();
+  console.log(`[Campay get-name] status=${res.status} body=${raw}`);
+
+  if (!res.ok) {
+    // Endpoint non supporté par ce compte Campay → traiter comme non disponible
+    if (res.status === 404 || res.status === 403) return null;
+    let msg = raw;
+    try { msg = (JSON.parse(raw) as any)?.message ?? raw; } catch { /* noop */ }
+    throw new AppError(502, "CAMPAY_ERROR", `Campay get-name : ${msg}`);
+  }
+
+  let data: Record<string, unknown>;
+  try { data = JSON.parse(raw); } catch { return null; }
+
+  const name = (data.name ?? data.subscriber_name ?? data.fullname ?? null) as string | null;
+  if (!name) return null;
+
+  return { name, operator };
 }
 
 /**

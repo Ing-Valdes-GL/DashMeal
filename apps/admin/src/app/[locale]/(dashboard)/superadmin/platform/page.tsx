@@ -118,7 +118,7 @@ export default function PlatformPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Globe className="h-6 w-6 text-brand-400" />
             {t("title")}
           </h1>
@@ -143,7 +143,7 @@ export default function PlatformPage() {
                     <div className={`h-9 w-9 rounded-lg flex items-center justify-center mb-3 ${k.bg}`}>
                       <Icon className={`h-4 w-4 ${k.color}`} />
                     </div>
-                    <p className="text-xl font-bold text-white">{k.value}</p>
+                    <p className="text-xl font-bold text-slate-900">{k.value}</p>
                     <p className="text-xs text-slate-500 mt-0.5">{k.label}</p>
                     <p className="text-xs text-slate-600 mt-0.5">{k.sub}</p>
                   </>
@@ -173,12 +173,12 @@ export default function PlatformPage() {
                       <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="date" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} />
                   <YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false}
                     tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                   <Tooltip
-                    contentStyle={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 8 }}
+                    contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8 }}
                     formatter={(v: number, name: string) =>
                       name === "GMV" ? [formatCurrency(v), "GMV"] : [v, "Commandes"]
                     }
@@ -212,7 +212,7 @@ export default function PlatformPage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 8 }}
+                      contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8 }}
                       formatter={(v: number) => [formatCurrency(v)]}
                     />
                   </PieChart>
@@ -224,7 +224,7 @@ export default function PlatformPage() {
                         <div className="h-2.5 w-2.5 rounded-full" style={{ background: COLORS[i] }} />
                         <span className="text-slate-400">{item.name}</span>
                       </div>
-                      <span className="text-white font-medium">{formatCurrency(item.value)}</span>
+                      <span className="text-slate-900 font-medium">{formatCurrency(item.value)}</span>
                     </div>
                   ))}
                 </div>
@@ -243,12 +243,12 @@ export default function PlatformPage() {
           <CardContent>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={stats.top_brands.slice(0, 8)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} />
                 <YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false}
                   tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
-                  contentStyle={{ background: "#0f172a", border: "1px solid #1e293b", borderRadius: 8 }}
+                  contentStyle={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 8 }}
                   formatter={(v: number, name: string) =>
                     name === "revenue" ? [formatCurrency(v), "CA"] : [v, "Commandes"]
                   }

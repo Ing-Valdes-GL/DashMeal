@@ -4,29 +4,37 @@
 
 @layer base {
   :root {
-    --background: 222 47% 6%;
-    --foreground: 210 40% 98%;
-    --card: 222 40% 9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 40% 9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 24 95% 53%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 32% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 32% 14%;
-    --muted-foreground: 215 20% 55%;
-    --accent: 217 32% 17%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 55%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 32% 17%;
-    --input: 217 32% 17%;
-    --ring: 24 95% 53%;
-    --radius: 0.5rem;
-    --sidebar: 222 47% 5%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-border: 217 32% 12%;
+    /* ── Thème clair Dash Meal ──────────────────────────────────────── */
+    --background:        210 40% 98%;       /* slate-50 */
+    --foreground:        222 47% 11%;       /* slate-900 */
+    --card:              0 0% 100%;         /* white */
+    --card-foreground:   222 47% 11%;
+    --popover:           0 0% 100%;
+    --popover-foreground:222 47% 11%;
+
+    --primary:           142 71% 45%;       /* green-500 */
+    --primary-foreground:0 0% 100%;
+
+    --secondary:         210 40% 96%;
+    --secondary-foreground:222 47% 11%;
+
+    --muted:             210 40% 96%;
+    --muted-foreground:  215 16% 47%;       /* slate-500 */
+
+    --accent:            48 96% 53%;        /* yellow-400 */
+    --accent-foreground: 222 47% 11%;
+
+    --destructive:       0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:            214 32% 91%;       /* slate-200 */
+    --input:             214 32% 91%;
+    --ring:              142 71% 45%;       /* green */
+    --radius:            0.75rem;
+
+    --sidebar:           0 0% 100%;         /* blanc pur */
+    --sidebar-foreground:222 47% 11%;
+    --sidebar-border:    214 32% 91%;
   }
 }
 
@@ -35,39 +43,123 @@
     @apply border-border border-0;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-surface-950 text-white antialiased;
+    @apply bg-surface-950 text-slate-900 antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
-  /* Scrollbar personnalisée */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  /* ── Scrollbar ────────────────────────────────────────────────────── */
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { @apply bg-slate-100; }
+  ::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-brand-400; }
+
+  /* ── Titres par défaut ───────────────────────────────────────────── */
+  h1, h2, h3, h4, h5, h6 { @apply text-slate-900 font-semibold; }
+
+  /* Correction thème clair : text-white → text-slate-900 dans les pages admin */
+  .dm-light h1, .dm-light h2, .dm-light h3 { @apply text-slate-900; }
+}
+
+@layer components {
+  /* ── Card standard ────────────────────────────────────────────────── */
+  .dm-card {
+    @apply bg-white rounded-xl border border-slate-200 shadow-card;
   }
-  ::-webkit-scrollbar-track {
-    @apply bg-surface-900;
+
+  /* ── Section hero (landing) ──────────────────────────────────────── */
+  .hero-overlay {
+    background: linear-gradient(
+      135deg,
+      rgba(15, 23, 42, 0.82) 0%,
+      rgba(20, 83, 45, 0.75) 60%,
+      rgba(113, 63, 18, 0.65) 100%
+    );
   }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-surface-600 rounded-full;
+
+  /* ── Badge vert ──────────────────────────────────────────────────── */
+  .badge-green {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-brand-100 text-brand-700 text-xs font-semibold px-3 py-1;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-surface-500;
+
+  /* ── Badge jaune ─────────────────────────────────────────────────── */
+  .badge-yellow {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-accent-100 text-accent-700 text-xs font-semibold px-3 py-1;
+  }
+
+  /* ── Gradient texte vert-jaune ───────────────────────────────────── */
+  .text-gradient {
+    @apply bg-gradient-to-r from-brand-600 via-brand-500 to-accent-500 bg-clip-text text-transparent;
+  }
+
+  /* ── Bouton principal ────────────────────────────────────────────── */
+  .btn-primary {
+    @apply bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-xl
+           px-6 py-3 transition-all duration-200 shadow-green hover:shadow-lg
+           hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  /* ── Bouton accent ────────────────────────────────────────────────── */
+  .btn-accent {
+    @apply bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl
+           px-6 py-3 transition-all duration-200 shadow-yellow hover:shadow-lg
+           hover:-translate-y-0.5 active:translate-y-0;
+  }
+
+  /* ── Glassmorphism ────────────────────────────────────────────────── */
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border border-white/50;
+  }
+
+  .glass-dark {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* ── Stat card ────────────────────────────────────────────────────── */
+  .stat-card {
+    @apply bg-white rounded-2xl border border-slate-100 shadow-card
+           p-6 transition-all duration-200 hover:shadow-card-hover hover:-translate-y-0.5;
+  }
+
+  /* ── Divider avec texte ───────────────────────────────────────────── */
+  .divider {
+    @apply relative flex items-center py-4;
+  }
+  .divider::before, .divider::after {
+    content: "";
+    @apply flex-1 border-t border-slate-200;
+  }
+  .divider span {
+    @apply mx-4 text-sm text-slate-400;
   }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .text-balance { text-wrap: balance; }
+
+  /* Ombre colorée vert */
+  .shadow-brand { box-shadow: 0 8px 30px -4px rgb(22 163 74 / 0.35); }
+
+  /* Fond dégradé vert → jaune */
+  .bg-brand-gradient {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 50%, #eab308 100%);
   }
 
-  /* Glassmorphism */
-  .glass {
-    @apply bg-surface-800/60 backdrop-blur-md border border-surface-600/40;
+  /* Fond dégradé hero */
+  .bg-hero-gradient {
+    background: linear-gradient(180deg, #0f172a 0%, #14532d 100%);
   }
 
-  /* Gradient texte orange */
-  .text-gradient {
-    @apply bg-gradient-to-r from-brand-400 to-brand-600 bg-clip-text text-transparent;
+  /* Animation shimmer pour skeleton */
+  .shimmer {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 400% 100%;
+    @apply animate-shimmer;
   }
 }

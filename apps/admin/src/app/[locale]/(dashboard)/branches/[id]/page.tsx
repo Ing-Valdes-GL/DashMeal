@@ -246,7 +246,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
           <div>
             {branchLoading ? <Skeleton className="h-7 w-48" /> : (
               <>
-                <h1 className="text-2xl font-bold text-white">{branch?.name}</h1>
+                <h1 className="text-2xl font-bold text-slate-900">{branch?.name}</h1>
                 <p className="text-sm text-slate-400 flex items-center gap-1">
                   <MapPin className="h-3 w-3" />{branch?.address}, {branch?.city}
                 </p>
@@ -262,7 +262,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
       {/* KPIs rapides */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card><CardContent className="p-4 text-center">
-          <p className="text-2xl font-bold text-white">{productsList.length}</p>
+          <p className="text-2xl font-bold text-slate-900">{productsList.length}</p>
           <p className="text-xs text-slate-500 mt-1">Produits</p>
         </CardContent></Card>
         <Card><CardContent className="p-4 text-center">
@@ -274,7 +274,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
           <p className="text-xs text-slate-500 mt-1">Cdes aujourd'hui</p>
         </CardContent></Card>
         <Card><CardContent className="p-4 text-center">
-          <p className="text-2xl font-bold text-white">{formatCurrency(stats?.total_revenue ?? 0)}</p>
+          <p className="text-2xl font-bold text-slate-900">{formatCurrency(stats?.total_revenue ?? 0)}</p>
           <p className="text-xs text-slate-500 mt-1">CA total</p>
         </CardContent></Card>
       </div>
@@ -303,7 +303,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {(categories ?? []).map((c) => (
-                    <div key={c.id} className="flex items-center gap-1.5 bg-surface-700 border border-surface-600 rounded-full px-3 py-1.5">
+                    <div key={c.id} className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
                       {c.icon && <span className="text-sm">{c.icon}</span>}
                       <span className="text-sm text-slate-200">{c.name_fr}</span>
                       {c.branch_id && (
@@ -346,20 +346,20 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
                       <TableRow key={p.id} className={p.is_hidden ? "opacity-50" : ""}>
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-surface-700 flex items-center justify-center overflow-hidden shrink-0">
+                            <div className="h-10 w-10 rounded-lg bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
                               {p.image_url
                                 ? <img src={p.image_url} alt={p.name_fr} className="h-full w-full object-cover" />
                                 : <Package className="h-5 w-5 text-slate-600" />}
                             </div>
                             <div>
-                              <p className="font-medium text-white">{p.name_fr}</p>
+                              <p className="font-medium text-slate-900">{p.name_fr}</p>
                               <p className="text-xs text-slate-500">{p.name_en}</p>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-slate-400 text-sm">{p.categories?.name_fr ?? "—"}</TableCell>
                         <TableCell>
-                          <p className={`font-semibold ${p.promo_price ? "line-through text-slate-500 text-sm" : "text-white"}`}>{formatCurrency(p.price)}</p>
+                          <p className={`font-semibold ${p.promo_price ? "line-through text-slate-500 text-sm" : "text-slate-900"}`}>{formatCurrency(p.price)}</p>
                           {p.promo_price && <p className="text-brand-400 font-bold text-sm">{formatCurrency(p.promo_price)}</p>}
                         </TableCell>
                         <TableCell>
@@ -418,7 +418,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
               <button
                 key={s}
                 onClick={() => setOrderStatus(s)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${orderStatus === s ? "bg-brand-500 text-white" : "bg-surface-700 text-slate-400 hover:text-white"}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${orderStatus === s ? "bg-brand-500 text-slate-900" : "bg-slate-50 text-slate-400 hover:text-slate-900"}`}
               >
                 {s === "all" ? "Tout" : STATUS_LABELS[s]}
               </button>
@@ -450,13 +450,13 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
                   <TableRow key={o.id}>
                     <TableCell className="font-mono text-xs text-slate-500">#{o.id.slice(0, 8)}</TableCell>
                     <TableCell>
-                      <p className="text-white text-sm">{o.users?.name ?? "—"}</p>
+                      <p className="text-slate-900 text-sm">{o.users?.name ?? "—"}</p>
                       <p className="text-xs text-slate-500">{o.users?.phone ?? ""}</p>
                     </TableCell>
                     <TableCell className="text-slate-400 text-sm">
                       {o.order_items?.length ?? 0} article(s)
                     </TableCell>
-                    <TableCell className="font-semibold text-white">{formatCurrency(o.total)}</TableCell>
+                    <TableCell className="font-semibold text-slate-900">{formatCurrency(o.total)}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[o.status] ?? "inactive"} className="text-xs">
                         {STATUS_LABELS[o.status] ?? o.status}
@@ -496,7 +496,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">CA total (livrées)</p>
-                  <p className="text-lg font-bold text-white">{formatCurrency(stats?.total_revenue ?? 0)}</p>
+                  <p className="text-lg font-bold text-slate-900">{formatCurrency(stats?.total_revenue ?? 0)}</p>
                 </div>
               </div>
             </CardContent></Card>
@@ -507,7 +507,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Commandes totales</p>
-                  <p className="text-lg font-bold text-white">{stats?.total_orders ?? 0}</p>
+                  <p className="text-lg font-bold text-slate-900">{stats?.total_orders ?? 0}</p>
                 </div>
               </div>
             </CardContent></Card>
@@ -518,7 +518,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Aujourd'hui</p>
-                  <p className="text-lg font-bold text-white">{stats?.today_orders ?? 0}</p>
+                  <p className="text-lg font-bold text-slate-900">{stats?.today_orders ?? 0}</p>
                 </div>
               </div>
             </CardContent></Card>
@@ -529,7 +529,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">En attente</p>
-                  <p className="text-lg font-bold text-white">{stats?.pending_orders ?? 0}</p>
+                  <p className="text-lg font-bold text-slate-900">{stats?.pending_orders ?? 0}</p>
                 </div>
               </div>
             </CardContent></Card>
@@ -546,10 +546,10 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
                   return (
                     <div key={s}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-slate-300">{STATUS_LABELS[s] ?? s}</span>
-                        <span className="text-sm font-semibold text-white">{count} <span className="text-slate-500 font-normal">({pct}%)</span></span>
+                        <span className="text-sm text-slate-700">{STATUS_LABELS[s] ?? s}</span>
+                        <span className="text-sm font-semibold text-slate-900">{count} <span className="text-slate-500 font-normal">({pct}%)</span></span>
                       </div>
-                      <div className="h-2 bg-surface-700 rounded-full overflow-hidden">
+                      <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
                         <div className="h-full bg-brand-500 rounded-full" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
@@ -649,7 +649,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
                 )}
               </div>
               {form.image_url && (
-                <img src={form.image_url} alt="preview" className="h-28 w-28 rounded-xl object-cover border border-surface-600 mt-2" />
+                <img src={form.image_url} alt="preview" className="h-28 w-28 rounded-xl object-cover border border-slate-200 mt-2" />
               )}
             </div>
 

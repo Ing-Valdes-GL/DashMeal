@@ -84,7 +84,7 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-5 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
         <p className="text-sm text-slate-400">{t("subtitle")}</p>
       </div>
 
@@ -118,7 +118,7 @@ export default function NotificationsPage() {
                     className={`flex-1 flex items-center gap-2 rounded-xl border p-3 text-sm transition-colors ${
                       mode === "broadcast"
                         ? "border-brand-500 bg-brand-500/10 text-brand-400"
-                        : "border-surface-600 text-slate-400 hover:border-surface-500"
+                        : "border-slate-200 text-slate-400 hover:border-slate-300"
                     }`}
                   >
                     <Users className="h-4 w-4" />
@@ -133,7 +133,7 @@ export default function NotificationsPage() {
                     className={`flex-1 flex items-center gap-2 rounded-xl border p-3 text-sm transition-colors ${
                       mode === "specific"
                         ? "border-brand-500 bg-brand-500/10 text-brand-400"
-                        : "border-surface-600 text-slate-400 hover:border-surface-500"
+                        : "border-slate-200 text-slate-400 hover:border-slate-300"
                     }`}
                   >
                     <Bell className="h-4 w-4" />
@@ -197,20 +197,20 @@ export default function NotificationsPage() {
               <CardTitle className="text-base">Conseils</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-slate-400">
-              <div className="rounded-lg bg-surface-700/50 p-3">
+              <div className="rounded-lg bg-slate-100 p-3">
                 <p className="text-brand-400 font-medium mb-1">Broadcast</p>
                 <p>Envoie la notification à tous les utilisateurs qui ont activé les notifications push.</p>
               </div>
-              <div className="rounded-lg bg-surface-700/50 p-3">
+              <div className="rounded-lg bg-slate-100 p-3">
                 <p className="text-blue-400 font-medium mb-1">Bilingue</p>
                 <p>Remplissez les champs FR et EN pour que chaque utilisateur reçoive la notification dans sa langue.</p>
               </div>
-              <div className="rounded-lg bg-surface-700/50 p-3">
+              <div className="rounded-lg bg-slate-100 p-3">
                 <p className="text-green-400 font-medium mb-1">Types</p>
                 <ul className="mt-1 space-y-0.5 text-xs">
-                  <li><span className="text-white">Général</span> — informations générales</li>
-                  <li><span className="text-white">Promo</span> — offres et promotions</li>
-                  <li><span className="text-white">Commande</span> — mises à jour commandes</li>
+                  <li><span className="text-slate-900">Général</span> — informations générales</li>
+                  <li><span className="text-slate-900">Promo</span> — offres et promotions</li>
+                  <li><span className="text-slate-900">Commande</span> — mises à jour commandes</li>
                 </ul>
               </div>
             </CardContent>
@@ -242,13 +242,13 @@ export default function NotificationsPage() {
                 : (data?.data ?? []).map((n) => (
                     <TableRow key={n.id}>
                       <TableCell>
-                        <p className="font-medium text-white">{n.title}</p>
+                        <p className="font-medium text-slate-900">{n.title}</p>
                         <p className="text-xs text-slate-500 line-clamp-1">{n.body}</p>
                       </TableCell>
                       <TableCell>
                         <Badge variant="info">{n.type}</Badge>
                       </TableCell>
-                      <TableCell className="text-slate-300">
+                      <TableCell className="text-slate-700">
                         {n.users?.name ?? <span className="text-slate-500 italic">Broadcast</span>}
                       </TableCell>
                       <TableCell>
@@ -262,7 +262,7 @@ export default function NotificationsPage() {
             </TableBody>
           </Table>
           {data?.pagination && (
-            <div className="p-4 border-t border-surface-700/50">
+            <div className="p-4 border-t border-slate-200">
               <Pagination page={data.pagination.page} totalPages={data.pagination.total_pages}
                 total={data.pagination.total} limit={data.pagination.limit} onPageChange={setPage} />
             </div>

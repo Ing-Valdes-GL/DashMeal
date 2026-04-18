@@ -74,7 +74,7 @@ export default function DeliveryPage() {
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-sm text-slate-400">{t("subtitle")}</p>
         </div>
         <div className="flex gap-2">
@@ -118,12 +118,12 @@ export default function DeliveryPage() {
                     <TableCell>
                       <div>
                         <p className="font-mono text-xs text-slate-500">#{d.id.slice(0, 8)}</p>
-                        <p className="text-sm font-semibold text-white">{formatCurrency(d.orders?.total)}</p>
+                        <p className="text-sm font-semibold text-slate-900">{formatCurrency(d.orders?.total)}</p>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="text-white font-medium">{d.orders?.users?.name}</p>
+                        <p className="text-slate-900 font-medium">{d.orders?.users?.name}</p>
                         <p className="text-xs text-slate-500">{d.orders?.users?.phone}</p>
                       </div>
                     </TableCell>
@@ -134,7 +134,7 @@ export default function DeliveryPage() {
                             {d.drivers.name.slice(0, 2).toUpperCase()}
                           </div>
                           <div>
-                            <p className="text-sm text-white">{d.drivers.name}</p>
+                            <p className="text-sm text-slate-900">{d.drivers.name}</p>
                             <p className="text-xs text-slate-500">{d.drivers.phone}</p>
                           </div>
                         </div>
@@ -180,7 +180,7 @@ export default function DeliveryPage() {
           </TableBody>
         </Table>
         {data?.pagination && (
-          <div className="p-4 border-t border-surface-700/50">
+          <div className="p-4 border-t border-slate-200">
             <Pagination page={data.pagination.page} totalPages={data.pagination.total_pages}
               total={data.pagination.total} limit={data.pagination.limit} onPageChange={setPage} />
           </div>
@@ -194,12 +194,12 @@ export default function DeliveryPage() {
           <div className="space-y-2">
             {(drivers ?? []).map((d) => (
               <button key={d.id}
-                className="w-full flex items-center gap-3 rounded-lg border border-surface-500 p-3 hover:border-brand-500 hover:bg-brand-500/10 transition-colors text-left"
+                className="w-full flex items-center gap-3 rounded-lg border border-slate-300 p-3 hover:border-brand-500 hover:bg-brand-500/10 transition-colors text-left"
                 onClick={() => assignMutation.mutate({ deliveryId: selected!.id, driver_id: d.id })}>
                 <div className="h-8 w-8 rounded-full bg-brand-500/20 flex items-center justify-center text-brand-400 text-xs font-bold">
                   {d.name.slice(0, 2).toUpperCase()}
                 </div>
-                <div><p className="text-white font-medium">{d.name}</p><p className="text-xs text-slate-500">{d.phone}</p></div>
+                <div><p className="text-slate-900 font-medium">{d.name}</p><p className="text-xs text-slate-500">{d.phone}</p></div>
               </button>
             ))}
           </div>

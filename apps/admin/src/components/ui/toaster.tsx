@@ -17,7 +17,7 @@ const borders: Record<ToastVariant, string> = {
   destructive: "border-red-500/30 bg-red-500/10",
   warning:     "border-yellow-500/30 bg-yellow-500/10",
   info:        "border-blue-500/30 bg-blue-500/10",
-  default:     "border-surface-500 bg-surface-800",
+  default:     "border-slate-200 bg-white",
 };
 
 export function Toaster() {
@@ -38,14 +38,14 @@ export function Toaster() {
           >
             {icons[variant]}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white">{t.title}</p>
+              <p className="text-sm font-medium text-slate-900">{t.title}</p>
               {t.description && (
                 <p className="mt-0.5 text-xs text-slate-400">{t.description}</p>
               )}
             </div>
             <button
               onClick={() => removeToast(t.id)}
-              className="shrink-0 text-slate-500 hover:text-white transition-colors"
+              className="shrink-0 text-slate-400 hover:text-slate-700 transition-colors"
             >
               <X className="h-4 w-4" />
             </button>

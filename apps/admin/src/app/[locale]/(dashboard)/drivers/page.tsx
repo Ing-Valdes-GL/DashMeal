@@ -154,7 +154,7 @@ export default function DriversPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Bike className="h-6 w-6 text-brand-400" />
             Livreurs
           </h1>
@@ -177,11 +177,11 @@ export default function DriversPage() {
       {/* Stats rapides */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total livreurs",  value: drivers.length,                          color: "text-white" },
+          { label: "Total livreurs",  value: drivers.length,                          color: "text-slate-900" },
           { label: "Actifs",          value: drivers.filter((d) => d.is_active).length, color: "text-green-400" },
           { label: "Suspendus",       value: drivers.filter((d) => !d.is_active).length, color: "text-red-400" },
         ].map((stat) => (
-          <Card key={stat.label} className="bg-surface-800 border-surface-700">
+          <Card key={stat.label} className="bg-white border-slate-200">
             <CardContent className="p-4">
               <p className="text-sm text-slate-400">{stat.label}</p>
               <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
@@ -191,17 +191,17 @@ export default function DriversPage() {
       </div>
 
       {/* Table */}
-      <Card className="bg-surface-800 border-surface-700">
+      <Card className="bg-white border-slate-200">
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-6 space-y-3">
-              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full bg-surface-700" />)}
+              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full bg-slate-50" />)}
             </div>
           ) : drivers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
               <Bike className="h-12 w-12 opacity-30" />
               <p className="text-sm">Aucun livreur enregistré</p>
-              <Button size="sm" onClick={() => setShowCreate(true)} variant="outline" className="gap-1.5 border-surface-600">
+              <Button size="sm" onClick={() => setShowCreate(true)} variant="outline" className="gap-1.5 border-slate-200">
                 <Plus className="h-3.5 w-3.5" />
                 Ajouter le premier livreur
               </Button>
@@ -209,7 +209,7 @@ export default function DriversPage() {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="border-surface-700 hover:bg-transparent">
+                <TableRow className="border-slate-200 hover:bg-transparent">
                   <TableHead className="text-slate-400">Livreur</TableHead>
                   <TableHead className="text-slate-400">Téléphone</TableHead>
                   <TableHead className="text-slate-400">Agence</TableHead>
@@ -220,7 +220,7 @@ export default function DriversPage() {
               </TableHeader>
               <TableBody>
                 {drivers.map((driver) => (
-                  <TableRow key={driver.id} className="border-surface-700 hover:bg-surface-750">
+                  <TableRow key={driver.id} className="border-slate-200 hover:bg-slate-50">
                     {/* Nom */}
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -232,12 +232,12 @@ export default function DriversPage() {
                             {driver.name.slice(0, 2).toUpperCase()}
                           </div>
                         )}
-                        <span className="font-medium text-white">{driver.name}</span>
+                        <span className="font-medium text-slate-900">{driver.name}</span>
                       </div>
                     </TableCell>
                     {/* Téléphone */}
                     <TableCell>
-                      <div className="flex items-center gap-1.5 text-slate-300 text-sm">
+                      <div className="flex items-center gap-1.5 text-slate-700 text-sm">
                         <Phone className="h-3.5 w-3.5 text-slate-500" />
                         {driver.phone}
                       </div>
@@ -245,7 +245,7 @@ export default function DriversPage() {
                     {/* Agence */}
                     <TableCell>
                       {driver.branches ? (
-                        <div className="flex items-center gap-1.5 text-slate-300 text-sm">
+                        <div className="flex items-center gap-1.5 text-slate-700 text-sm">
                           <Store className="h-3.5 w-3.5 text-slate-500" />
                           {driver.branches.name}
                         </div>
@@ -267,16 +267,16 @@ export default function DriversPage() {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-900">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-surface-800 border-surface-700 text-white">
-                          <DropdownMenuItem onClick={() => openEdit(driver)} className="gap-2 hover:bg-surface-700 cursor-pointer">
+                        <DropdownMenuContent align="end" className="bg-white border-slate-200 text-slate-900">
+                          <DropdownMenuItem onClick={() => openEdit(driver)} className="gap-2 hover:bg-slate-50 cursor-pointer">
                             <Pencil className="h-3.5 w-3.5 text-slate-400" />
                             Modifier
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setPinTarget(driver); pinForm.reset(); }} className="gap-2 hover:bg-surface-700 cursor-pointer">
+                          <DropdownMenuItem onClick={() => { setPinTarget(driver); pinForm.reset(); }} className="gap-2 hover:bg-slate-50 cursor-pointer">
                             <Key className="h-3.5 w-3.5 text-slate-400" />
                             Changer le PIN
                           </DropdownMenuItem>
@@ -300,7 +300,7 @@ export default function DriversPage() {
 
       {/* ── Modal création ──────────────────────────────────────────────────── */}
       <Dialog open={showCreate} onOpenChange={(o) => { setShowCreate(o); if (!o) { setPhotoUrl(null); createForm.reset(); } }}>
-        <DialogContent className="bg-surface-800 border-surface-700 text-white max-w-md">
+        <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCheck className="h-5 w-5 text-brand-400" />
@@ -321,40 +321,40 @@ export default function DriversPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={photoUrl} alt="Photo livreur" className="h-20 w-20 rounded-full object-cover ring-2 ring-brand-500" />
                 ) : (
-                  <div className="h-20 w-20 rounded-full bg-surface-700 border-2 border-dashed border-surface-500 flex flex-col items-center justify-center gap-1 group-hover:border-brand-500 transition-colors">
+                  <div className="h-20 w-20 rounded-full bg-slate-50 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center gap-1 group-hover:border-brand-500 transition-colors">
                     {photoUploading ? <Loader2 className="h-5 w-5 text-brand-400 animate-spin" /> : <Camera className="h-5 w-5 text-slate-500" />}
                     {!photoUploading && <span className="text-xs text-slate-500">Photo</span>}
                   </div>
                 )}
                 {photoUrl && (
                   <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Camera className="h-5 w-5 text-white" />
+                    <Camera className="h-5 w-5 text-slate-900" />
                   </div>
                 )}
               </button>
               <p className="text-xs text-slate-500">Photo du livreur (optionnel)</p>
             </div>
             <div>
-              <Label className="text-slate-300">Nom complet</Label>
-              <Input {...createForm.register("name")} placeholder="Jean Dupont" className="mt-1.5 bg-surface-700 border-surface-600 text-white" />
+              <Label className="text-slate-700">Nom complet</Label>
+              <Input {...createForm.register("name")} placeholder="Jean Dupont" className="mt-1.5 bg-slate-50 border-slate-200 text-slate-900" />
               {createForm.formState.errors.name && (
                 <p className="text-xs text-red-400 mt-1">{createForm.formState.errors.name.message}</p>
               )}
             </div>
             <div>
-              <Label className="text-slate-300">Téléphone</Label>
-              <Input {...createForm.register("phone")} placeholder="+237 6XX XXX XXX" className="mt-1.5 bg-surface-700 border-surface-600 text-white" />
+              <Label className="text-slate-700">Téléphone</Label>
+              <Input {...createForm.register("phone")} placeholder="+237 6XX XXX XXX" className="mt-1.5 bg-slate-50 border-slate-200 text-slate-900" />
               {createForm.formState.errors.phone && (
                 <p className="text-xs text-red-400 mt-1">{createForm.formState.errors.phone.message}</p>
               )}
             </div>
             <div>
-              <Label className="text-slate-300">Agence rattachée (optionnel)</Label>
+              <Label className="text-slate-700">Agence rattachée (optionnel)</Label>
               <Select onValueChange={(v) => createForm.setValue("branch_id", v)}>
-                <SelectTrigger className="mt-1.5 bg-surface-700 border-surface-600 text-white">
+                <SelectTrigger className="mt-1.5 bg-slate-50 border-slate-200 text-slate-900">
                   <SelectValue placeholder="Sélectionner une agence…" />
                 </SelectTrigger>
-                <SelectContent className="bg-surface-800 border-surface-700 text-white">
+                <SelectContent className="bg-white border-slate-200 text-slate-900">
                   {branches.map((b) => (
                     <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                   ))}
@@ -362,14 +362,14 @@ export default function DriversPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-slate-300">PIN de connexion (4 chiffres)</Label>
+              <Label className="text-slate-700">PIN de connexion (4 chiffres)</Label>
               <Input
                 {...createForm.register("pin")}
                 type="password"
                 inputMode="numeric"
                 maxLength={4}
                 placeholder="••••"
-                className="mt-1.5 bg-surface-700 border-surface-600 text-white tracking-widest text-center text-lg"
+                className="mt-1.5 bg-slate-50 border-slate-200 text-slate-900 tracking-widest text-center text-lg"
               />
               {createForm.formState.errors.pin && (
                 <p className="text-xs text-red-400 mt-1">{createForm.formState.errors.pin.message}</p>
@@ -390,7 +390,7 @@ export default function DriversPage() {
 
       {/* ── Modal modification ──────────────────────────────────────────────── */}
       <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
-        <DialogContent className="bg-surface-800 border-surface-700 text-white max-w-md">
+        <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5 text-brand-400" />
@@ -399,23 +399,23 @@ export default function DriversPage() {
           </DialogHeader>
           <form onSubmit={editForm.handleSubmit((d) => editMutation.mutate(d))} className="space-y-4">
             <div>
-              <Label className="text-slate-300">Nom complet</Label>
-              <Input {...editForm.register("name")} className="mt-1.5 bg-surface-700 border-surface-600 text-white" />
+              <Label className="text-slate-700">Nom complet</Label>
+              <Input {...editForm.register("name")} className="mt-1.5 bg-slate-50 border-slate-200 text-slate-900" />
             </div>
             <div>
-              <Label className="text-slate-300">Téléphone</Label>
-              <Input {...editForm.register("phone")} className="mt-1.5 bg-surface-700 border-surface-600 text-white" />
+              <Label className="text-slate-700">Téléphone</Label>
+              <Input {...editForm.register("phone")} className="mt-1.5 bg-slate-50 border-slate-200 text-slate-900" />
             </div>
             <div>
-              <Label className="text-slate-300">Agence</Label>
+              <Label className="text-slate-700">Agence</Label>
               <Select
                 defaultValue={editTarget?.branch_id ?? undefined}
                 onValueChange={(v) => editForm.setValue("branch_id", v)}
               >
-                <SelectTrigger className="mt-1.5 bg-surface-700 border-surface-600 text-white">
+                <SelectTrigger className="mt-1.5 bg-slate-50 border-slate-200 text-slate-900">
                   <SelectValue placeholder="Aucune agence" />
                 </SelectTrigger>
-                <SelectContent className="bg-surface-800 border-surface-700 text-white">
+                <SelectContent className="bg-white border-slate-200 text-slate-900">
                   {branches.map((b) => (
                     <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                   ))}
@@ -434,7 +434,7 @@ export default function DriversPage() {
 
       {/* ── Modal PIN ────────────────────────────────────────────────────────── */}
       <Dialog open={!!pinTarget} onOpenChange={(o) => !o && setPinTarget(null)}>
-        <DialogContent className="bg-surface-800 border-surface-700 text-white max-w-sm">
+        <DialogContent className="bg-white border-slate-200 text-slate-900 max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Key className="h-5 w-5 text-brand-400" />
@@ -443,14 +443,14 @@ export default function DriversPage() {
           </DialogHeader>
           <form onSubmit={pinForm.handleSubmit((d) => pinMutation.mutate(d))} className="space-y-4">
             <div>
-              <Label className="text-slate-300">PIN (4 chiffres)</Label>
+              <Label className="text-slate-700">PIN (4 chiffres)</Label>
               <Input
                 {...pinForm.register("pin")}
                 type="password"
                 inputMode="numeric"
                 maxLength={4}
                 placeholder="••••"
-                className="mt-1.5 bg-surface-700 border-surface-600 text-white tracking-widest text-center text-2xl"
+                className="mt-1.5 bg-slate-50 border-slate-200 text-slate-900 tracking-widest text-center text-2xl"
                 autoFocus
               />
               {pinForm.formState.errors.pin && (

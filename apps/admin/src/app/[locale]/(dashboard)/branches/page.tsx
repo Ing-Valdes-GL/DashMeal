@@ -211,7 +211,7 @@ export default function BranchesPage() {
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-sm text-slate-400">{t("subtitle")}</p>
         </div>
         <Button onClick={openCreate}><Plus className="h-4 w-4" />{t("addBranch")}</Button>
@@ -340,7 +340,7 @@ export default function BranchesPage() {
             </div>
 
             {/* Planning hebdomadaire */}
-            <div className="border border-surface-600 rounded-lg p-4 space-y-4">
+            <div className="border border-slate-200 rounded-lg p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5" /> Planning Click &amp; Collect
@@ -377,7 +377,7 @@ export default function BranchesPage() {
                   <div
                     key={key}
                     className={`grid grid-cols-[100px_1fr_1fr_auto] items-center gap-3 rounded-md px-3 py-2 transition-colors ${
-                      schedule[key].enabled ? "bg-surface-700" : "bg-surface-800 opacity-50"
+                      schedule[key].enabled ? "bg-slate-50" : "bg-white opacity-50"
                     }`}
                   >
                     {/* Jour + toggle */}
@@ -386,7 +386,7 @@ export default function BranchesPage() {
                         checked={schedule[key].enabled}
                         onCheckedChange={(v) => setDay(key, "enabled", v)}
                       />
-                      <span className="text-sm font-medium text-white">{label}</span>
+                      <span className="text-sm font-medium text-slate-900">{label}</span>
                     </div>
 
                     {/* Heure ouverture */}

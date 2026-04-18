@@ -96,7 +96,7 @@ export default function CommissionsPage() {
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-sm text-slate-400">{t("subtitle")}</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => refetch()}>
@@ -120,7 +120,7 @@ export default function CommissionsPage() {
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">{s.label}</p>
-                      <p className="text-base font-bold text-white">{s.value}</p>
+                      <p className="text-base font-bold text-slate-900">{s.value}</p>
                     </div>
                   </div>
                 )}
@@ -162,7 +162,7 @@ export default function CommissionsPage() {
               <TableHead className="w-10">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-surface-500 bg-surface-700 accent-brand-500"
+                  className="h-4 w-4 rounded border-slate-300 bg-slate-50 accent-brand-500"
                   checked={selected.length > 0 && selected.length === commissions.filter(c => !c.settled_at).length}
                   onChange={toggleAll}
                 />
@@ -186,32 +186,32 @@ export default function CommissionsPage() {
                   </TableRow>
                 ))
               : commissions.map((c) => (
-                  <TableRow key={c.id} className={selected.includes(c.id) ? "bg-surface-700/50" : ""}>
+                  <TableRow key={c.id} className={selected.includes(c.id) ? "bg-slate-100" : ""}>
                     <TableCell>
                       {!c.settled_at && (
                         <input
                           type="checkbox"
-                          className="h-4 w-4 rounded border-surface-500 bg-surface-700 accent-brand-500"
+                          className="h-4 w-4 rounded border-slate-300 bg-slate-50 accent-brand-500"
                           checked={selected.includes(c.id)}
                           onChange={() => toggleSelect(c.id)}
                         />
                       )}
                     </TableCell>
-                    <TableCell className="font-medium text-white">
+                    <TableCell className="font-medium text-slate-900">
                       {c.brands?.name ?? "—"}
                     </TableCell>
                     <TableCell>
                       <span className="font-mono text-xs text-slate-500">
                         #{c.orders?.id?.slice(0, 8) ?? "—"}
                       </span>
-                      <p className="text-sm text-white">{formatCurrency(c.orders?.total ?? 0)}</p>
+                      <p className="text-sm text-slate-900">{formatCurrency(c.orders?.total ?? 0)}</p>
                     </TableCell>
                     <TableCell>
                       <Badge variant={c.type === "online" ? "info" : "pending"}>
                         {c.type === "online" ? "En ligne" : "Présentiel"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-slate-300">{(c.rate * 100).toFixed(1)}%</TableCell>
+                    <TableCell className="text-slate-700">{(c.rate * 100).toFixed(1)}%</TableCell>
                     <TableCell className="font-bold text-brand-400">{formatCurrency(c.amount)}</TableCell>
                     <TableCell>
                       {c.settled_at ? (
@@ -240,7 +240,7 @@ export default function CommissionsPage() {
           </TableBody>
         </Table>
         {data?.pagination && (
-          <div className="p-4 border-t border-surface-700/50">
+          <div className="p-4 border-t border-slate-200">
             <Pagination page={data.pagination.page} totalPages={data.pagination.total_pages}
               total={data.pagination.total} limit={data.pagination.limit} onPageChange={setPage} />
           </div>

@@ -54,7 +54,7 @@ export default function SuperAdminUsersPage() {
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-sm text-slate-400">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -102,13 +102,13 @@ export default function SuperAdminUsersPage() {
                   <TableRow key={u.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-surface-700 flex items-center justify-center text-xs font-bold text-slate-400">
+                        <div className="h-8 w-8 rounded-full bg-slate-50 flex items-center justify-center text-xs font-bold text-slate-400">
                           {u.name.slice(0, 2).toUpperCase()}
                         </div>
-                        <p className="font-medium text-white">{u.name}</p>
+                        <p className="font-medium text-slate-900">{u.name}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-slate-300">{u.phone}</TableCell>
+                    <TableCell className="font-mono text-slate-700">{u.phone}</TableCell>
                     <TableCell>
                       <Badge variant={u.is_verified ? "active" : "inactive"}>
                         {u.is_verified ? "Vérifié" : "Non vérifié"}
@@ -143,7 +143,7 @@ export default function SuperAdminUsersPage() {
           </TableBody>
         </Table>
         {data?.pagination && (
-          <div className="p-4 border-t border-surface-700/50">
+          <div className="p-4 border-t border-slate-200">
             <Pagination page={data.pagination.page} totalPages={data.pagination.total_pages}
               total={data.pagination.total} limit={data.pagination.limit} onPageChange={setPage} />
           </div>

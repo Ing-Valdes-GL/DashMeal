@@ -58,6 +58,7 @@
     "users": "Utilisateurs",
     "audit": "Audit",
     "platform": "Plateforme",
+    "wallet": "Wallet",
     "logout": "Déconnexion"
   },
   "auth": {

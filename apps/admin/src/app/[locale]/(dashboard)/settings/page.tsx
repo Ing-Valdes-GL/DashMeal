@@ -88,7 +88,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-5 animate-fade-in max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
         <p className="text-sm text-slate-400">{t("subtitle")}</p>
       </div>
 
@@ -120,7 +120,7 @@ export default function SettingsPage() {
                 {user?.username?.slice(0, 2).toUpperCase() ?? "AD"}
               </div>
               <div>
-                <p className="font-medium text-white">{user?.username}</p>
+                <p className="font-medium text-slate-900">{user?.username}</p>
                 <p className="text-sm text-slate-500 capitalize">{user?.role}</p>
                 {user?.brand_name && (
                   <p className="text-xs text-brand-400 mt-0.5">{user.brand_name}</p>
@@ -171,7 +171,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setShowPwd(!showPwd)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
                   >
                     {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -192,7 +192,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setShowNewPwd(!showNewPwd)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
                   >
                     {showNewPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -229,7 +229,7 @@ export default function SettingsPage() {
           <CardContent className="space-y-5">
             {/* Language */}
             <div>
-              <p className="text-sm font-medium text-white mb-2">{t("language")}</p>
+              <p className="text-sm font-medium text-slate-900 mb-2">{t("language")}</p>
               <div className="flex gap-2">
                 {["fr", "en"].map((l) => (
                   <button
@@ -238,7 +238,7 @@ export default function SettingsPage() {
                     className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-colors ${
                       locale === l
                         ? "border-brand-500 bg-brand-500/10 text-brand-400"
-                        : "border-surface-600 text-slate-400 hover:border-surface-500"
+                        : "border-slate-200 text-slate-400 hover:border-slate-300"
                     }`}
                   >
                     <span className="text-base">{l === "fr" ? "🇫🇷" : "🇬🇧"}</span>
@@ -251,16 +251,16 @@ export default function SettingsPage() {
             <Separator />
 
             {/* Info */}
-            <div className="rounded-xl bg-surface-700/50 border border-surface-600 p-4 text-sm text-slate-400">
-              <p className="text-white font-medium mb-2">Informations du compte</p>
+            <div className="rounded-xl bg-slate-100 border border-slate-200 p-4 text-sm text-slate-400">
+              <p className="text-slate-900 font-medium mb-2">Informations du compte</p>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <p className="text-slate-500">Rôle</p>
-                  <p className="text-white capitalize">{user?.role}</p>
+                  <p className="text-slate-900 capitalize">{user?.role}</p>
                 </div>
                 <div>
                   <p className="text-slate-500">ID Admin</p>
-                  <p className="text-white font-mono">{user?.id?.slice(0, 8)}…</p>
+                  <p className="text-slate-900 font-mono">{user?.id?.slice(0, 8)}…</p>
                 </div>
                 {user?.brand_name && (
                   <div>

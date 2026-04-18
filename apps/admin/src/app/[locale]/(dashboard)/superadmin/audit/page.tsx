@@ -70,14 +70,14 @@ export default function AuditPage() {
 
   const getActionColor = (action: string) => {
     const key = Object.keys(ACTION_COLORS).find((k) => action.toUpperCase().includes(k));
-    return key ? ACTION_COLORS[key] : "text-slate-300";
+    return key ? ACTION_COLORS[key] : "text-slate-700";
   };
 
   return (
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-sm text-slate-400">{t("subtitle")}</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => refetch()}><RefreshCw className="h-4 w-4" /></Button>
@@ -175,7 +175,7 @@ export default function AuditPage() {
                       {formatDateTime(log.created_at)}
                     </TableCell>
                     <TableCell>
-                      <p className="text-white text-sm font-medium">{getActorName(log)}</p>
+                      <p className="text-slate-900 text-sm font-medium">{getActorName(log)}</p>
                     </TableCell>
                     <TableCell>
                       <Badge variant={ROLE_VARIANT[log.actor_role] ?? "info"}>
@@ -207,7 +207,7 @@ export default function AuditPage() {
           </TableBody>
         </Table>
         {data?.pagination && (
-          <div className="p-4 border-t border-surface-700/50">
+          <div className="p-4 border-t border-slate-200">
             <Pagination page={data.pagination.page} totalPages={data.pagination.total_pages}
               total={data.pagination.total} limit={data.pagination.limit} onPageChange={setPage} />
           </div>

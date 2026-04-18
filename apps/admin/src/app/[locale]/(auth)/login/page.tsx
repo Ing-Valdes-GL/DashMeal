@@ -105,11 +105,11 @@ export default function LoginPage({
           className="mb-2 drop-shadow-2xl"
           priority
         />
-        <h1 className="text-2xl font-bold text-white">{t("loginTitle")}</h1>
-        <p className="mt-1 text-sm text-slate-400">{t("loginSubtitle")}</p>
+        <h1 className="text-2xl font-bold text-slate-900">{t("loginTitle")}</h1>
+        <p className="mt-1 text-sm text-slate-500">{t("loginSubtitle")}</p>
       </div>
 
-      <Card className="border-surface-600/50 bg-surface-800/60 backdrop-blur-sm">
+      <Card className="border-slate-200 bg-white shadow-card">
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
@@ -142,7 +142,7 @@ export default function LoginPage({
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -167,12 +167,12 @@ export default function LoginPage({
         </CardContent>
       </Card>
 
-      <p className="mt-6 text-center text-xs text-slate-600">
+      <p className="mt-6 text-center text-xs text-slate-400">
         Dash Meal Cameroun {new Date().getFullYear()}
       </p>
-      <p className="mt-2 text-center text-sm text-slate-400">
+      <p className="mt-2 text-center text-sm text-slate-500">
         {t("noAccount")}{" "}
-        <Link href={`/${locale}/signin`} className="text-brand-400 hover:text-brand-300">
+        <Link href={`/${locale}/signin`} className="text-brand-600 hover:text-brand-700 font-medium">
           {t("goToSignUp")}
         </Link>
       </p>

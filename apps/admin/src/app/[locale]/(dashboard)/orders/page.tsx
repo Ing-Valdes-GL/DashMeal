@@ -105,7 +105,7 @@ export default function OrdersPage() {
       {/* En-tête */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-sm text-slate-400">{t("subtitle")}</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -170,11 +170,11 @@ export default function OrdersPage() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-white">{order.users?.name}</p>
+                        <p className="font-medium text-slate-900">{order.users?.name}</p>
                         <p className="text-xs text-slate-500">{order.users?.phone}</p>
                       </div>
                     </TableCell>
-                    <TableCell className="text-slate-300">{order.branches?.name}</TableCell>
+                    <TableCell className="text-slate-700">{order.branches?.name}</TableCell>
                     <TableCell>
                       <Badge variant={order.type === "collect" ? "collect" : "delivery"}>
                         {order.type === "collect" ? t("collect") : t("delivery")}
@@ -185,7 +185,7 @@ export default function OrdersPage() {
                         {t(order.status as any)}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-semibold text-white">
+                    <TableCell className="font-semibold text-slate-900">
                       {formatCurrency(order.total)}
                     </TableCell>
                     <TableCell className="text-xs text-slate-500">
@@ -228,7 +228,7 @@ export default function OrdersPage() {
           </TableBody>
         </Table>
         {pagination && (
-          <div className="p-4 border-t border-surface-700/50">
+          <div className="p-4 border-t border-slate-200">
             <Pagination
               page={pagination.page}
               totalPages={pagination.total_pages}
@@ -249,19 +249,19 @@ export default function OrdersPage() {
           {selectedOrder && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-slate-500">Client</p><p className="text-white font-medium">{selectedOrder.users?.name}</p></div>
-                <div><p className="text-slate-500">Téléphone</p><p className="text-white">{selectedOrder.users?.phone}</p></div>
-                <div><p className="text-slate-500">Agence</p><p className="text-white">{selectedOrder.branches?.name}</p></div>
+                <div><p className="text-slate-500">Client</p><p className="text-slate-900 font-medium">{selectedOrder.users?.name}</p></div>
+                <div><p className="text-slate-500">Téléphone</p><p className="text-slate-900">{selectedOrder.users?.phone}</p></div>
+                <div><p className="text-slate-500">Agence</p><p className="text-slate-900">{selectedOrder.branches?.name}</p></div>
                 <div><p className="text-slate-500">Type</p>
                   <Badge variant={selectedOrder.type === "collect" ? "collect" : "delivery"}>
                     {selectedOrder.type === "collect" ? t("collect") : t("delivery")}
                   </Badge>
                 </div>
                 <div><p className="text-slate-500">Statut</p><Badge variant={STATUS_VARIANT[selectedOrder.status]}>{t(selectedOrder.status as any)}</Badge></div>
-                <div><p className="text-slate-500">Total</p><p className="text-white font-bold">{formatCurrency(selectedOrder.total)}</p></div>
+                <div><p className="text-slate-500">Total</p><p className="text-slate-900 font-bold">{formatCurrency(selectedOrder.total)}</p></div>
               </div>
               {selectedOrder.notes && (
-                <div className="rounded-lg bg-surface-700/50 p-3 text-sm text-slate-300">
+                <div className="rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
                   <p className="text-xs text-slate-500 mb-1">Note</p>
                   {selectedOrder.notes}
                 </div>
@@ -303,14 +303,14 @@ export default function OrdersPage() {
             {drivers?.map((d) => (
               <button
                 key={d.id}
-                className="w-full flex items-center gap-3 rounded-lg border border-surface-500 bg-surface-700/50 p-3 hover:border-brand-500 hover:bg-brand-500/10 transition-colors text-left"
+                className="w-full flex items-center gap-3 rounded-lg border border-slate-300 bg-slate-100 p-3 hover:border-brand-500 hover:bg-brand-500/10 transition-colors text-left"
                 onClick={() => assignDriver.mutate({ id: selectedOrder!.id, driver_id: d.id })}
               >
                 <div className="h-9 w-9 rounded-full bg-brand-500/20 flex items-center justify-center text-brand-400 font-bold text-sm">
                   {d.name.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-white font-medium">{d.name}</p>
+                  <p className="text-slate-900 font-medium">{d.name}</p>
                   <p className="text-xs text-slate-500">{d.phone}</p>
                 </div>
               </button>

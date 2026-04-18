@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { apiGet, apiPost } from "@/lib/api";
@@ -13,25 +13,40 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { QrCode, ScanLine, CheckCircle, XCircle, RefreshCw, Calendar } from "lucide-react";
-import { useAuthStore } from "@/stores/auth";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { QrCode, ScanLine, CheckCircle, XCircle, RefreshCw, Calendar, Download, Eye } from "lucide-react";
+import QRCode from "react-qr-code";
 
 interface CollectOrder {
-  id: string; qr_code: string; pickup_status: "waiting" | "picked_up"; picked_up_at: string | null;
+  id: string;
+  qr_code: string;
+  pickup_code: string | null;
+  pickup_status: "waiting" | "picked_up";
+  picked_up_at: string | null;
   orders: { id: string; total: number; status: string; users: { name: string; phone: string } };
   time_slots: { date: string; start_time: string; end_time: string; branches?: { name: string } };
 }
 interface Branch { id: string; name: string }
 
+// Génère un code numérique 6 chiffres déterministe depuis le qr_code UUID
+function numericCode(qrCode: string): string {
+  const digits = qrCode.replace(/[^0-9]/g, "");
+  if (digits.length >= 6) return digits.slice(0, 6);
+  // Fallback: hash hex → number
+  const hex = qrCode.replace(/-/g, "").slice(0, 8);
+  return String(parseInt(hex, 16) % 1000000).padStart(6, "0");
+}
+
 export default function CollectPage() {
   const t = useTranslations("collect");
-  const { user } = useAuthStore();
   const qc = useQueryClient();
+  const qrRef = useRef<HTMLDivElement>(null);
   const [qrInput, setQrInput] = useState("");
   const [selectedBranch, setSelectedBranch] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [statusFilter, setStatusFilter] = useState("all");
   const [scanResult, setScanResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
+  const [qrModal, setQrModal] = useState<CollectOrder | null>(null);
 
   const { data: branches } = useQuery<Branch[]>({
     queryKey: ["branches"],
@@ -71,10 +86,52 @@ export default function CollectPage() {
     scanMutation.mutate(qrInput.trim());
   };
 
+  const downloadQrCode = (collect: CollectOrder) => {
+    const svg = document.getElementById(`qr-svg-${collect.id}`);
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+
+    img.onload = () => {
+      canvas.width = 300;
+      canvas.height = 360;
+      if (!ctx) return;
+
+      // Background blanc
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, 300, 360);
+
+      // QR code
+      ctx.drawImage(img, 25, 20, 250, 250);
+
+      // Code numérique
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 28px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(numericCode(collect.qr_code), 150, 310);
+
+      ctx.font = "14px sans-serif";
+      ctx.fillStyle = "#6b7280";
+      ctx.fillText("Code de retrait", 150, 340);
+
+      URL.revokeObjectURL(url);
+      const link = document.createElement("a");
+      link.download = `qr-collect-${collect.id.slice(0, 8)}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    };
+    img.src = url;
+  };
+
   return (
     <div className="space-y-5 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+        <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
         <p className="text-sm text-slate-400">{t("subtitle")}</p>
       </div>
 
@@ -86,7 +143,7 @@ export default function CollectPage() {
           </CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label>QR Code</Label>
+              <Label>QR Code ou code numérique</Label>
               <div className="flex gap-2">
                 <Input
                   value={qrInput}
@@ -99,9 +156,11 @@ export default function CollectPage() {
                   <ScanLine className="h-4 w-4" />
                 </Button>
               </div>
+              <p className="text-xs text-slate-500">
+                Accepte le QR code ou le code numérique à 6 chiffres
+              </p>
             </div>
 
-            {/* Résultat du scan */}
             {scanResult && (
               <div className={`rounded-xl border p-4 flex items-start gap-3 ${
                 scanResult.success
@@ -136,8 +195,7 @@ export default function CollectPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            {/* Filtres */}
-            <div className="flex gap-2 p-4 border-b border-surface-700/50">
+            <div className="flex gap-2 p-4 border-b border-slate-200">
               <Select value={branchId} onValueChange={setSelectedBranch}>
                 <SelectTrigger className="flex-1"><SelectValue placeholder="Agence" /></SelectTrigger>
                 <SelectContent>
@@ -171,13 +229,14 @@ export default function CollectPage() {
                   <TableHead>Créneau</TableHead>
                   <TableHead>Total</TableHead>
                   <TableHead>Statut</TableHead>
+                  <TableHead className="text-right">QR</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading
                   ? Array.from({ length: 5 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: 4 }).map((_, j) => (
+                        {Array.from({ length: 5 }).map((_, j) => (
                           <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
                         ))}
                       </TableRow>
@@ -185,7 +244,7 @@ export default function CollectPage() {
                   : (collects ?? []).length === 0
                   ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-12 text-slate-500">
+                        <TableCell colSpan={5} className="text-center py-12 text-slate-500">
                           Aucun retrait pour ce jour
                         </TableCell>
                       </TableRow>
@@ -194,20 +253,30 @@ export default function CollectPage() {
                       <TableRow key={c.id}>
                         <TableCell>
                           <div>
-                            <p className="font-medium text-white">{c.orders?.users?.name}</p>
+                            <p className="font-medium text-slate-900">{c.orders?.users?.name}</p>
                             <p className="text-xs text-slate-500">{c.orders?.users?.phone}</p>
                           </div>
                         </TableCell>
                         <TableCell className="text-sm text-slate-400">
                           {c.time_slots?.start_time} – {c.time_slots?.end_time}
                         </TableCell>
-                        <TableCell className="font-semibold text-white">
+                        <TableCell className="font-semibold text-slate-900">
                           {formatCurrency(c.orders?.total)}
                         </TableCell>
                         <TableCell>
                           <Badge variant={c.pickup_status === "picked_up" ? "delivered" : "pending"}>
                             {c.pickup_status === "picked_up" ? t("pickedUp") : t("waiting")}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setQrModal(c)}
+                            title="Voir QR code"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -216,6 +285,56 @@ export default function CollectPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal QR Code */}
+      <Dialog open={!!qrModal} onOpenChange={() => setQrModal(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-brand-400" />
+              QR Code — Retrait
+            </DialogTitle>
+          </DialogHeader>
+          {qrModal && (
+            <div className="flex flex-col items-center gap-4 pt-2">
+              {/* Info client */}
+              <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                <p className="font-medium text-slate-900">{qrModal.orders?.users?.name}</p>
+                <p className="text-slate-400">{qrModal.time_slots?.start_time} – {qrModal.time_slots?.end_time}</p>
+                <p className="text-brand-400 font-bold mt-0.5">{formatCurrency(qrModal.orders?.total)}</p>
+              </div>
+
+              {/* QR Code SVG */}
+              <div className="bg-white p-4 rounded-xl" ref={qrRef}>
+                <QRCode
+                  id={`qr-svg-${qrModal.id}`}
+                  value={qrModal.qr_code}
+                  size={200}
+                  bgColor="#ffffff"
+                  fgColor="#111827"
+                />
+              </div>
+
+              {/* Code numérique */}
+              <div className="text-center">
+                <p className="text-xs text-slate-500 mb-1">Code numérique de secours</p>
+                <p className="text-4xl font-black tracking-[0.3em] text-slate-900 font-mono">
+                  {numericCode(qrModal.qr_code)}
+                </p>
+              </div>
+
+              {/* Bouton télécharger */}
+              <Button
+                className="w-full"
+                onClick={() => downloadQrCode(qrModal)}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Télécharger en image
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

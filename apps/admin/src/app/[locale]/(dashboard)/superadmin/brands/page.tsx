@@ -76,7 +76,7 @@ export default function SuperAdminBrandsPage() {
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-sm text-slate-400">{t("subtitle")}</p>
         </div>
         <div className="flex gap-2">
@@ -122,7 +122,7 @@ export default function SuperAdminBrandsPage() {
                   <TableRow key={b.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-lg bg-surface-700 flex items-center justify-center overflow-hidden shrink-0">
+                        <div className="h-9 w-9 rounded-lg bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
                           {b.logo_url ? (
                             <img src={b.logo_url} alt={b.name} className="h-full w-full object-cover" />
                           ) : (
@@ -130,7 +130,7 @@ export default function SuperAdminBrandsPage() {
                           )}
                         </div>
                         <div>
-                          <p className="font-medium text-white">{b.name}</p>
+                          <p className="font-medium text-slate-900">{b.name}</p>
                           <p className="text-xs font-mono text-slate-600">#{b.id.slice(0, 8)}</p>
                         </div>
                       </div>
@@ -138,14 +138,14 @@ export default function SuperAdminBrandsPage() {
                     <TableCell>
                       {b.admins?.[0] ? (
                         <div>
-                          <p className="text-white text-sm">{b.admins[0].username}</p>
+                          <p className="text-slate-900 text-sm">{b.admins[0].username}</p>
                           <p className="text-xs text-slate-500">{b.admins[0].email}</p>
                         </div>
                       ) : (
                         <span className="text-xs text-slate-500 italic">Aucun admin</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-slate-300">{b.branches?.length ?? 0} agences</TableCell>
+                    <TableCell className="text-slate-700">{b.branches?.length ?? 0} agences</TableCell>
                     <TableCell>
                       <Badge variant={b.is_active ? "active" : "inactive"}>
                         {b.is_active ? "Active" : "Suspendue"}

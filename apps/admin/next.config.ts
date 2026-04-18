@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import path from "path";
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
@@ -12,21 +13,19 @@ const baseConfig: NextConfig = {
   },
 };
 
-// next-intl injects experimental.turbo (old format); Next.js 16 uses turbopack.
-// Migrate the alias and remove the stale experimental.turbo key.
-const config = withNextIntl(baseConfig) as NextConfig & {
-  experimental?: { turbo?: { resolveAlias?: Record<string, string> } };
-};
+const config = withNextIntl(baseConfig) as any;
 
+// next-intl injects experimental.turbo (old format) — migrate to turbopack
 const intlAlias = config.experimental?.turbo?.resolveAlias ?? {};
-delete config.experimental?.turbo;
+if (config.experimental?.turbo) delete config.experimental.turbo;
+
+// turbopack.root MUST be the workspace root (monorepo root), not apps/admin,
+// so Turbopack can access node_modules/.pnpm/* through pnpm symlinks.
+const workspaceRoot = path.resolve(process.cwd(), "../..");
 
 config.turbopack = {
-  root: process.cwd(),
-  resolveAlias: {
-    ...intlAlias,
-    ...(config.turbopack as any)?.resolveAlias,
-  },
+  root: workspaceRoot,
+  resolveAlias: { ...intlAlias, ...config.turbopack?.resolveAlias },
 };
 
 export default config;

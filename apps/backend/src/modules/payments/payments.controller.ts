@@ -256,13 +256,18 @@ export async function getPaymentStatus(req: Request, res: Response, next: NextFu
             .from("orders").update({ status: "confirmed" })
             .eq("id", payment.order_id).select("id, user_id").single();
 
-          const brandId = (payment.orders as unknown as { branches: { brand_id: string } })?.branches?.brand_id;
-          if (brandId) {
-            await supabase.from("commissions").insert({
-              payment_id: payment.id, order_id: payment.order_id, brand_id: brandId,
-              type: "online", rate: COMMISSION_RATE_ONLINE,
-              amount: Math.round(payment.amount * COMMISSION_RATE_ONLINE), is_settled: false,
-            });
+          const orderData = payment.orders as unknown as { branch_id: string; branches: { brand_id: string } };
+          const branchId = orderData?.branch_id;
+          const brandId  = orderData?.branches?.brand_id;
+          if (branchId && brandId) {
+            await supabase.rpc("credit_branch_wallet", {
+              p_branch_id:   branchId,
+              p_brand_id:    brandId,
+              p_amount:      payment.amount,
+              p_payment_id:  payment.id,
+              p_order_id:    payment.order_id,
+              p_description: `Commande #${String(payment.order_id).slice(0, 8)} — paiement en ligne`,
+            }).then(({ error }) => { if (error) console.error("[poll] wallet credit:", error.message); });
           }
 
           if (updatedOrder?.user_id) {
@@ -380,17 +385,17 @@ async function createOrderFromIntent(
 
   if (paymentErr) console.error("[createOrderFromIntent] Erreur payments:", paymentErr.message);
 
-  // ── 5. Commission ─────────────────────────────────────────────────────────
-  if (branch?.brand_id && payment) {
-    await supabase.from("commissions").insert({
-      payment_id: payment.id,
-      order_id: order.id,
-      brand_id: branch.brand_id,
-      type: "online",
-      rate: COMMISSION_RATE_ONLINE,
-      amount: Math.round(Number(d.total) * COMMISSION_RATE_ONLINE),
-      is_settled: false,
+  // ── 5. Créditer le wallet de l'agence (paiement en ligne = sans frais) ──────
+  if (branch?.brand_id && d.branch_id && payment) {
+    const { error: walletErr } = await supabase.rpc("credit_branch_wallet", {
+      p_branch_id:  d.branch_id as string,
+      p_brand_id:   branch.brand_id,
+      p_amount:     Number(d.total),
+      p_payment_id: payment.id,
+      p_order_id:   order.id,
+      p_description: `Commande #${order.id.slice(0, 8)} — paiement en ligne`,
     });
+    if (walletErr) console.error("[createOrderFromIntent] Erreur wallet credit:", walletErr.message);
   }
 
   // ── 6. Marquer l'intent comme traité ──────────────────────────────────────
@@ -423,17 +428,18 @@ export async function campayWebhook(req: Request, res: Response, next: NextFunct
           .select("id, user_id")
           .single();
 
-        const brandId = (payment.orders as unknown as { branches: { brand_id: string } })?.branches?.brand_id;
-        if (brandId) {
-          await supabase.from("commissions").insert({
-            payment_id: payment.id,
-            order_id: external_reference,
-            brand_id: brandId,
-            type: "online",
-            rate: COMMISSION_RATE_ONLINE,
-            amount: Math.round((payment.amount as number) * COMMISSION_RATE_ONLINE),
-            is_settled: false,
-          });
+        const webhookOrder = payment.orders as unknown as { branch_id: string; branches: { brand_id: string } };
+        const wBranchId = webhookOrder?.branch_id;
+        const wBrandId  = webhookOrder?.branches?.brand_id;
+        if (wBranchId && wBrandId) {
+          await supabase.rpc("credit_branch_wallet", {
+            p_branch_id:   wBranchId,
+            p_brand_id:    wBrandId,
+            p_amount:      payment.amount as number,
+            p_payment_id:  payment.id,
+            p_order_id:    external_reference,
+            p_description: `Commande #${String(external_reference).slice(0, 8)} — paiement en ligne`,
+          }).then(({ error }) => { if (error) console.error("[webhook] wallet credit:", error.message); });
         }
 
         if (updatedOrder?.user_id) {

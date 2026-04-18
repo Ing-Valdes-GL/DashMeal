@@ -5,16 +5,16 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-950 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:     "bg-brand-500 text-white shadow hover:bg-brand-600 active:bg-brand-700",
-        secondary:   "bg-surface-700 text-white hover:bg-surface-600 border border-surface-500",
-        outline:     "border border-surface-500 bg-transparent text-slate-300 hover:bg-surface-700 hover:text-white",
-        ghost:       "text-slate-400 hover:bg-surface-700 hover:text-white",
-        destructive: "bg-red-600/20 text-red-400 border border-red-600/30 hover:bg-red-600 hover:text-white",
-        success:     "bg-green-600/20 text-green-400 border border-green-600/30 hover:bg-green-600 hover:text-white",
+        secondary:   "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200",
+        outline:     "border border-slate-200 bg-transparent text-slate-700 hover:bg-slate-50 hover:text-slate-900",
+        ghost:       "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+        destructive: "bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white",
+        success:     "bg-green-50 text-green-700 border border-green-200 hover:bg-green-600 hover:text-white",
         link:        "text-brand-500 underline-offset-4 hover:underline p-0 h-auto",
       },
       size: {

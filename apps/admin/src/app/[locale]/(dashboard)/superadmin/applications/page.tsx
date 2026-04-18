@@ -53,7 +53,7 @@ export default function ApplicationsPage() {
   const [showReject, setShowReject] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
-  const { data, isLoading, refetch } = useQuery<Application[]>({
+  const { data, isLoading, error, refetch } = useQuery<Application[]>({
     queryKey: ["applications", { page, statusFilter }],
     queryFn: () => apiGet<Application[]>("/brands/applications", {
       page, limit: 20,
@@ -93,12 +93,12 @@ export default function ApplicationsPage() {
     <div className="space-y-5 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">{t("title")}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
           <p className="text-sm text-slate-400">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
           {pendingCount > 0 && (
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-slate-900">
               {pendingCount}
             </span>
           )}
@@ -141,11 +141,27 @@ export default function ApplicationsPage() {
                     ))}
                   </TableRow>
                 ))
+              : error
+                ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-10 text-red-400">
+                      Erreur : {(error as any)?.response?.data?.error?.message ?? (error as any)?.message ?? "Impossible de charger les demandes"}
+                    </TableCell>
+                  </TableRow>
+                )
+              : applications.length === 0
+                ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12 text-slate-500">
+                      Aucune demande {statusFilter !== "all" ? `avec le statut « ${statusFilter} »` : ""}
+                    </TableCell>
+                  </TableRow>
+                )
               : applications.map((a) => (
                   <TableRow key={a.id}>
-                    <TableCell className="font-medium text-white">{a.brand_name}</TableCell>
-                    <TableCell className="text-slate-300">{a.contact_email}</TableCell>
-                    <TableCell className="text-slate-300">{a.contact_phone}</TableCell>
+                    <TableCell className="font-medium text-slate-900">{a.brand_name}</TableCell>
+                    <TableCell className="text-slate-700">{a.contact_email}</TableCell>
+                    <TableCell className="text-slate-700">{a.contact_phone}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[a.status]}>{t(a.status as any)}</Badge>
                     </TableCell>
@@ -167,7 +183,7 @@ export default function ApplicationsPage() {
           </TableBody>
         </Table>
         {(data?.length ?? 0) > 0 && (
-          <div className="p-4 border-t border-surface-700/50 text-xs text-slate-500 text-right">
+          <div className="p-4 border-t border-slate-200 text-xs text-slate-500 text-right">
             {data?.length} résultat{(data?.length ?? 0) > 1 ? "s" : ""}
           </div>
         )}
@@ -187,20 +203,20 @@ export default function ApplicationsPage() {
                   <Badge variant={STATUS_VARIANT[selected.status]}>{t(selected.status as any)}</Badge>
                 </div>
                 <div><p className="text-slate-500">Soumis le</p>
-                  <p className="text-white">{formatDateTime(selected.submitted_at)}</p>
+                  <p className="text-slate-900">{formatDateTime(selected.submitted_at)}</p>
                 </div>
                 <div><p className="text-slate-500">Contact email</p>
-                  <p className="text-white">{selected.contact_email}</p>
+                  <p className="text-slate-900">{selected.contact_email}</p>
                 </div>
                 <div><p className="text-slate-500">Contact tél.</p>
-                  <p className="text-white">{selected.contact_phone}</p>
+                  <p className="text-slate-900">{selected.contact_phone}</p>
                 </div>
               </div>
 
               {/* Documents */}
               {selected.brand_documents && selected.brand_documents.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-white mb-2">{t("viewDocuments")}</p>
+                  <p className="text-sm font-medium text-slate-900 mb-2">{t("viewDocuments")}</p>
                   <div className="grid grid-cols-2 gap-2">
                     {selected.brand_documents.map((doc) => (
                       <a
@@ -208,7 +224,7 @@ export default function ApplicationsPage() {
                         href={doc.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 rounded-lg border border-surface-600 bg-surface-700/50 p-3 hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
+                        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 p-3 hover:border-brand-500 hover:bg-brand-500/10 transition-colors"
                       >
                         {doc.type === "logo" ? (
                           <ImageIcon className="h-4 w-4 text-brand-400 shrink-0" />
@@ -216,7 +232,7 @@ export default function ApplicationsPage() {
                           <File className="h-4 w-4 text-brand-400 shrink-0" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white truncate">{DOC_TYPES[doc.type] ?? doc.type}</p>
+                          <p className="text-sm text-slate-900 truncate">{DOC_TYPES[doc.type] ?? doc.type}</p>
                           <p className="text-xs text-slate-500">{doc.verified ? "Vérifié" : "Non vérifié"}</p>
                         </div>
                         <Download className="h-3.5 w-3.5 text-slate-500 shrink-0" />
@@ -230,7 +246,7 @@ export default function ApplicationsPage() {
               {selected.rejection_reason && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
                   <p className="text-xs text-red-400 mb-1">Motif de rejet</p>
-                  <p className="text-sm text-slate-300">{selected.rejection_reason}</p>
+                  <p className="text-sm text-slate-700">{selected.rejection_reason}</p>
                 </div>
               )}
             </div>

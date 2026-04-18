@@ -2,9 +2,7 @@
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/auth";
 import { useRouter, usePathname } from "next/navigation";
-import {
-  Globe, ChevronDown, Settings, LogOut, User,
-} from "lucide-react";
+import { Globe, ChevronDown, Settings, LogOut, Bell } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -14,12 +12,7 @@ import { Button } from "@/components/ui/button";
 import { getInitials } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 
-interface HeaderProps {
-  locale: string;
-  title?: string;
-}
-
-export function Header({ locale, title }: HeaderProps) {
+export function Header({ locale }: { locale: string }) {
   const t = useTranslations("nav");
   const tSettings = useTranslations("settings");
   const { user, logout } = useAuthStore();
@@ -33,70 +26,80 @@ export function Header({ locale, title }: HeaderProps) {
   };
 
   const switchLocale = (newLocale: string) => {
-    // Remplacer le préfixe de locale dans le chemin
-    const newPath = pathname.replace(`/${locale}`, `/${newLocale}`);
-    router.push(newPath);
+    router.push(pathname.replace(`/${locale}`, `/${newLocale}`));
   };
 
   return (
-    <header className="fixed top-0 right-0 left-64 z-30 flex h-16 items-center justify-between border-b border-surface-700/50 bg-surface-950/80 px-6 backdrop-blur-sm">
-      {/* Titre de la page (passé optionnellement) */}
+    <header className="fixed top-0 right-0 left-64 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-6 backdrop-blur-sm shadow-[0_1px_3px_0_rgba(0,0,0,0.05)]">
+
+      {/* Breadcrumb / titre */}
       <div className="flex items-center gap-2">
-        {title && (
-          <h1 className="text-base font-semibold text-white">{title}</h1>
-        )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400 font-medium">Dash Meal</span>
+          <ChevronDown className="h-3 w-3 text-slate-300 -rotate-90" />
+          <span className="text-sm font-semibold text-slate-700">
+            {user?.role === "superadmin" ? "Super Admin" : user?.brand_name ?? "Admin"}
+          </span>
+        </div>
       </div>
 
-      {/* Actions côté droit */}
-      <div className="flex items-center gap-2">
-        {/* Sélecteur de langue */}
+      <div className="flex items-center gap-1.5">
+        {/* Notifications */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+          onClick={() => router.push(`/${locale}/notifications`)}
+        >
+          <Bell className="h-4 w-4" />
+        </Button>
+
+        {/* Langue */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1.5 text-slate-400">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-slate-500 hover:text-slate-900 hover:bg-slate-100 font-medium">
               <Globe className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase">{locale}</span>
+              <span className="text-xs uppercase font-semibold">{locale}</span>
               <ChevronDown className="h-3 w-3 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>{tSettings("language")}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => switchLocale("fr")} className={locale === "fr" ? "text-brand-400" : ""}>
+          <DropdownMenuContent align="end" className="bg-white border-slate-200 shadow-lg">
+            <DropdownMenuLabel className="text-slate-500 text-xs">{tSettings("language")}</DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-slate-100" />
+            <DropdownMenuItem onClick={() => switchLocale("fr")} className={locale === "fr" ? "text-brand-600 font-semibold bg-brand-50" : "text-slate-700"}>
               🇫🇷 Français
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => switchLocale("en")} className={locale === "en" ? "text-brand-400" : ""}>
+            <DropdownMenuItem onClick={() => switchLocale("en")} className={locale === "en" ? "text-brand-600 font-semibold bg-brand-50" : "text-slate-700"}>
               🇬🇧 English
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Avatar + menu utilisateur */}
+        {/* Profil */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2 pl-2 pr-3 text-slate-300 hover:text-white">
+            <Button variant="ghost" size="sm" className="gap-2 pl-2 pr-3 text-slate-700 hover:bg-slate-100">
               <Avatar className="h-7 w-7">
-                <AvatarFallback className="text-xs">
+                <AvatarFallback className="bg-gradient-to-br from-brand-500 to-brand-700 text-white text-xs font-bold">
                   {getInitials(user?.username ?? "AD")}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-medium hidden sm:block">{user?.username}</span>
+              <span className="text-sm font-medium hidden sm:block text-slate-700">{user?.username}</span>
               <ChevronDown className="h-3 w-3 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-52 bg-white border-slate-200 shadow-lg">
             <DropdownMenuLabel>
-              <div>
-                <p className="font-medium text-white">{user?.username}</p>
-                <p className="text-xs text-slate-500 capitalize">{user?.role}</p>
-              </div>
+              <p className="font-semibold text-slate-900">{user?.username}</p>
+              <p className="text-xs text-slate-400 capitalize font-normal">{user?.role}</p>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push(`/${locale}/settings`)}>
-              <Settings className="mr-2 h-4 w-4" />
+            <DropdownMenuSeparator className="bg-slate-100" />
+            <DropdownMenuItem onClick={() => router.push(`/${locale}/settings`)} className="text-slate-700 hover:bg-slate-50">
+              <Settings className="mr-2 h-4 w-4 text-slate-400" />
               {tSettings("title")}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} destructive>
+            <DropdownMenuSeparator className="bg-slate-100" />
+            <DropdownMenuItem onClick={handleLogout} destructive className="text-red-600 hover:bg-red-50">
               <LogOut className="mr-2 h-4 w-4" />
               {t("logout")}
             </DropdownMenuItem>

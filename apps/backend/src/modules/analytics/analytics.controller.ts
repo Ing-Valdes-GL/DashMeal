@@ -3,58 +3,217 @@ import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess } from "../../utils/response.js";
 
+// ─── GET /analytics/dashboard?days=7|30|90 ───────────────────────────────────
+// Tableau de bord complet pour l'admin de marque
+
 export async function getDashboard(req: Request, res: Response, next: NextFunction) {
   try {
-    const brand_id = req.user!.role === "superadmin" ? (req.query.brand_id as string) : req.user!.brand_id!;
-    const today = new Date().toISOString().split("T")[0];
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const brand_id = req.user!.brand_id;
+    if (!brand_id) throw new AppError(403, "FORBIDDEN", "Accès réservé aux admins de marque");
 
-    // Commandes du jour
-    const { count: todayOrders } = await supabase
+    const days = Math.max(1, Math.min(365, parseInt(req.query.days as string) || 30));
+    const since = new Date(Date.now() - days * 86400_000).toISOString();
+    const todayStart = new Date().toISOString().split("T")[0] + "T00:00:00";
+
+    // Récupérer toutes les agences de la marque
+    const { data: branches } = await supabase
+      .from("branches")
+      .select("id")
+      .eq("brand_id", brand_id);
+    const branchIds = (branches ?? []).map((b: any) => b.id);
+
+    if (branchIds.length === 0) {
+      return sendSuccess(res, emptyDashboard());
+    }
+
+    // Commandes de la période
+    const { data: orders } = await supabase
       .from("orders")
-      .select("id", { count: "exact" })
-      .gte("created_at", `${today}T00:00:00`)
-      .eq("branches.brand_id", brand_id);
+      .select("id, total, status, type, created_at, payment_method")
+      .in("branch_id", branchIds)
+      .gte("created_at", since);
 
-    // En attente
-    const { count: pendingOrders } = await supabase
-      .from("orders")
-      .select("id", { count: "exact" })
-      .eq("status", "pending");
+    const allOrders = (orders ?? []) as any[];
 
-    // Produits en rupture
+    // Stats du jour
+    const todayOrders = allOrders.filter((o) => o.created_at >= todayStart);
+    const todayRevenue = todayOrders.filter((o) => o.status === "delivered").reduce((s: number, o: any) => s + (o.total ?? 0), 0);
+    const todayAvg = todayOrders.length ? todayRevenue / todayOrders.filter((o) => o.status === "delivered").length : 0;
+
+    // Stock en rupture (tous les produits de la marque sans stock)
     const { count: outOfStock } = await supabase
       .from("branch_stock")
       .select("id", { count: "exact" })
+      .in("branch_id", branchIds)
       .eq("stock_qty", 0);
 
+    // CA par jour (delivered orders uniquement)
+    const deliveredOrders = allOrders.filter((o) => o.status === "delivered");
+    const byDay: Record<string, { revenue: number; orders: number }> = {};
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400_000).toISOString().split("T")[0];
+      byDay[d] = { revenue: 0, orders: 0 };
+    }
+    for (const o of allOrders) {
+      const d = o.created_at.split("T")[0];
+      if (byDay[d]) {
+        byDay[d].orders++;
+        if (o.status === "delivered") byDay[d].revenue += o.total ?? 0;
+      }
+    }
+    const revenue_by_day = Object.entries(byDay).map(([date, v]) => ({ date, ...v }));
+
+    // Top produits de la période
+    const { data: itemsData } = await supabase
+      .from("order_items")
+      .select("quantity, unit_price, products(name_fr), orders!inner(branch_id, status, created_at)")
+      .in("orders.branch_id", branchIds)
+      .eq("orders.status", "delivered")
+      .gte("orders.created_at", since);
+
+    const productMap: Record<string, { name: string; revenue: number; quantity: number }> = {};
+    for (const item of (itemsData ?? []) as any[]) {
+      const name = item.products?.name_fr ?? "Inconnu";
+      if (!productMap[name]) productMap[name] = { name, revenue: 0, quantity: 0 };
+      productMap[name].revenue += (item.quantity ?? 0) * (item.unit_price ?? 0);
+      productMap[name].quantity += item.quantity ?? 0;
+    }
+    const top_products = Object.values(productMap)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 10);
+
+    // Répartition par statut
+    const statusCount: Record<string, number> = {};
+    for (const o of allOrders) {
+      statusCount[o.status] = (statusCount[o.status] ?? 0) + 1;
+    }
+    const orders_by_status = Object.entries(statusCount).map(([status, count]) => ({ status, count }));
+
+    // Répartition par type (collect / delivery)
+    const typeCount: Record<string, number> = {};
+    for (const o of allOrders) {
+      typeCount[o.type ?? "delivery"] = (typeCount[o.type ?? "delivery"] ?? 0) + 1;
+    }
+    const orders_by_type = Object.entries(typeCount).map(([type, count]) => ({ type, count }));
+
+    // Répartition par moyen de paiement
+    const paymentCount: Record<string, number> = {};
+    for (const o of allOrders) {
+      paymentCount[o.payment_method ?? "unknown"] = (paymentCount[o.payment_method ?? "unknown"] ?? 0) + 1;
+    }
+    const orders_by_payment = Object.entries(paymentCount).map(([method, count]) => ({ method, count }));
+
+    // Taux de conversion (delivered / total)
+    const conversionRate = allOrders.length
+      ? Math.round((deliveredOrders.length / allOrders.length) * 100)
+      : 0;
+
     sendSuccess(res, {
-      today_orders: todayOrders ?? 0,
-      pending_orders: pendingOrders ?? 0,
-      out_of_stock: outOfStock ?? 0,
+      period_days: days,
+      today: {
+        revenue: Math.round(todayRevenue),
+        orders: todayOrders.length,
+        avg_order: Math.round(todayAvg),
+        out_of_stock: outOfStock ?? 0,
+      },
+      period: {
+        revenue: Math.round(deliveredOrders.reduce((s: number, o: any) => s + (o.total ?? 0), 0)),
+        orders: allOrders.length,
+        delivered: deliveredOrders.length,
+        avg_order: deliveredOrders.length
+          ? Math.round(deliveredOrders.reduce((s: number, o: any) => s + (o.total ?? 0), 0) / deliveredOrders.length)
+          : 0,
+        conversion_rate: conversionRate,
+      },
+      revenue_by_day,
+      top_products,
+      orders_by_status,
+      orders_by_type,
+      orders_by_payment,
     });
   } catch (err) {
     next(err);
   }
 }
 
+function emptyDashboard() {
+  return {
+    period_days: 30,
+    today: { revenue: 0, orders: 0, avg_order: 0, out_of_stock: 0 },
+    period: { revenue: 0, orders: 0, delivered: 0, avg_order: 0, conversion_rate: 0 },
+    revenue_by_day: [],
+    top_products: [],
+    orders_by_status: [],
+    orders_by_type: [],
+    orders_by_payment: [],
+  };
+}
+
+// ─── GET /analytics/branches?days=7|30|90 ────────────────────────────────────
+// CA + commandes par agence
+
+export async function getBranchesStats(req: Request, res: Response, next: NextFunction) {
+  try {
+    const brand_id = req.user!.brand_id;
+    if (!brand_id) throw new AppError(403, "FORBIDDEN", "Accès réservé aux admins de marque");
+
+    const days = Math.max(1, Math.min(365, parseInt(req.query.days as string) || 30));
+    const since = new Date(Date.now() - days * 86400_000).toISOString();
+
+    const { data: branches } = await supabase
+      .from("branches")
+      .select("id, name")
+      .eq("brand_id", brand_id);
+
+    if (!branches || branches.length === 0) {
+      return sendSuccess(res, []);
+    }
+
+    const results = await Promise.all(
+      (branches as any[]).map(async (branch) => {
+        const { data: orders } = await supabase
+          .from("orders")
+          .select("total, status")
+          .eq("branch_id", branch.id)
+          .gte("created_at", since);
+
+        const all = orders ?? [];
+        const delivered = (all as any[]).filter((o: any) => o.status === "delivered");
+        const revenue = delivered.reduce((s: number, o: any) => s + (o.total ?? 0), 0);
+
+        return {
+          branch_id: branch.id,
+          branch_name: branch.name,
+          revenue: Math.round(revenue),
+          orders: all.length,
+          delivered: delivered.length,
+        };
+      })
+    );
+
+    sendSuccess(res, results.sort((a, b) => b.revenue - a.revenue));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── GET /analytics/orders-stats ─────────────────────────────────────────────
 export async function getOrdersStats(req: Request, res: Response, next: NextFunction) {
   try {
     const { period = "week" } = req.query;
-    // TODO: Requêtes SQL agrégées selon la période
     sendSuccess(res, { period, stats: [] });
   } catch (err) {
     next(err);
   }
 }
 
+// ─── GET /analytics/top-products ─────────────────────────────────────────────
 export async function getTopProducts(req: Request, res: Response, next: NextFunction) {
   try {
     const { data, error } = await supabase
       .from("order_items")
       .select("product_id, quantity, products(name_fr)")
       .limit(10);
-
     if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
     sendSuccess(res, data);
   } catch (err) {
@@ -62,20 +221,20 @@ export async function getTopProducts(req: Request, res: Response, next: NextFunc
   }
 }
 
+// ─── GET /analytics/revenue ───────────────────────────────────────────────────
 export async function getRevenue(req: Request, res: Response, next: NextFunction) {
   try {
-    // TODO: Agrégation par période
     sendSuccess(res, { revenue: 0 });
   } catch (err) {
     next(err);
   }
 }
 
+// ─── GET /analytics/branch/:branch_id ────────────────────────────────────────
 export async function getBranchStats(req: Request, res: Response, next: NextFunction) {
   try {
     const { branch_id } = req.params;
 
-    // Vérifier l'accès : admin ne peut voir que ses propres agences
     if (req.user!.role === "admin") {
       const { data: branch } = await supabase.from("branches").select("brand_id").eq("id", branch_id).single();
       if (!branch || branch.brand_id !== req.user!.brand_id) {
@@ -101,10 +260,9 @@ export async function getBranchStats(req: Request, res: Response, next: NextFunc
 
     const totalRevenue = (revenueData ?? []).reduce((s: number, o: any) => s + (o.total ?? 0), 0);
 
-    // Compter par statut
     const byStatus: Record<string, number> = {};
     for (const o of (statusData ?? [])) {
-      byStatus[o.status] = (byStatus[o.status] ?? 0) + 1;
+      byStatus[(o as any).status] = (byStatus[(o as any).status] ?? 0) + 1;
     }
 
     sendSuccess(res, {
@@ -119,6 +277,7 @@ export async function getBranchStats(req: Request, res: Response, next: NextFunc
   }
 }
 
+// ─── GET /analytics/platform (superadmin) ────────────────────────────────────
 export async function getPlatformStats(req: Request, res: Response, next: NextFunction) {
   try {
     const [
@@ -155,35 +314,12 @@ export async function getPlatformStats(req: Request, res: Response, next: NextFu
     const commPending = commissions.filter(c => !c.is_settled).reduce((s, c) => s + c.amount, 0);
 
     sendSuccess(res, {
-      brands: {
-        total: (activeBrands ?? 0) + (suspendedBrands ?? 0),
-        active: activeBrands ?? 0,
-        suspended: suspendedBrands ?? 0,
-      },
-      users: {
-        total: totalUsers ?? 0,
-        verified: verifiedUsers ?? 0,
-      },
-      orders: {
-        total: totalOrders ?? 0,
-        today: todayOrders ?? 0,
-        delivering: deliveringOrders ?? 0,
-      },
-      revenue: {
-        gmv_total: Math.round(gmvOnline + gmvInperson),
-        gmv_online: Math.round(gmvOnline),
-        gmv_inperson: Math.round(gmvInperson),
-      },
-      commissions: {
-        total: Math.round(commTotal),
-        pending: Math.round(commPending),
-        settled: Math.round(commSettled),
-      },
-      applications: {
-        pending: pendingApplications ?? 0,
-        approved: approvedApplications ?? 0,
-        rejected: rejectedApplications ?? 0,
-      },
+      brands: { total: (activeBrands ?? 0) + (suspendedBrands ?? 0), active: activeBrands ?? 0, suspended: suspendedBrands ?? 0 },
+      users: { total: totalUsers ?? 0, verified: verifiedUsers ?? 0 },
+      orders: { total: totalOrders ?? 0, today: todayOrders ?? 0, delivering: deliveringOrders ?? 0 },
+      revenue: { gmv_total: Math.round(gmvOnline + gmvInperson), gmv_online: Math.round(gmvOnline), gmv_inperson: Math.round(gmvInperson) },
+      commissions: { total: Math.round(commTotal), pending: Math.round(commPending), settled: Math.round(commSettled) },
+      applications: { pending: pendingApplications ?? 0, approved: approvedApplications ?? 0, rejected: rejectedApplications ?? 0 },
       gmv_by_day: [],
       top_brands: [],
     });
@@ -192,6 +328,7 @@ export async function getPlatformStats(req: Request, res: Response, next: NextFu
   }
 }
 
+// ─── GET /analytics/commissions (superadmin) ─────────────────────────────────
 export async function getCommissionsOverview(req: Request, res: Response, next: NextFunction) {
   try {
     const { data, error } = await supabase
@@ -202,9 +339,9 @@ export async function getCommissionsOverview(req: Request, res: Response, next: 
 
     if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
 
-    const total_online = data.filter(c => c.type === "online").reduce((sum, c) => sum + c.amount, 0);
-    const total_inperson = data.filter(c => c.type === "inperson").reduce((sum, c) => sum + c.amount, 0);
-    const pending = data.filter(c => !c.is_settled).reduce((sum, c) => sum + c.amount, 0);
+    const total_online = (data ?? []).filter(c => c.type === "online").reduce((sum, c) => sum + c.amount, 0);
+    const total_inperson = (data ?? []).filter(c => c.type === "inperson").reduce((sum, c) => sum + c.amount, 0);
+    const pending = (data ?? []).filter(c => !c.is_settled).reduce((sum, c) => sum + c.amount, 0);
 
     sendSuccess(res, { total_online, total_inperson, pending_settlement: pending, entries: data });
   } catch (err) {

@@ -29,6 +29,7 @@ import commissionsRoutes from "./modules/commissions/commissions.routes.js";
 import documentsRoutes from "./modules/documents/documents.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
 import mapsRoutes from "./modules/maps/maps.routes.js";
+import walletRoutes from "./modules/wallet/wallet.routes.js";
 
 const app: Application = express();
 
@@ -95,7 +96,8 @@ app.use(`${API_PREFIX}/notifications`, notificationsRoutes);
 app.use(`${API_PREFIX}/commissions`, commissionsRoutes);
 app.use(`${API_PREFIX}/documents`, documentsRoutes);
 app.use(`${API_PREFIX}/audit`, auditRoutes);
-app.use(`${API_PREFIX}/maps`,  mapsRoutes);
+app.use(`${API_PREFIX}/maps`,   mapsRoutes);
+app.use(`${API_PREFIX}/wallet`, walletRoutes);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
