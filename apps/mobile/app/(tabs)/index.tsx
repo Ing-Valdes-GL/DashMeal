@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as Location from "expo-location";
 import { Colors, Radius, Shadow } from "@/lib/theme";
+import { AdBanner } from "@/components/AdBanner";
 
 const BRANCH_TYPES = [
   { key: "all",        label: "Tous",         icon: "apps-outline" as const },
@@ -149,6 +150,9 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
         </View>
+
+        {/* ── Publicité ──────────────────────────────────────────────────────── */}
+        <AdBanner />
 
         {/* ── Agences ────────────────────────────────────────────────────────── */}
         <View style={styles.section}>

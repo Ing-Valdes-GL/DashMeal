@@ -62,6 +62,7 @@ const EnvSchema = z.object({
   STORAGE_BUCKET_PRODUCTS: z.string().default("product-images"),
   STORAGE_BUCKET_DOCUMENTS: z.string().default("brand-documents"),
   STORAGE_BUCKET_INVOICES: z.string().default("invoices"),
+  STORAGE_BUCKET_ADS: z.string().default("ad-images"),
 });
 
 function loadEnv() {

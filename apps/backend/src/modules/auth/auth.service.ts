@@ -311,6 +311,54 @@ export async function loginDriver(input: { phone: string; pin: string }): Promis
   return { driver: safeDriver, tokens };
 }
 
+// ─── Demande d'accès marque ───────────────────────────────────────────────────
+
+export async function applyBrand(input: {
+  brand_name: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  city: string;
+  description: string;
+  password: string;
+}) {
+  const { brand_name, contact_name, contact_email, contact_phone, city, description, password } = input;
+
+  // Vérifier si une demande existe déjà avec cet email ou téléphone
+  const { data: existing } = await supabase
+    .from("brand_applications")
+    .select("id")
+    .or(`contact_email.eq.${contact_email},contact_phone.eq.${contact_phone}`)
+    .maybeSingle();
+
+  if (existing) {
+    throw new AppError(409, "APPLICATION_ALREADY_EXISTS", "Une demande existe déjà avec cet email ou ce numéro");
+  }
+
+  const password_hash = await bcrypt.hash(password, 12);
+
+  const { data, error } = await supabase
+    .from("brand_applications")
+    .insert({
+      brand_name,
+      contact_name,
+      contact_email,
+      contact_phone,
+      city,
+      description,
+      password_hash,
+      status: "pending",
+    })
+    .select("id, brand_name, contact_email, status, submitted_at")
+    .single();
+
+  if (error || !data) {
+    throw new AppError(500, "APPLICATION_ERROR", "Échec de l'envoi de la demande");
+  }
+
+  return { message: "Demande soumise avec succès", application: data };
+}
+
 // ─── Helpers privés ───────────────────────────────────────────────────────────
 
 function buildUserTokens(user: { id: string; name?: string; phone: string }): AuthTokens {

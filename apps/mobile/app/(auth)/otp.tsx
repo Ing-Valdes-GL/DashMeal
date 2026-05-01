@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from "react-native";
@@ -60,6 +60,13 @@ export default function OtpScreen() {
   };
 
   const code = otp.join("");
+
+  useEffect(() => {
+    if (code.length === 6 && !verifyMutation.isPending) {
+      setError("");
+      verifyMutation.mutate();
+    }
+  }, [code]);
 
   return (
     <View style={styles.container}>

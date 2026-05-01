@@ -44,6 +44,23 @@ router.post(
 );
 router.post("/superadmin/login", validate(LoginAdminSchema), controller.loginSuperAdmin);
 
+// ─── Demande d'accès marque (landing page) ───────────────────────────────────
+router.post(
+  "/apply",
+  validate(
+    z.object({
+      brand_name:    z.string().min(2),
+      contact_name:  z.string().min(2),
+      contact_email: z.string().email(),
+      contact_phone: z.string().regex(/^\+?[1-9]\d{7,14}$/),
+      city:          z.string().min(2),
+      description:   z.string().min(20).max(500),
+      password:      z.string().min(8),
+    })
+  ),
+  controller.applyBrand
+);
+
 // ─── Commun ───────────────────────────────────────────────────────────────────
 router.post("/refresh", validate(RefreshTokenSchema), controller.refreshTokens);
 

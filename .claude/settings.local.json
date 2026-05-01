@@ -18,7 +18,8 @@
       "WebFetch(domain:demo.campay.net)",
       "WebFetch(domain:documenter.getpostman.com)",
       "WebFetch(domain:www.postman.com)",
-      "Bash(pnpm --filter @dash-meal/mobile typecheck)"
+      "Bash(pnpm --filter @dash-meal/mobile typecheck)",
+      "Bash(pnpm --filter @dash-meal/backend typecheck)"
     ]
   }
 }

@@ -192,6 +192,45 @@ export async function getPlatformWallet(req: Request, res: Response, next: NextF
   }
 }
 
+// ─── POST /wallet/platform/withdraw ──────────────────────────────────────────
+
+export async function platformWithdraw(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { amount, phone } = req.body;
+    const amountNum = Number(amount);
+    if (!amountNum || amountNum <= 0) throw new AppError(400, "INVALID_AMOUNT", "Montant invalide");
+    if (!phone) throw new AppError(400, "PHONE_REQUIRED", "Numéro de téléphone requis");
+
+    const { data: wallet } = await supabase.from("platform_wallet").select("balance").single();
+    if (!wallet || wallet.balance < amountNum) throw new AppError(422, "INSUFFICIENT_BALANCE", "Solde insuffisant");
+
+    const description = `Retrait superadmin — ${amountNum.toLocaleString("fr-FR")} FCFA`;
+
+    let campayRef: string;
+    try {
+      const campayRes = await campayWithdraw({ amount: amountNum, phone, description, externalReference: `platform_wd_${Date.now()}` });
+      campayRef = campayRes.reference;
+    } catch (campayErr: any) {
+      if (campayErr instanceof AppError) throw campayErr;
+      throw new AppError(502, "CAMPAY_ERROR", campayErr?.message ?? "Échec du virement Campay");
+    }
+
+    const { error } = await supabase.rpc("process_platform_withdrawal", {
+      p_amount: amountNum,
+      p_campay_reference: campayRef,
+      p_description: description,
+    });
+    if (error) {
+      if (error.message.includes("INSUFFICIENT_BALANCE")) throw new AppError(422, "INSUFFICIENT_BALANCE", "Solde insuffisant");
+      throw new AppError(500, "DB_ERROR", error.message);
+    }
+
+    sendSuccess(res, { campay_reference: campayRef, amount: amountNum }, "Retrait effectué");
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ─── GET /wallet/platform/transactions ───────────────────────────────────────
 
 export async function getPlatformTransactions(req: Request, res: Response, next: NextFunction) {

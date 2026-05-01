@@ -30,6 +30,7 @@ import documentsRoutes from "./modules/documents/documents.routes.js";
 import auditRoutes from "./modules/audit/audit.routes.js";
 import mapsRoutes from "./modules/maps/maps.routes.js";
 import walletRoutes from "./modules/wallet/wallet.routes.js";
+import adsRoutes from "./modules/ads/ads.routes.js";
 
 const app: Application = express();
 
@@ -98,6 +99,7 @@ app.use(`${API_PREFIX}/documents`, documentsRoutes);
 app.use(`${API_PREFIX}/audit`, auditRoutes);
 app.use(`${API_PREFIX}/maps`,   mapsRoutes);
 app.use(`${API_PREFIX}/wallet`, walletRoutes);
+app.use(`${API_PREFIX}/ads`,    adsRoutes);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {

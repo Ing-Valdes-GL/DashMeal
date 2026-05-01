@@ -59,6 +59,7 @@
     "audit": "Audit",
     "platform": "Plateforme",
     "wallet": "Wallet",
+    "ads": "Publicités",
     "logout": "Déconnexion"
   },
   "auth": {

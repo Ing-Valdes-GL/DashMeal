@@ -59,6 +59,7 @@
     "audit": "Audit",
     "platform": "Platform",
     "wallet": "Wallet",
+    "ads": "Ads",
     "logout": "Log out"
   },
   "auth": {

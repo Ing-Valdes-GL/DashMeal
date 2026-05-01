@@ -74,6 +74,15 @@ export async function refreshTokens(req: Request, res: Response, next: NextFunct
   }
 }
 
+export async function applyBrand(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.applyBrand(req.body);
+    res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function requestReset(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await authService.requestPasswordReset(req.body.phone);

@@ -9,7 +9,7 @@ import {
   LayoutDashboard, ShoppingCart, Store, Truck, QrCode,
   BarChart2, Bell, Settings, Building2, FileText,
   Users, Activity, Globe, ChevronRight, LogOut,
-  UserCheck, Wallet, DollarSign,
+  UserCheck, Wallet, DollarSign, Megaphone,
 } from "lucide-react";
 
 interface NavItem {
@@ -58,6 +58,7 @@ export function Sidebar({ locale }: { locale: string }) {
     { href: "/collect",       label: t("collect"),       icon: QrCode },
     { href: "/analytics",     label: t("analytics"),     icon: BarChart2 },
     { href: "/wallet",        label: t("wallet"),        icon: Wallet },
+    { href: "/ads",           label: t("ads"),           icon: Megaphone },
     { href: "/notifications", label: t("notifications"), icon: Bell },
     { href: "/settings",      label: t("settings"),      icon: Settings },
   ];
@@ -68,6 +69,7 @@ export function Sidebar({ locale }: { locale: string }) {
     { href: "/superadmin/applications", label: t("applications"), icon: FileText },
     { href: "/superadmin/users",        label: t("users"),        icon: Users },
     { href: "/superadmin/commissions",  label: t("commissions"),  icon: DollarSign },
+    { href: "/superadmin/ads",          label: t("ads"),          icon: Megaphone },
     { href: "/superadmin/wallet",       label: t("wallet"),       icon: Wallet },
     { href: "/superadmin/audit",        label: t("audit"),        icon: Activity },
     { href: "/settings",                label: t("settings"),     icon: Settings },
