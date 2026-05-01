@@ -6,7 +6,7 @@
       "pnpm --filter @dash-meal/backend build"
     ]
   },
-  "start": {
-    "cmd": "node apps/backend/dist/app.js"
+  "deploy": {
+    "startCmd": "node apps/backend/dist/app.js"
   }
 }
