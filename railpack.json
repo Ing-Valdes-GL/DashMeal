@@ -2,11 +2,7 @@
   "build": {
     "cmds": [
       "pnpm install --frozen-lockfile",
-      "pnpm --filter @dash-meal/shared build",
-      "pnpm --filter @dash-meal/backend build"
+      "pnpm run build"
     ]
-  },
-  "deploy": {
-    "startCmd": "node apps/backend/dist/app.js"
   }
 }

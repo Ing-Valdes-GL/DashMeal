@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "dev": "turbo run dev",
-    "build": "turbo run build",
+    "build": "pnpm --filter @dash-meal/shared build && pnpm --filter @dash-meal/backend build",
+    "start": "node apps/backend/dist/app.js",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "clean": "turbo run clean"
