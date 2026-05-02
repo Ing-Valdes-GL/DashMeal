@@ -48,6 +48,7 @@ const EnvSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
 
   TERMII_API_KEY: z.string().min(1),
+  TERMII_BASE_URL: z.string().url().default("https://v3.api.termii.com"),
   TERMII_SENDER_ID: z.string().default("DashMeal"),
   OTP_EXPOSE_CODE: z.coerce.boolean().default(false),
 
