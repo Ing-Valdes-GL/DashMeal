@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Plan de Test — Dash Meal</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1a1a1a; background: #fff; }
+
+  .cover {
+    height: 100vh; display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    background: linear-gradient(135deg, #0a0f1e 0%, #1a1a2e 100%);
+    color: white; text-align: center; page-break-after: always;
+  }
+  .cover h1 { font-size: 36px; font-weight: 800; margin-bottom: 12px; color: #f97316; }
+  .cover h2 { font-size: 20px; font-weight: 400; margin-bottom: 32px; opacity: 0.8; }
+  .cover .meta { font-size: 13px; opacity: 0.6; line-height: 2; }
+  .cover .badge {
+    display: inline-block; background: #f97316; color: white;
+    padding: 6px 18px; border-radius: 20px; font-size: 12px;
+    font-weight: 700; margin-top: 24px; letter-spacing: 1px;
+  }
+
+  .toc { padding: 40px 50px; page-break-after: always; }
+  .toc h2 { font-size: 20px; font-weight: 700; color: #0a0f1e; border-bottom: 3px solid #f97316; padding-bottom: 10px; margin-bottom: 24px; }
+  .toc-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dotted #ddd; font-size: 12px; }
+  .toc-item span:first-child { color: #1a1a2e; font-weight: 500; }
+  .toc-item span:last-child { color: #f97316; font-weight: 700; }
+  .toc-section { font-size: 13px; font-weight: 700; color: #f97316; margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 1px; }
+
+  .section { padding: 30px 50px; page-break-before: always; }
+  .section-header {
+    background: linear-gradient(135deg, #0a0f1e, #1a1a2e);
+    color: white; padding: 16px 24px; border-radius: 8px;
+    margin-bottom: 24px; display: flex; align-items: center; gap: 12px;
+  }
+  .section-header .icon { font-size: 24px; }
+  .section-header h2 { font-size: 18px; font-weight: 700; }
+  .section-header p { font-size: 11px; opacity: 0.7; margin-top: 4px; }
+  .section-header .badge-env {
+    margin-left: auto; background: #f97316;
+    padding: 4px 12px; border-radius: 12px; font-size: 10px;
+    font-weight: 700; white-space: nowrap;
+  }
+
+  .subsection { margin-bottom: 28px; }
+  .subsection-title {
+    font-size: 13px; font-weight: 700; color: #0a0f1e;
+    background: #f0f4ff; padding: 8px 14px; border-left: 4px solid #f97316;
+    border-radius: 0 6px 6px 0; margin-bottom: 12px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  thead tr { background: #0a0f1e; color: white; }
+  thead th { padding: 9px 10px; text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+  tbody tr { border-bottom: 1px solid #eee; }
+  tbody tr:nth-child(even) { background: #fafafa; }
+  tbody td { padding: 9px 10px; vertical-align: top; line-height: 1.4; }
+
+  .test-id { font-family: monospace; font-size: 9px; color: #666; white-space: nowrap; }
+  .test-name { font-weight: 600; font-size: 11px; color: #1a1a2e; }
+  .test-action { font-size: 10px; color: #444; }
+  .test-expected { font-size: 10px; color: #2d6a2d; }
+
+  .cb { width: 16px; height: 16px; border: 2px solid #ccc; border-radius: 3px; display: inline-block; }
+  .cb-group { display: flex; gap: 8px; align-items: center; }
+
+  .status-pass { color: #16a34a; font-weight: 700; font-size: 10px; }
+  .status-fail { color: #dc2626; font-weight: 700; font-size: 10px; }
+  .status-skip { color: #d97706; font-weight: 700; font-size: 10px; }
+
+  .priority-high { background: #fee2e2; color: #991b1b; padding: 2px 7px; border-radius: 10px; font-size: 9px; font-weight: 700; }
+  .priority-med  { background: #fef3c7; color: #92400e; padding: 2px 7px; border-radius: 10px; font-size: 9px; font-weight: 700; }
+  .priority-low  { background: #d1fae5; color: #065f46; padding: 2px 7px; border-radius: 10px; font-size: 9px; font-weight: 700; }
+
+  .notes-box {
+    border: 1px solid #e2e8f0; border-radius: 6px;
+    padding: 12px; margin-top: 8px; min-height: 50px;
+    background: #fffbf5;
+  }
+  .notes-label { font-size: 10px; color: #888; margin-bottom: 6px; font-weight: 600; }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .info-box { border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px; }
+  .info-box label { font-size: 10px; color: #888; display: block; margin-bottom: 4px; }
+  .info-box .field { border-bottom: 1px solid #ccc; min-height: 22px; font-size: 11px; color: #444; }
+
+  .legend { display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; color: #555; }
+
+  .page-footer {
+    position: fixed; bottom: 20px; left: 50px; right: 50px;
+    display: flex; justify-content: space-between;
+    font-size: 9px; color: #999; border-top: 1px solid #eee; padding-top: 8px;
+  }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+  .summary-card { text-align: center; padding: 16px; border-radius: 8px; }
+  .summary-card.total { background: #f0f4ff; }
+  .summary-card.pass { background: #d1fae5; }
+  .summary-card.fail { background: #fee2e2; }
+  .summary-card.skip { background: #fef3c7; }
+  .summary-card .num { font-size: 28px; font-weight: 800; }
+  .summary-card .lbl { font-size: 10px; font-weight: 600; opacity: 0.7; margin-top: 4px; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .section { page-break-before: always; }
+    .no-break { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ COUVERTURE ═══ -->
+<div class="cover">
+  <h1>DASH MEAL</h1>
+  <h2>Plan de Test — Recette Fonctionnelle</h2>
+  <div class="meta">
+    Version : 1.0.0 &nbsp;|&nbsp; Environnement : Production / Staging<br>
+    Projet : SaaS Food Ordering — Zone CEMAC<br>
+    Stack : Next.js 16 · Express 4 · Expo 54 · Supabase
+  </div>
+  <div class="badge">CONFIDENTIEL — USAGE INTERNE</div>
+</div>
+
+<!-- ═══ INFORMATIONS TESTEUR ═══ -->
+<div class="section" style="page-break-before: always;">
+  <div class="section-header">
+    <div class="icon">📋</div>
+    <div>
+      <h2>Informations de la Session de Test</h2>
+      <p>À remplir avant de commencer les tests</p>
+    </div>
+  </div>
+  <div class="info-grid">
+    <div class="info-box">
+      <label>Nom du Testeur</label>
+      <div class="field">&nbsp;</div>
+    </div>
+    <div class="info-box">
+      <label>Date du Test</label>
+      <div class="field">&nbsp;</div>
+    </div>
+    <div class="info-box">
+      <label>Environnement testé</label>
+      <div class="field">&nbsp;</div>
+    </div>
+    <div class="info-box">
+      <label>Version de l'application</label>
+      <div class="field">&nbsp;</div>
+    </div>
+    <div class="info-box">
+      <label>Appareil Mobile (modèle + OS)</label>
+      <div class="field">&nbsp;</div>
+    </div>
+    <div class="info-box">
+      <label>Navigateur Admin (nom + version)</label>
+      <div class="field">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="subsection-title">URLs des Services</div>
+  <div class="info-grid">
+    <div class="info-box">
+      <label>Backend API (Railway)</label>
+      <div class="field">hopeful-gentleness-production.up.railway.app</div>
+    </div>
+    <div class="info-box">
+      <label>Admin Web (Vercel)</label>
+      <div class="field">&nbsp;</div>
+    </div>
+    <div class="info-box">
+      <label>Mobile (Expo Go / APK)</label>
+      <div class="field">&nbsp;</div>
+    </div>
+    <div class="info-box">
+      <label>Supabase Project</label>
+      <div class="field">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="subsection-title">Légende</div>
+  <div class="legend">
+    <div class="legend-item"><span class="cb"></span> Case à cocher = test exécuté</div>
+    <div class="legend-item"><span class="priority-high">CRITIQUE</span> Test bloquant — must-pass</div>
+    <div class="legend-item"><span class="priority-med">IMPORTANT</span> Impacte l'expérience</div>
+    <div class="legend-item"><span class="priority-low">MINEUR</span> Amélioration UX</div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><span class="status-pass">✓ PASS</span></div>
+    <div class="legend-item"><span class="status-fail">✗ FAIL</span></div>
+    <div class="legend-item"><span class="status-skip">— SKIP</span></div>
+    <div class="legend-item" style="font-size:10px; color:#666">Résultat : noter PASS / FAIL / SKIP dans la colonne Résultat</div>
+  </div>
+
+  <div class="subsection-title">Récapitulatif Global (à remplir en fin de session)</div>
+  <div class="summary-grid">
+    <div class="summary-card total"><div class="num">___</div><div class="lbl">TOTAL</div></div>
+    <div class="summary-card pass"><div class="num">___</div><div class="lbl">PASS ✓</div></div>
+    <div class="summary-card fail"><div class="num">___</div><div class="lbl">FAIL ✗</div></div>
+    <div class="summary-card skip"><div class="num">___</div><div class="lbl">SKIP —</div></div>
+  </div>
+</div>
+
+<!-- ═══ 1. AUTHENTIFICATION ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">🔐</div>
+    <div>
+      <h2>1. Authentification</h2>
+      <p>Auth Admin (OTP SMS), Superadmin (email/password), Mobile (OTP SMS)</p>
+    </div>
+    <div class="badge-env">BACKEND · ADMIN · MOBILE</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">1.1 Admin — Connexion OTP</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th>
+          <th width="22%">Cas de Test</th>
+          <th width="30%">Action</th>
+          <th width="28%">Résultat Attendu</th>
+          <th width="8%">Priorité</th>
+          <th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">AUTH-01</td>
+          <td class="test-name">Envoi OTP valide</td>
+          <td class="test-action">Saisir numéro de téléphone enregistré → cliquer Envoyer OTP</td>
+          <td class="test-expected">SMS reçu en &lt; 30s, modal de saisie code affiché</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-02</td>
+          <td class="test-name">OTP correct</td>
+          <td class="test-action">Saisir le code OTP reçu par SMS → valider</td>
+          <td class="test-expected">Redirection vers dashboard, token JWT stocké en cookie</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-03</td>
+          <td class="test-name">OTP incorrect</td>
+          <td class="test-action">Saisir un code erroné (ex: 000000)</td>
+          <td class="test-expected">Message d'erreur "Code invalide", pas de redirection</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-04</td>
+          <td class="test-name">OTP expiré</td>
+          <td class="test-action">Attendre 10+ minutes puis soumettre le code</td>
+          <td class="test-expected">Message "Code expiré", invitation à renvoyer</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-05</td>
+          <td class="test-name">Numéro non enregistré</td>
+          <td class="test-action">Saisir numéro inexistant en base</td>
+          <td class="test-expected">Erreur 404 ou message adapté, pas de crash</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-06</td>
+          <td class="test-name">Déconnexion</td>
+          <td class="test-action">Cliquer sur Déconnexion dans la sidebar</td>
+          <td class="test-expected">Cookies supprimés, redirection vers /login</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-07</td>
+          <td class="test-name">Accès direct protégé</td>
+          <td class="test-action">Accéder à /dashboard sans être connecté</td>
+          <td class="test-expected">Redirection automatique vers /login</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-08</td>
+          <td class="test-name">Refresh token</td>
+          <td class="test-action">Attendre expiration access token (15min), faire une action</td>
+          <td class="test-expected">Token rafraîchi automatiquement, action effectuée</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">1.2 Superadmin — Connexion</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">AUTH-09</td>
+          <td class="test-name">Login superadmin valide</td>
+          <td class="test-action">Email + mot de passe corrects → connexion</td>
+          <td class="test-expected">Accès au dashboard superadmin avec menus spécifiques</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-10</td>
+          <td class="test-name">Isolation de rôle</td>
+          <td class="test-action">Connecté en admin, accéder à /superadmin/*</td>
+          <td class="test-expected">403 Forbidden ou redirection, jamais accès aux données</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-11</td>
+          <td class="test-name">Isolation de marque</td>
+          <td class="test-action">Admin marque A — appeler API avec brand_id de la marque B</td>
+          <td class="test-expected">Données non retournées, erreur 403</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">1.3 Mobile — Connexion OTP</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">AUTH-12</td>
+          <td class="test-name">Connexion mobile OTP</td>
+          <td class="test-action">Saisir numéro → recevoir SMS → entrer code</td>
+          <td class="test-expected">Accès aux tabs principal, token stocké en SecureStore</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">AUTH-13</td>
+          <td class="test-name">Persistance de session</td>
+          <td class="test-action">Fermer et rouvrir l'application</td>
+          <td class="test-expected">Toujours connecté, pas de re-login demandé</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 2. GESTION DES MARQUES ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">🏪</div>
+    <div>
+      <h2>2. Gestion des Marques (Brands)</h2>
+      <p>Candidature, validation KYC, profil marque</p>
+    </div>
+    <div class="badge-env">ADMIN · SUPERADMIN</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">2.1 Candidature de Marque</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">BRD-01</td>
+          <td class="test-name">Soumission candidature</td>
+          <td class="test-action">Remplir formulaire marque + upload logo/docs → soumettre</td>
+          <td class="test-expected">Statut "pending", fichiers visibles dans Supabase Storage</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">BRD-02</td>
+          <td class="test-name">Approbation superadmin</td>
+          <td class="test-action">Superadmin → liste candidatures → approuver une marque</td>
+          <td class="test-expected">Statut passe à "approved", admin peut se connecter</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">BRD-03</td>
+          <td class="test-name">Rejet candidature</td>
+          <td class="test-action">Superadmin → rejeter avec motif</td>
+          <td class="test-expected">Statut "rejected", motif enregistré en base</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">BRD-04</td>
+          <td class="test-name">Upload fichier trop lourd</td>
+          <td class="test-action">Tenter d'uploader un fichier > 5 MB</td>
+          <td class="test-expected">Erreur claire côté client, pas d'upload</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 3. PRODUITS ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">🍔</div>
+    <div>
+      <h2>3. Gestion des Produits</h2>
+      <p>CRUD produits, catégories, images, disponibilité</p>
+    </div>
+    <div class="badge-env">ADMIN</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">3.1 CRUD Produits</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">PRD-01</td>
+          <td class="test-name">Créer un produit</td>
+          <td class="test-action">Formulaire complet (nom, prix, image, catégorie) → sauvegarder</td>
+          <td class="test-expected">Produit visible dans la liste, image dans Supabase Storage</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">PRD-02</td>
+          <td class="test-name">Modifier un produit</td>
+          <td class="test-action">Éditer nom et prix d'un produit existant</td>
+          <td class="test-expected">Changements sauvegardés, liste mise à jour</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">PRD-03</td>
+          <td class="test-name">Désactiver un produit</td>
+          <td class="test-action">Toggle disponibilité → désactiver</td>
+          <td class="test-expected">Produit non visible dans l'app mobile</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">PRD-04</td>
+          <td class="test-name">Supprimer un produit</td>
+          <td class="test-action">Supprimer un produit sans commande en cours</td>
+          <td class="test-expected">Supprimé de la liste, image retirée du storage</td>
+          <td><span class="priority-low">MINEUR</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">PRD-05</td>
+          <td class="test-name">Isolation marque</td>
+          <td class="test-action">Vérifier que les produits affichés sont uniquement ceux de la marque connectée</td>
+          <td class="test-expected">Aucun produit d'une autre marque visible</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 4. COMMANDES ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">📦</div>
+    <div>
+      <h2>4. Gestion des Commandes</h2>
+      <p>Cycle de vie commande, statuts, paiements, livraison</p>
+    </div>
+    <div class="badge-env">ADMIN · MOBILE</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">4.1 Passage de Commande (Mobile)</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">CMD-01</td>
+          <td class="test-name">Ajouter au panier</td>
+          <td class="test-action">Sélectionner produit → ajouter au panier</td>
+          <td class="test-expected">Quantité mise à jour, total recalculé</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">CMD-02</td>
+          <td class="test-name">Passer commande Mobile Money</td>
+          <td class="test-action">Checkout → payer via Orange/MTN → confirmer PIN USSD</td>
+          <td class="test-expected">Commande créée statut "pending", push notification reçue</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">CMD-03</td>
+          <td class="test-name">Payer en personne</td>
+          <td class="test-action">Checkout → choisir paiement sur place → confirmer</td>
+          <td class="test-expected">Commande créée, statut "confirmed"</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">CMD-04</td>
+          <td class="test-name">Calcul commission</td>
+          <td class="test-action">Passer commande de 1000 FCFA en ligne</td>
+          <td class="test-expected">Commission 2% = 20 FCFA créditée au wallet plateforme</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">4.2 Gestion des Commandes (Admin)</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">CMD-05</td>
+          <td class="test-name">Voir commandes reçues</td>
+          <td class="test-action">Admin → onglet Commandes</td>
+          <td class="test-expected">Liste des commandes de la marque uniquement, filtrables par statut</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">CMD-06</td>
+          <td class="test-name">Changer statut commande</td>
+          <td class="test-action">Passer une commande de "pending" → "preparing" → "ready"</td>
+          <td class="test-expected">Chaque changement envoie une push notification au client mobile</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">CMD-07</td>
+          <td class="test-name">Annuler une commande</td>
+          <td class="test-action">Admin → annuler une commande "pending"</td>
+          <td class="test-expected">Statut "cancelled", client notifié</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">CMD-08</td>
+          <td class="test-name">Scan QR livraison</td>
+          <td class="test-action">Scanner le QR code affiché sur la commande mobile</td>
+          <td class="test-expected">Commande marquée "delivered" automatiquement</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">CMD-09</td>
+          <td class="test-name">StaleNotifier</td>
+          <td class="test-action">Laisser une commande "confirmed" sans changement > seuil défini</td>
+          <td class="test-expected">Notification push automatique envoyée au client</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">CMD-10</td>
+          <td class="test-name">Génération facture PDF</td>
+          <td class="test-action">Commande terminée → télécharger facture</td>
+          <td class="test-expected">PDF valide téléchargé avec montants corrects</td>
+          <td><span class="priority-low">MINEUR</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 5. PUBLICITÉS ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">📢</div>
+    <div>
+      <h2>5. Système Publicitaire (Ads)</h2>
+      <p>Création pub, paiement Campay, approbation, diffusion mobile, impressions</p>
+    </div>
+    <div class="badge-env">ADMIN · SUPERADMIN · MOBILE</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">5.1 Création et Paiement (Admin)</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">ADS-01</td>
+          <td class="test-name">Calcul du prix</td>
+          <td class="test-action">Saisir target_count = 60 utilisateurs</td>
+          <td class="test-expected">Prix affiché = 100 FCFA (10 unités × 10 FCFA)</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-02</td>
+          <td class="test-name">Upload image pub</td>
+          <td class="test-action">Sélectionner image JPG/PNG < 10MB → continuer</td>
+          <td class="test-expected">Aperçu affiché, image uploadée dans bucket ad-images</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-03</td>
+          <td class="test-name">Initier paiement Campay</td>
+          <td class="test-action">Saisir numéro Orange/MTN → valider → recevoir USSD push</td>
+          <td class="test-expected">USSD push reçu sur téléphone, code USSD manuel affiché, polling démarre</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-04</td>
+          <td class="test-name">Confirmer paiement PIN</td>
+          <td class="test-action">Entrer PIN sur téléphone → attendre polling</td>
+          <td class="test-expected">Étapes : Upload → Initiation → Enregistrement → Confirmation ✓</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-05</td>
+          <td class="test-name">Pub créée en "pending"</td>
+          <td class="test-action">Après paiement confirmé → vérifier dans la liste des pubs</td>
+          <td class="test-expected">Pub visible avec statut "En attente d'approbation"</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-06</td>
+          <td class="test-name">Wallet plateforme crédité</td>
+          <td class="test-action">Superadmin → Wallet → vérifier transactions</td>
+          <td class="test-expected">Transaction "ad_payment" avec le bon montant apparaît</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-07</td>
+          <td class="test-name">Échec paiement</td>
+          <td class="test-action">Annuler le USSD / ne pas entrer le PIN → attendre timeout</td>
+          <td class="test-expected">Statut "failed" affiché, pas de pub créée</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">5.2 Modération (Superadmin)</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">ADS-08</td>
+          <td class="test-name">Approuver une pub</td>
+          <td class="test-action">Superadmin → Pubs → approuver une pub "pending"</td>
+          <td class="test-expected">Statut passe à "active", pub diffusée sur mobile</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-09</td>
+          <td class="test-name">Rejeter une pub</td>
+          <td class="test-action">Superadmin → rejeter avec motif</td>
+          <td class="test-expected">Statut "rejected", argent reste dans wallet plateforme</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">5.3 Diffusion Mobile</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">ADS-10</td>
+          <td class="test-name">Affichage bannière</td>
+          <td class="test-action">Ouvrir l'app mobile avec une pub active disponible</td>
+          <td class="test-expected">Bannière pub apparaît après 2s avec image + titre + marque</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-11</td>
+          <td class="test-name">Fermer la bannière</td>
+          <td class="test-action">Cliquer sur le bouton × de la bannière</td>
+          <td class="test-expected">Bannière disparaît avec animation, ne réapparaît pas dans la session</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-12</td>
+          <td class="test-name">Enregistrement impression</td>
+          <td class="test-action">Laisser la bannière apparaître → vérifier en base</td>
+          <td class="test-expected">impressions_count++ dans table ads, entrée dans ad_impressions</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-13</td>
+          <td class="test-name">Pas de doublon impression</td>
+          <td class="test-action">Même utilisateur voir la pub 2 fois</td>
+          <td class="test-expected">impressions_count n'augmente pas au delà de 1 pour cet utilisateur</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-14</td>
+          <td class="test-name">Expiration pub</td>
+          <td class="test-action">Atteindre le target_count d'impressions</td>
+          <td class="test-expected">Statut pub passe à "expired", plus diffusée</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ADS-15</td>
+          <td class="test-name">Fallback image</td>
+          <td class="test-action">URL image invalide ou inaccessible</td>
+          <td class="test-expected">Affichage fallback : icône + titre + marque sur fond sombre</td>
+          <td><span class="priority-low">MINEUR</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 6. WALLET ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">💰</div>
+    <div>
+      <h2>6. Système Wallet</h2>
+      <p>Wallet marque, wallet plateforme, retraits, transactions</p>
+    </div>
+    <div class="badge-env">ADMIN · SUPERADMIN</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">6.1 Wallet Marque</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">WLT-01</td>
+          <td class="test-name">Solde après commande</td>
+          <td class="test-action">Passer une commande payée → vérifier wallet admin</td>
+          <td class="test-expected">Montant (moins commission) crédité dans le wallet de la marque</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">WLT-02</td>
+          <td class="test-name">Retrait marque</td>
+          <td class="test-action">Admin → Wallet → initier retrait vers numéro Mobile Money</td>
+          <td class="test-expected">USSD push reçu, après confirmation solde débité</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">WLT-03</td>
+          <td class="test-name">Retrait insuffisant</td>
+          <td class="test-action">Tenter retrait supérieur au solde disponible</td>
+          <td class="test-expected">Erreur "Solde insuffisant", pas de transaction</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">WLT-04</td>
+          <td class="test-name">Historique transactions</td>
+          <td class="test-action">Admin → Wallet → voir historique</td>
+          <td class="test-expected">Toutes les transactions (crédits commandes + retraits) listées</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">6.2 Wallet Plateforme (Superadmin)</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">WLT-05</td>
+          <td class="test-name">Affichage solde plateforme</td>
+          <td class="test-action">Superadmin → Wallet Plateforme</td>
+          <td class="test-expected">Solde correct affiché (commissions + pubs reçues)</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">WLT-06</td>
+          <td class="test-name">Retrait superadmin</td>
+          <td class="test-action">Saisir montant + numéro → valider retrait</td>
+          <td class="test-expected">Campay withdraw déclenché, solde débité, transaction enregistrée</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">WLT-07</td>
+          <td class="test-name">Transactions types</td>
+          <td class="test-action">Superadmin → voir historique transactions plateforme</td>
+          <td class="test-expected">Types commission / ad_payment / withdrawal bien différenciés</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 7. ANALYTICS ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">📊</div>
+    <div>
+      <h2>7. Analytics & Dashboard</h2>
+      <p>KPIs, graphiques revenus, top produits, commandes récentes</p>
+    </div>
+    <div class="badge-env">ADMIN · SUPERADMIN</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">7.1 Dashboard Admin</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">ANL-01</td>
+          <td class="test-name">KPIs du jour</td>
+          <td class="test-action">Ouvrir le dashboard admin</td>
+          <td class="test-expected">Chiffres visibles : CA, commandes, clients, panier moyen</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ANL-02</td>
+          <td class="test-name">Graphique revenus 30j</td>
+          <td class="test-action">Vérifier le graphique de revenus sur 30 jours</td>
+          <td class="test-expected">Courbe affichée, données cohérentes avec les commandes passées</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ANL-03</td>
+          <td class="test-name">Top produits</td>
+          <td class="test-action">Section "Top Produits"</td>
+          <td class="test-expected">Liste des 5 produits les plus commandés avec quantités</td>
+          <td><span class="priority-low">MINEUR</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">ANL-04</td>
+          <td class="test-name">Isolation données marque</td>
+          <td class="test-action">Deux admins différents consultent leur dashboard</td>
+          <td class="test-expected">Chaque admin voit uniquement les données de sa marque</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 8. SUCCURSALES ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">📍</div>
+    <div>
+      <h2>8. Succursales & Localisation</h2>
+      <p>Gestion branches, géolocalisation, carte mobile</p>
+    </div>
+    <div class="badge-env">ADMIN · MOBILE</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">8.1 Gestion des Succursales</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">BRN-01</td>
+          <td class="test-name">Créer une succursale</td>
+          <td class="test-action">Admin → Succursales → Ajouter avec adresse GPS</td>
+          <td class="test-expected">Succursale créée, visible sur la carte mobile</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">BRN-02</td>
+          <td class="test-name">Recherche succursales proches</td>
+          <td class="test-action">Mobile → activer localisation → chercher restaurants</td>
+          <td class="test-expected">Succursales triées par distance, carte affichée</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">BRN-03</td>
+          <td class="test-name">Localisation refusée</td>
+          <td class="test-action">Refuser la permission de localisation</td>
+          <td class="test-expected">Message explicatif, possibilité de saisir adresse manuellement</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 9. NOTIFICATIONS ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">🔔</div>
+    <div>
+      <h2>9. Notifications Push</h2>
+      <p>Expo Push Notifications, statuts commandes, stale notifier</p>
+    </div>
+    <div class="badge-env">MOBILE · BACKEND</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">9.1 Notifications de Commande</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">NTF-01</td>
+          <td class="test-name">Notif changement statut</td>
+          <td class="test-action">Admin change statut commande → "preparing"</td>
+          <td class="test-expected">Push reçue sur mobile du client en &lt; 10s</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">NTF-02</td>
+          <td class="test-name">Notif app fermée</td>
+          <td class="test-action">Fermer l'app mobile → admin change statut</td>
+          <td class="test-expected">Notification système reçue même app fermée</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">NTF-03</td>
+          <td class="test-name">StaleNotifier automatique</td>
+          <td class="test-action">Commande figée en "confirmed" → attendre le délai configuré</td>
+          <td class="test-expected">Notification "Préparation imminente" envoyée automatiquement</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">NTF-04</td>
+          <td class="test-name">Token push valide</td>
+          <td class="test-action">Vérifier dans la DB que le push token de l'utilisateur est enregistré</td>
+          <td class="test-expected">Token ExponentPushToken[...] présent en base après login mobile</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 10. SECURITE ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">🛡️</div>
+    <div>
+      <h2>10. Sécurité & Robustesse</h2>
+      <p>Injection, rate limiting, tokens invalides, CORS</p>
+    </div>
+    <div class="badge-env">BACKEND</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">10.1 Tests de Sécurité</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">SEC-01</td>
+          <td class="test-name">Token JWT invalide</td>
+          <td class="test-action">Appeler une route protégée avec token falsifié</td>
+          <td class="test-expected">401 UNAUTHORIZED, pas d'accès aux données</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">SEC-02</td>
+          <td class="test-name">Sans token</td>
+          <td class="test-action">Appeler /api/v1/orders sans Authorization header</td>
+          <td class="test-expected">401 "Token manquant"</td>
+          <td><span class="priority-high">CRITIQUE</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">SEC-03</td>
+          <td class="test-name">Rate limiting</td>
+          <td class="test-action">Envoyer 200+ requêtes en moins d'une minute</td>
+          <td class="test-expected">429 Too Many Requests après le seuil</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">SEC-04</td>
+          <td class="test-name">Validation input</td>
+          <td class="test-action">Envoyer payload invalide (ex: target_count = -5)</td>
+          <td class="test-expected">400 VALIDATION_ERROR avec message descriptif</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">SEC-05</td>
+          <td class="test-name">CORS origins</td>
+          <td class="test-action">Appeler l'API depuis une origine non autorisée</td>
+          <td class="test-expected">Requête bloquée par CORS</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 11. PERFORMANCES ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">⚡</div>
+    <div>
+      <h2>11. Performance & Disponibilité</h2>
+      <p>Temps de réponse API, chargement admin, fluidité mobile</p>
+    </div>
+    <div class="badge-env">TOUS</div>
+  </div>
+
+  <div class="subsection no-break">
+    <div class="subsection-title">11.1 Temps de Réponse</div>
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">ID</th><th width="22%">Cas de Test</th><th width="30%">Action</th><th width="28%">Résultat Attendu</th><th width="8%">Priorité</th><th width="6%">Résultat</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="test-id">PFR-01</td>
+          <td class="test-name">Login admin</td>
+          <td class="test-action">Mesurer le temps de connexion complet (OTP + validation)</td>
+          <td class="test-expected">&lt; 3 secondes hors délai SMS</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">PFR-02</td>
+          <td class="test-name">Chargement dashboard</td>
+          <td class="test-action">Ouvrir le dashboard admin (cold start)</td>
+          <td class="test-expected">&lt; 2 secondes, pas de freeze visible</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">PFR-03</td>
+          <td class="test-name">Liste commandes</td>
+          <td class="test-action">Charger la liste des commandes avec pagination</td>
+          <td class="test-expected">&lt; 1.5 secondes pour la première page</td>
+          <td><span class="priority-low">MINEUR</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">PFR-04</td>
+          <td class="test-name">Démarrage app mobile</td>
+          <td class="test-action">Cold start de l'app mobile</td>
+          <td class="test-expected">Splash screen &lt; 3s, tab home chargé &lt; 5s</td>
+          <td><span class="priority-med">IMPORTANT</span></td>
+          <td>&nbsp;</td>
+        </tr>
+        <tr>
+          <td class="test-id">PFR-05</td>
+          <td class="test-name">Railway cold start</td>
+          <td class="test-action">Premier appel API après une période d'inactivité</td>
+          <td class="test-expected">Réponse en &lt; 10 secondes (Railway free tier wake-up)</td>
+          <td><span class="priority-low">MINEUR</span></td>
+          <td>&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ 12. OBSERVATIONS ═══ -->
+<div class="section">
+  <div class="section-header">
+    <div class="icon">📝</div>
+    <div>
+      <h2>12. Observations & Bugs Détectés</h2>
+      <p>Espace pour noter les anomalies rencontrées pendant les tests</p>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th width="8%">Ref Test</th>
+        <th width="35%">Description du Bug</th>
+        <th width="20%">Étapes de reproduction</th>
+        <th width="15%">Sévérité</th>
+        <th width="12%">Screenshot</th>
+        <th width="10%">Statut</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="height:40px"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr style="height:40px"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr style="height:40px"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr style="height:40px"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr style="height:40px"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr style="height:40px"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr style="height:40px"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr style="height:40px"><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top: 32px;">
+    <div class="subsection-title">Signature & Validation</div>
+    <div class="info-grid" style="margin-top: 16px;">
+      <div class="info-box">
+        <label>Testeur — Signature</label>
+        <div class="field" style="height: 40px;">&nbsp;</div>
+      </div>
+      <div class="info-box">
+        <label>Responsable Technique — Validation</label>
+        <div class="field" style="height: 40px;">&nbsp;</div>
+      </div>
+      <div class="info-box">
+        <label>Date de validation</label>
+        <div class="field">&nbsp;</div>
+      </div>
+      <div class="info-box">
+        <label>Verdict global</label>
+        <div class="field" style="font-size: 13px; font-weight: 700; color: #f97316;">&nbsp;&nbsp;☐ GO &nbsp;&nbsp; ☐ NO-GO &nbsp;&nbsp; ☐ GO CONDITIONNEL</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 24px; text-align: center; font-size: 10px; color: #aaa; border-top: 1px solid #eee; padding-top: 16px;">
+    Dash Meal — Plan de Test v1.0 · Confidentiel · Usage interne uniquement
+  </div>
+</div>
+
+</body>
+</html>
