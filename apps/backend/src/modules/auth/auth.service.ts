@@ -3,6 +3,7 @@ import { supabase } from "../../config/supabase.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../utils/jwt.js";
 import { sendOtp, verifyOtp } from "../../utils/otp.js";
 import { AppError } from "../../middleware/errorHandler.js";
+import { env } from "../../config/env.js";
 import type {
   RegisterUserInput,
   LoginUserInput,
@@ -39,13 +40,14 @@ export async function registerUser(input: RegisterUserInput) {
   }
 
   const { smsSent, code } = await sendOtp(phone);
+  const exposeCode = env.OTP_EXPOSE_CODE || !smsSent;
 
   return {
-    message: smsSent
+    message: smsSent && !env.OTP_EXPOSE_CODE
       ? "Compte créé. Un code OTP a été envoyé par SMS."
       : "Compte créé. SMS non livré — utilisez le code ci-dessous.",
     user_id: user.id,
-    ...(smsSent ? {} : { otp_code: code }),
+    ...(exposeCode ? { otp_code: code } : {}),
   };
 }
 
