@@ -18,12 +18,11 @@ function normalizePhone(phone: string): string {
   return `+237${digits}`;
 }
 
-export async function sendOtp(phone: string): Promise<void> {
+export async function sendOtp(phone: string): Promise<{ code: string; smsSent: boolean }> {
   const normalized = normalizePhone(phone);
   const code = generateCode();
   const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
 
-  // Stocker le code en base (table otp_codes)
   await supabase.from("otp_codes").upsert({
     phone,
     code,
@@ -31,17 +30,15 @@ export async function sendOtp(phone: string): Promise<void> {
     is_used: false,
   });
 
-  // Toujours logger en console (utile pour debug)
   console.log(`\n🔑 OTP ──────────────────────────────`);
   console.log(`   Téléphone : ${normalized}`);
   console.log(`   Code      : ${code}`);
   console.log(`   Expire    : ${expiresAt.toLocaleTimeString()}`);
   console.log(`─────────────────────────────────────\n`);
 
-  // Envoyer via AfricasTalking si la clé est configurée
   if (!env.AT_API_KEY || !env.AT_USERNAME) {
     console.warn("⚠️  AT_API_KEY ou AT_USERNAME manquant — SMS non envoyé");
-    return;
+    return { code, smsSent: false };
   }
 
   const body = new URLSearchParams({
@@ -67,11 +64,13 @@ export async function sendOtp(phone: string): Promise<void> {
     if (!response.ok) {
       const errText = await response.text();
       console.error(`❌ Échec envoi SMS OTP (${response.status}): ${errText}`);
-      return;
+      return { code, smsSent: false };
     }
 
     const result = await response.json() as { SMSMessageData?: { Recipients?: { status: string; number: string }[] } };
     const recipients = result.SMSMessageData?.Recipients ?? [];
+    const allDelivered = recipients.every((r) => r.status === "Success");
+
     recipients.forEach((r) => {
       if (r.status === "Success") {
         console.log(`✅ SMS OTP envoyé à ${r.number}`);
@@ -79,8 +78,11 @@ export async function sendOtp(phone: string): Promise<void> {
         console.warn(`⚠️  SMS OTP échoué pour ${r.number} : ${r.status}`);
       }
     });
+
+    return { code, smsSent: allDelivered };
   } catch (err) {
     console.error("❌ Erreur réseau envoi SMS OTP:", err);
+    return { code, smsSent: false };
   }
 }
 

@@ -38,9 +38,15 @@ export async function registerUser(input: RegisterUserInput) {
     throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte");
   }
 
-  await sendOtp(phone);
+  const { smsSent, code } = await sendOtp(phone);
 
-  return { message: "Compte créé. Un code OTP a été envoyé.", user_id: user.id };
+  return {
+    message: smsSent
+      ? "Compte créé. Un code OTP a été envoyé par SMS."
+      : "Compte créé. SMS non livré — utilisez le code ci-dessous.",
+    user_id: user.id,
+    ...(smsSent ? {} : { otp_code: code }),
+  };
 }
 
 export async function verifyUserPhone(input: VerifyOtpInput) {
