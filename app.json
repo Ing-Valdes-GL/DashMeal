@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "e05fc85f-3f43-478f-9c64-80935a324ef1"
+      }
+    },
+    "android": {
+      "package": "com.valdes237.dashmeal"
+    }
+  }
+}

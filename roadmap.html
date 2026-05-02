@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Roadmap Fonctionnalités — Dash Meal Admin</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8fafc; color: #1a1a2e; }
+
+  .header {
+    background: linear-gradient(135deg, #0a0f1e 0%, #1a1a2e 60%, #0f172a 100%);
+    padding: 48px 60px 40px;
+    position: relative; overflow: hidden;
+  }
+  .header::before {
+    content: ''; position: absolute; top: -80px; right: -80px;
+    width: 320px; height: 320px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(249,115,22,0.15) 0%, transparent 70%);
+  }
+  .header-badge {
+    display: inline-block; background: rgba(249,115,22,0.2);
+    color: #f97316; border: 1px solid rgba(249,115,22,0.4);
+    padding: 4px 14px; border-radius: 20px; font-size: 11px;
+    font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 16px;
+  }
+  .header h1 { font-size: 36px; font-weight: 800; color: #fff; line-height: 1.2; }
+  .header h1 span { color: #f97316; }
+  .header p { color: rgba(255,255,255,0.55); font-size: 14px; margin-top: 10px; max-width: 520px; line-height: 1.6; }
+  .header-meta { margin-top: 24px; display: flex; gap: 32px; }
+  .header-meta .stat { }
+  .header-meta .stat .num { font-size: 28px; font-weight: 800; color: #f97316; }
+  .header-meta .stat .lbl { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 2px; }
+
+  .filters {
+    background: #fff; border-bottom: 1px solid #e2e8f0;
+    padding: 16px 60px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 8px rgba(0,0,0,0.06);
+  }
+  .filter-label { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-right: 4px; }
+  .filter-btn {
+    padding: 6px 16px; border-radius: 20px; border: 1.5px solid #e2e8f0;
+    background: #fff; color: #64748b; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: #f97316; color: #f97316; }
+  .filter-btn.active { background: #f97316; border-color: #f97316; color: #fff; }
+
+  .main { padding: 40px 60px 80px; max-width: 1400px; margin: 0 auto; }
+
+  .section { margin-bottom: 48px; }
+  .section-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  .section-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; flex-shrink: 0;
+  }
+  .section-icon.corrective { background: linear-gradient(135deg, #fef3c7, #fde68a); }
+  .section-icon.new { background: linear-gradient(135deg, #d1fae5, #a7f3d0); }
+  .section-title { font-size: 20px; font-weight: 800; color: #0a0f1e; }
+  .section-subtitle { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .section-count {
+    margin-left: auto; background: #f1f5f9; color: #64748b;
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+  }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+
+  .card {
+    background: #fff; border-radius: 14px; padding: 22px 24px;
+    border: 1.5px solid #e8edf5; transition: all 0.2s;
+    cursor: default; position: relative; overflow: hidden;
+  }
+  .card:hover { border-color: #f97316; box-shadow: 0 8px 32px rgba(249,115,22,0.12); transform: translateY(-2px); }
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #f97316, #fb923c);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .card:hover::before { opacity: 1; }
+
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+  .card-num {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    color: white; font-size: 12px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .card-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge {
+    padding: 3px 10px; border-radius: 10px; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.3px; text-transform: uppercase;
+  }
+  .badge.prio-haute { background: #fee2e2; color: #991b1b; }
+  .badge.prio-med   { background: #fef3c7; color: #92400e; }
+  .badge.prio-low   { background: #d1fae5; color: #065f46; }
+  .badge.type-corr  { background: #ede9fe; color: #6d28d9; }
+  .badge.type-new   { background: #dbeafe; color: #1d4ed8; }
+  .badge.effort-s   { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+  .badge.effort-m   { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+  .badge.effort-l   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+  .card-title { font-size: 15px; font-weight: 700; color: #0a0f1e; margin-bottom: 8px; line-height: 1.3; }
+  .card-desc { font-size: 12.5px; color: #64748b; line-height: 1.6; margin-bottom: 14px; }
+
+  .card-footer { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tag {
+    background: #f8fafc; border: 1px solid #e2e8f0;
+    padding: 3px 9px; border-radius: 6px; font-size: 10px; color: #94a3b8; font-weight: 600;
+  }
+  .impact {
+    margin-left: auto; font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; gap: 4px; color: #94a3b8;
+  }
+  .impact .dots { display: flex; gap: 2px; }
+  .impact .dot { width: 8px; height: 8px; border-radius: 50%; background: #e2e8f0; }
+  .impact .dot.on { background: #f97316; }
+
+  .legend {
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px;
+    padding: 16px 24px; margin-bottom: 32px;
+    display: flex; gap: 24px; flex-wrap: wrap; align-items: center;
+  }
+  .legend-title { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+  .legend-group { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .legend-sep { width: 1px; height: 24px; background: #e2e8f0; }
+
+  @media (max-width: 768px) {
+    .header { padding: 32px 20px; }
+    .main { padding: 24px 20px; }
+    .filters { padding: 12px 20px; }
+    .cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-badge">Dash Meal · Admin</div>
+  <h1>Roadmap <span>25 Fonctionnalités</span></h1>
+  <p>Améliorations et nouvelles fonctionnalités prioritaires pour la partie administration — classées par impact et effort estimé.</p>
+  <div class="header-meta">
+    <div class="stat"><div class="num">10</div><div class="lbl">Correctifs</div></div>
+    <div class="stat"><div class="num">15</div><div class="lbl">Nouvelles fonctionnalités</div></div>
+    <div class="stat"><div class="num">25</div><div class="lbl">Total</div></div>
+  </div>
+</div>
+
+<div class="filters">
+  <span class="filter-label">Filtrer :</span>
+  <button class="filter-btn active" onclick="filter('all')">Tout</button>
+  <button class="filter-btn" onclick="filter('correctif')">Correctifs</button>
+  <button class="filter-btn" onclick="filter('nouvelle')">Nouvelles</button>
+  <button class="filter-btn" onclick="filter('haute')">Priorité haute</button>
+  <button class="filter-btn" onclick="filter('S')">Effort S</button>
+  <button class="filter-btn" onclick="filter('M')">Effort M</button>
+  <button class="filter-btn" onclick="filter('L')">Effort L</button>
+</div>
+
+<div class="main">
+
+  <div class="legend">
+    <span class="legend-title">Priorité</span>
+    <div class="legend-group">
+      <span class="badge prio-haute">Haute</span>
+      <span class="badge prio-med">Moyenne</span>
+      <span class="badge prio-low">Basse</span>
+    </div>
+    <div class="legend-sep"></div>
+    <span class="legend-title">Type</span>
+    <div class="legend-group">
+      <span class="badge type-corr">Correctif</span>
+      <span class="badge type-new">Nouvelle</span>
+    </div>
+    <div class="legend-sep"></div>
+    <span class="legend-title">Effort</span>
+    <div class="legend-group">
+      <span class="badge effort-s">S — &lt; 1 jour</span>
+      <span class="badge effort-m">M — 2-3 jours</span>
+      <span class="badge effort-l">L — 1 semaine+</span>
+    </div>
+    <div class="legend-sep"></div>
+    <span class="legend-title">Impact</span>
+    <div class="legend-group">
+      <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div> Faible</div>
+      <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div> Moyen</div>
+      <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div> Élevé</div>
+    </div>
+  </div>
+
+  <!-- CORRECTIFS -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon corrective">🔧</div>
+      <div>
+        <div class="section-title">Améliorations de l'existant</div>
+        <div class="section-subtitle">Optimisations et corrections sur les fonctionnalités déjà en place</div>
+      </div>
+      <div class="section-count">10 items</div>
+    </div>
+    <div class="cards" id="correctifs">
+
+      <div class="card" data-type="correctif" data-prio="haute" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">01</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Indicateur temps réel des nouvelles commandes</div>
+        <div class="card-desc">Badge animé sur le menu "Commandes" quand une nouvelle commande arrive. Polling toutes les 30 secondes ou WebSocket. L'admin ne rate plus aucune commande sans devoir rafraîchir manuellement.</div>
+        <div class="card-footer">
+          <span class="tag">Commandes</span>
+          <span class="tag">React Query</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="correctif" data-prio="haute" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">02</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Recherche commandes par #ID ou nom client</div>
+        <div class="card-desc">Actuellement seul un filtre par statut est disponible. Ajouter une barre de recherche pour retrouver une commande par son numéro court (#AB0339FD) ou le nom du client.</div>
+        <div class="card-footer">
+          <span class="tag">Commandes</span>
+          <span class="tag">UX</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="correctif" data-prio="haute" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">03</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Confirmation avant annulation de commande</div>
+        <div class="card-desc">Ajouter une modale de confirmation avec motif obligatoire avant d'annuler une commande. Évite les annulations accidentelles et enrichit les logs avec un contexte métier.</div>
+        <div class="card-footer">
+          <span class="tag">Commandes</span>
+          <span class="tag">Sécurité UX</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="correctif" data-prio="med" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">04</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Filtre de dates sur l'historique wallet</div>
+        <div class="card-desc">L'historique des transactions n'est pas filtrable. Ajouter un sélecteur de plage de dates (7j, 30j, personnalisé) pour faciliter la comptabilité et les réconciliations.</div>
+        <div class="card-footer">
+          <span class="tag">Wallet</span>
+          <span class="tag">Finances</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="correctif" data-prio="med" data-effort="M">
+        <div class="card-top">
+          <div class="card-num">05</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-m">M</span>
+          </div>
+        </div>
+        <div class="card-title">Aperçu image avant upload produit</div>
+        <div class="card-desc">Dans le formulaire de création/édition de produit, afficher un aperçu en temps réel de l'image sélectionnée avant de la soumettre. Réduction des mauvaises images uploadées.</div>
+        <div class="card-footer">
+          <span class="tag">Produits</span>
+          <span class="tag">Upload</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="correctif" data-prio="med" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">06</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Motif de rejet pub visible côté admin marque</div>
+        <div class="card-desc">Quand le superadmin rejette une publicité, l'admin de la marque doit voir le motif directement dans sa liste de pubs, sans avoir à contacter le support.</div>
+        <div class="card-footer">
+          <span class="tag">Publicités</span>
+          <span class="tag">Communication</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="correctif" data-prio="haute" data-effort="M">
+        <div class="card-top">
+          <div class="card-num">07</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-m">M</span>
+          </div>
+        </div>
+        <div class="card-title">Réordonner les produits par drag & drop</div>
+        <div class="card-desc">Permettre à l'admin de glisser-déposer les produits pour définir l'ordre d'affichage dans l'app mobile. Actuellement l'ordre est fixé par date de création.</div>
+        <div class="card-footer">
+          <span class="tag">Produits</span>
+          <span class="tag">Mobile UX</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="correctif" data-prio="haute" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">08</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Message "Session expirée" explicite</div>
+        <div class="card-desc">Actuellement une expiration du token cause une redirection silencieuse vers /login. Afficher un toast "Votre session a expiré, veuillez vous reconnecter" avant la redirection.</div>
+        <div class="card-footer">
+          <span class="tag">Auth</span>
+          <span class="tag">UX</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="correctif" data-prio="med" data-effort="M">
+        <div class="card-top">
+          <div class="card-num">09</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-m">M</span>
+          </div>
+        </div>
+        <div class="card-title">Pagination infinie sur les commandes</div>
+        <div class="card-desc">Remplacer la pagination par numéros par un scroll infini. Plus naturel pour un admin qui traite des dizaines de commandes par heure sans perdre sa position dans la liste.</div>
+        <div class="card-footer">
+          <span class="tag">Commandes</span>
+          <span class="tag">Performance</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="correctif" data-prio="med" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">10</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-corr">Correctif</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Compteur secondes sur le step paiement pub</div>
+        <div class="card-desc">L'indicateur d'étapes lors de la création de pub ne montre pas combien de temps s'est écoulé. Afficher un timer "En attente depuis Xs" pour rassurer l'admin pendant le polling Campay.</div>
+        <div class="card-footer">
+          <span class="tag">Publicités</span>
+          <span class="tag">Paiement</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- NOUVELLES -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon new">✨</div>
+      <div>
+        <div class="section-title">Nouvelles Fonctionnalités</div>
+        <div class="section-subtitle">Fonctionnalités inédites à développer pour enrichir la plateforme</div>
+      </div>
+      <div class="section-count">15 items</div>
+    </div>
+    <div class="cards" id="nouvelles">
+
+      <div class="card" data-type="nouvelle" data-prio="haute" data-effort="L">
+        <div class="card-top">
+          <div class="card-num">11</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-l">L</span>
+          </div>
+        </div>
+        <div class="card-title">Tableau de bord Superadmin global</div>
+        <div class="card-desc">Vue d'ensemble plateforme : total marques actives, CA global, pubs en cours, top 5 brands par revenus, évolution du wallet plateforme. Décisions stratégiques en un coup d'œil.</div>
+        <div class="card-footer">
+          <span class="tag">Superadmin</span>
+          <span class="tag">Analytics</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="haute" data-effort="L">
+        <div class="card-top">
+          <div class="card-num">12</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-l">L</span>
+          </div>
+        </div>
+        <div class="card-title">Gestion des livreurs</div>
+        <div class="card-desc">Créer et assigner des livreurs à une succursale avec un PIN de connexion. Suivi de leurs livraisons en cours, historique et performance. Interface dédiée dans le dashboard admin.</div>
+        <div class="card-footer">
+          <span class="tag">Livraison</span>
+          <span class="tag">Opérations</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="haute" data-effort="M">
+        <div class="card-top">
+          <div class="card-num">13</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-m">M</span>
+          </div>
+        </div>
+        <div class="card-title">Catégories de produits avec ordre personnalisable</div>
+        <div class="card-desc">Grouper les produits par catégories (Entrées, Plats, Boissons, Desserts…). Chaque catégorie est ordonnée, activable/désactivable. Affichage par onglets dans l'app mobile.</div>
+        <div class="card-footer">
+          <span class="tag">Produits</span>
+          <span class="tag">Mobile</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="haute" data-effort="L">
+        <div class="card-top">
+          <div class="card-num">14</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-l">L</span>
+          </div>
+        </div>
+        <div class="card-title">Promotions & codes promo</div>
+        <div class="card-desc">Créer des codes de réduction (montant fixe ou %, usage unique ou multiple, date d'expiration). Les clients saisissent le code au checkout. L'admin suit les utilisations en temps réel.</div>
+        <div class="card-footer">
+          <span class="tag">Marketing</span>
+          <span class="tag">Commandes</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="med" data-effort="M">
+        <div class="card-top">
+          <div class="card-num">15</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-m">M</span>
+          </div>
+        </div>
+        <div class="card-title">Heures d'ouverture par succursale</div>
+        <div class="card-desc">Définir des créneaux horaires par jour de la semaine pour chaque succursale. Hors des horaires configurés, la commande est bloquée avec un message "Fermé, ouvre à HH:MM".</div>
+        <div class="card-footer">
+          <span class="tag">Succursales</span>
+          <span class="tag">Opérations</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="haute" data-effort="M">
+        <div class="card-top">
+          <div class="card-num">16</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-m">M</span>
+          </div>
+        </div>
+        <div class="card-title">Centre de notifications interne admin</div>
+        <div class="card-desc">Cloche dans la sidebar avec un badge de compteur. Alertes pour : nouvelle commande, pub approuvée/rejetée, retrait traité, paiement reçu. Historique des 30 dernières notifications.</div>
+        <div class="card-footer">
+          <span class="tag">Notifications</span>
+          <span class="tag">Sidebar</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="med" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">17</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Export CSV des commandes</div>
+        <div class="card-desc">Bouton "Exporter" dans la liste des commandes. Génère un fichier CSV/Excel avec toutes les commandes filtrées (date, montant, client, statut, articles). Pour la comptabilité mensuelle.</div>
+        <div class="card-footer">
+          <span class="tag">Commandes</span>
+          <span class="tag">Finances</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="haute" data-effort="L">
+        <div class="card-top">
+          <div class="card-num">18</div>
+          <div class="card-badges">
+            <span class="badge prio-haute">Haute</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-l">L</span>
+          </div>
+        </div>
+        <div class="card-title">Modificateurs de produit (options & suppléments)</div>
+        <div class="card-desc">Ajouter des groupes d'options aux produits : taille (S/M/L), cuisson, extras (fromage +200F, sauce +100F). Configurables par l'admin, sélectionnables par le client au moment de la commande.</div>
+        <div class="card-footer">
+          <span class="tag">Produits</span>
+          <span class="tag">Mobile</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="med" data-effort="M">
+        <div class="card-top">
+          <div class="card-num">19</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-m">M</span>
+          </div>
+        </div>
+        <div class="card-title">Délai de livraison estimé par succursale</div>
+        <div class="card-desc">L'admin configure un délai moyen de livraison (ex: 20-30 min). Ce délai est affiché au client dans l'app avant de commander. Peut varier selon l'heure de la journée (heure de pointe).</div>
+        <div class="card-footer">
+          <span class="tag">Succursales</span>
+          <span class="tag">Client</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="med" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">20</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Blacklist de numéros de téléphone</div>
+        <div class="card-desc">Le superadmin peut bloquer un numéro (fraude, spam, abus). Les tentatives de connexion ou de commande depuis ce numéro sont rejetées avec un message générique. Log des raisons de blocage.</div>
+        <div class="card-footer">
+          <span class="tag">Superadmin</span>
+          <span class="tag">Sécurité</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="low" data-effort="M">
+        <div class="card-top">
+          <div class="card-num">21</div>
+          <div class="card-badges">
+            <span class="badge prio-low">Basse</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-m">M</span>
+          </div>
+        </div>
+        <div class="card-title">Rapport mensuel automatique par email</div>
+        <div class="card-desc">Chaque début de mois, envoi automatique d'un email récapitulatif à l'admin : CA, nombre de commandes, top produits, commissions, retraits du mois précédent. Format PDF en pièce jointe.</div>
+        <div class="card-footer">
+          <span class="tag">Analytics</span>
+          <span class="tag">Email</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="med" data-effort="L">
+        <div class="card-top">
+          <div class="card-num">22</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-l">L</span>
+          </div>
+        </div>
+        <div class="card-title">Avis & notes clients</div>
+        <div class="card-desc">Après livraison, le client peut noter sa commande (1-5 étoiles) et laisser un commentaire. L'admin voit la note moyenne par produit et par succursale. Filtre "Avis négatifs récents" pour action rapide.</div>
+        <div class="card-footer">
+          <span class="tag">Qualité</span>
+          <span class="tag">Client</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="low" data-effort="L">
+        <div class="card-top">
+          <div class="card-num">23</div>
+          <div class="card-badges">
+            <span class="badge prio-low">Basse</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-l">L</span>
+          </div>
+        </div>
+        <div class="card-title">Programme de fidélité configurable</div>
+        <div class="card-desc">Points accumulés à chaque commande (ratio configurable par marque). Convertibles en réduction au checkout. L'admin gère les règles d'accumulation et peut offrir des bonus ponctuels.</div>
+        <div class="card-footer">
+          <span class="tag">Marketing</span>
+          <span class="tag">Fidélisation</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="med" data-effort="S">
+        <div class="card-top">
+          <div class="card-num">24</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-s">S</span>
+          </div>
+        </div>
+        <div class="card-title">Mode maintenance par marque</div>
+        <div class="card-desc">Le superadmin peut mettre une marque "en pause" : la marque reste visible dans l'app avec un badge "Temporairement indisponible" mais toute commande est bloquée. Réactivation en un clic.</div>
+        <div class="card-footer">
+          <span class="tag">Superadmin</span>
+          <span class="tag">Opérations</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+      <div class="card" data-type="nouvelle" data-prio="med" data-effort="M">
+        <div class="card-top">
+          <div class="card-num">25</div>
+          <div class="card-badges">
+            <span class="badge prio-med">Moyenne</span>
+            <span class="badge type-new">Nouvelle</span>
+            <span class="badge effort-m">M</span>
+          </div>
+        </div>
+        <div class="card-title">Multi-langue pour les produits (FR / EN)</div>
+        <div class="card-desc">Les admins peuvent saisir nom et description de chaque produit en français et en anglais. L'app mobile affiche automatiquement la langue du téléphone du client. Cohérent avec l'i18n déjà en place.</div>
+        <div class="card-footer">
+          <span class="tag">Produits</span>
+          <span class="tag">i18n</span>
+          <div class="impact"><div class="dots"><div class="dot on"></div><div class="dot on"></div><div class="dot"></div></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function filter(type) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    document.querySelectorAll('.card').forEach(card => {
+      if (type === 'all') {
+        card.style.display = '';
+      } else if (type === 'correctif' || type === 'nouvelle') {
+        card.style.display = card.dataset.type === type ? '' : 'none';
+      } else if (type === 'haute') {
+        card.style.display = card.dataset.prio === 'haute' ? '' : 'none';
+      } else if (type === 'S' || type === 'M' || type === 'L') {
+        card.style.display = card.dataset.effort === type ? '' : 'none';
+      }
+    });
+  }
+</script>
+
+</body>
+</html>
