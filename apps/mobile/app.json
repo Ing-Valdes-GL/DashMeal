@@ -90,7 +90,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "be8c7c0d-8c03-4729-8f39-b9c906cb03b1"
+        "projectId": "e05fc85f-3f43-478f-9c64-80935a324ef1"
       }
     },
     "owner": "valdes237",
@@ -98,7 +98,7 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/be8c7c0d-8c03-4729-8f39-b9c906cb03b1"
+      "url": "https://u.expo.dev/e05fc85f-3f43-478f-9c64-80935a324ef1"
     }
   }
 }
