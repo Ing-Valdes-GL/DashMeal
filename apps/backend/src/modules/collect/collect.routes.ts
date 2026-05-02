@@ -13,6 +13,9 @@ router.post("/scan", authenticate, requireRole("admin", "superadmin"), controlle
 // ─── Côté utilisateur : voir son QR code pour une commande ───────────────────
 router.get("/order/:orderId", authenticate, requireRole("user"), controller.getCollectDetails);
 
+// ─── Admin : QR code d'une commande collect spécifique ───────────────────────
+router.get("/admin/order/:orderId", authenticate, requireRole("admin", "superadmin"), controller.getCollectQrForAdmin);
+
 // ─── Lister les commandes click & collect d'une agence (par jour/statut) ─────
 router.get("/branch/:branchId", authenticate, requireRole("admin", "superadmin"), controller.listBranchCollects);
 

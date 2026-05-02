@@ -60,7 +60,7 @@ export default function SuperadminAuthPage({
 
   const toMessage = (error: unknown, fallback: string) => {
     if (error instanceof AxiosError) {
-      if (!error.response) return "Backend indisponible (http://localhost:3001)";
+      if (!error.response) return "Impossible de joindre le serveur";
       return (
         (error.response.data as { error?: { message?: string } })?.error?.message ?? fallback
       );

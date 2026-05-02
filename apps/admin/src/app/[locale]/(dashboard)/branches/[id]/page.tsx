@@ -21,7 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   ArrowLeft, Plus, MoreHorizontal, Pencil, Trash2,
   Eye, EyeOff, Tag, Package, MapPin, RefreshCw,
-  Upload, ShoppingCart, BarChart2, TrendingUp, Clock,
+  Upload, ShoppingCart, BarChart2, TrendingUp, Clock, X,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,6 +78,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
   const [promoForm, setPromoForm] = useState({ promo_price: "", promo_ends_at: "" });
   const [form, setForm] = useState(emptyForm);
   const [uploading, setUploading] = useState(false);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
 
   // Catégories
   const [showCatDialog, setShowCatDialog] = useState(false);
@@ -206,17 +207,31 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Aperçu local immédiat
+    const objectUrl = URL.createObjectURL(file);
+    if (localPreview) URL.revokeObjectURL(localPreview);
+    setLocalPreview(objectUrl);
+
     setUploading(true);
     try {
       const result = await apiUpload<{ url: string }>("/products/upload-image", file);
       setForm((f) => ({ ...f, image_url: result.url }));
-      toast.success("Photo uploadée");
+      // Garder le preview local jusqu'à ce que l'URL distante soit disponible
     } catch {
       toast.error("Échec de l'upload");
+      URL.revokeObjectURL(objectUrl);
+      setLocalPreview(null);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const clearImage = () => {
+    if (localPreview) URL.revokeObjectURL(localPreview);
+    setLocalPreview(null);
+    setForm((f) => ({ ...f, image_url: "" }));
   };
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -226,6 +241,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
     setForm({ name_fr: p.name_fr, name_en: p.name_en, price: String(p.price),
       description_fr: p.description_fr ?? "", description_en: p.description_en ?? "",
       image_url: p.image_url ?? "", category_id: p.category_id ?? "" });
+    if (localPreview) { URL.revokeObjectURL(localPreview); setLocalPreview(null); }
     setShowCreate(true);
   };
 
@@ -595,7 +611,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
       </Dialog>
 
       {/* ── Dialog créer/modifier produit ────────────────────────────────── */}
-      <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) { setEditing(null); setForm(emptyForm); } }}>
+      <Dialog open={showCreate} onOpenChange={(v) => { setShowCreate(v); if (!v) { setEditing(null); setForm(emptyForm); if (localPreview) { URL.revokeObjectURL(localPreview); setLocalPreview(null); } } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier le produit" : "Nouveau produit"}</DialogTitle>
@@ -633,23 +649,55 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
               </div>
             </div>
 
-            {/* Upload photo */}
+            {/* Upload photo avec aperçu local */}
             <div className="space-y-1.5">
               <Label>Photo du produit <span className="text-red-400">*</span></Label>
-              <div className="flex items-center gap-3">
-                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} />
-                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  {uploading ? "Upload..." : "Choisir une photo"}
-                </Button>
-                {form.image_url && (
-                  <Button type="button" variant="ghost" size="sm" className="text-red-400" onClick={() => setForm((f) => ({ ...f, image_url: "" }))}>
-                    Retirer
-                  </Button>
-                )}
-              </div>
-              {form.image_url && (
-                <img src={form.image_url} alt="preview" className="h-28 w-28 rounded-xl object-cover border border-slate-200 mt-2" />
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} />
+              {localPreview || form.image_url ? (
+                <div className="relative w-full h-40 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                  <img
+                    src={localPreview ?? form.image_url}
+                    alt="aperçu"
+                    className="h-full w-full object-cover"
+                  />
+                  {uploading && (
+                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-2">
+                      <div className="h-6 w-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span className="text-white text-xs font-medium">Upload en cours…</span>
+                    </div>
+                  )}
+                  {!uploading && (
+                    <div className="absolute top-2 right-2 flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="h-7 w-7 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-black/70 transition-colors"
+                        title="Changer"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearImage}
+                        className="h-7 w-7 rounded-full bg-black/50 flex items-center justify-center text-white hover:bg-red-600/80 transition-colors"
+                        title="Retirer"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 py-8 cursor-pointer hover:border-brand-400 hover:bg-brand-50/40 transition-colors"
+                >
+                  <Upload className="h-6 w-6 text-slate-400" />
+                  <p className="text-sm text-slate-500">
+                    <span className="text-brand-600 font-medium">Choisir</span> ou glisser une photo
+                  </p>
+                  <p className="text-xs text-slate-400">JPG, PNG, WebP — max 5 Mo</p>
+                </div>
               )}
             </div>
 
@@ -663,7 +711,7 @@ export default function BranchDetailPage({ params }: { params: Promise<{ locale:
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCreate(false); setEditing(null); setForm(emptyForm); }}>Annuler</Button>
+            <Button variant="outline" onClick={() => { setShowCreate(false); setEditing(null); setForm(emptyForm); if (localPreview) { URL.revokeObjectURL(localPreview); setLocalPreview(null); } }}>Annuler</Button>
             <Button
               onClick={() => saveMutation.mutate(form)}
               disabled={!form.name_fr || !form.name_en || !form.price || saveMutation.isPending}

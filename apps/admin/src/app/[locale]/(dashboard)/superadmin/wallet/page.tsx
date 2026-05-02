@@ -14,7 +14,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
-import { Wallet, TrendingUp, ArrowDownToLine, Building2, Megaphone, ArrowUpFromLine } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Wallet, TrendingUp, ArrowDownToLine, Building2, Megaphone, ArrowUpFromLine, Calendar } from "lucide-react";
 
 interface PlatformWallet {
   id: string; balance: number; total_received: number; updated_at: string;
@@ -36,6 +37,10 @@ export default function SuperadminWalletPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [datePreset, setDatePreset] = useState("all");
+  const [dateFrom, setDateFrom]     = useState("");
+  const [dateTo, setDateTo]         = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [wAmount, setWAmount] = useState("");
   const [wPhone, setWPhone]   = useState("");
 
@@ -44,9 +49,24 @@ export default function SuperadminWalletPage() {
     queryFn: () => apiGet("/wallet/platform"),
   });
 
+  const resolvedDateFrom = (() => {
+    if (datePreset === "7d")  return new Date(Date.now() - 7  * 864e5).toISOString();
+    if (datePreset === "30d") return new Date(Date.now() - 30 * 864e5).toISOString();
+    if (datePreset === "custom" && dateFrom) return new Date(dateFrom).toISOString();
+    return undefined;
+  })();
+  const resolvedDateTo = datePreset === "custom" && dateTo
+    ? new Date(dateTo + "T23:59:59").toISOString()
+    : undefined;
+
   const { data: txData, isLoading: txLoading } = useQuery<{ data: PlatformTransaction[]; pagination: any }>({
-    queryKey: ["platform-wallet-transactions", page],
-    queryFn: () => apiGet("/wallet/platform/transactions", { page, limit: 20 }) as any,
+    queryKey: ["platform-wallet-transactions", page, datePreset, dateFrom, dateTo, typeFilter],
+    queryFn: () => apiGet("/wallet/platform/transactions", {
+      page, limit: 20,
+      ...(typeFilter !== "all"  && { type:      typeFilter }),
+      ...(resolvedDateFrom      && { date_from: resolvedDateFrom }),
+      ...(resolvedDateTo        && { date_to:   resolvedDateTo }),
+    }) as any,
   });
 
   const withdrawMutation = useMutation({
@@ -127,11 +147,43 @@ export default function SuperadminWalletPage() {
 
       {/* Historique */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <ArrowDownToLine className="h-4 w-4 text-brand-600" />
-            Historique des transactions
-          </CardTitle>
+        <CardHeader className="pb-3">
+          <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ArrowDownToLine className="h-4 w-4 text-brand-600" />
+              Historique des transactions
+            </CardTitle>
+            <div className="flex gap-2 flex-wrap">
+              <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous types</SelectItem>
+                  <SelectItem value="commission">Commissions</SelectItem>
+                  <SelectItem value="ad_payment">Publicités</SelectItem>
+                  <SelectItem value="withdrawal">Retraits</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={datePreset} onValueChange={(v) => { setDatePreset(v); setDateFrom(""); setDateTo(""); setPage(1); }}>
+                <SelectTrigger className="w-40">
+                  <Calendar className="h-3.5 w-3.5 mr-1 text-slate-400" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toute période</SelectItem>
+                  <SelectItem value="7d">7 derniers jours</SelectItem>
+                  <SelectItem value="30d">30 derniers jours</SelectItem>
+                  <SelectItem value="custom">Personnalisé</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {datePreset === "custom" && (
+            <div className="flex gap-2 mt-2 items-center">
+              <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-40 text-sm" />
+              <span className="text-slate-400 text-sm">→</span>
+              <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-40 text-sm" />
+            </div>
+          )}
         </CardHeader>
         <Table>
           <TableHeader>

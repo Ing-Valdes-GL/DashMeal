@@ -39,7 +39,7 @@ loadEnvFile(path.join(backendRoot, ".env"));
 const EnvSchema = z.object({
   PORT: z.coerce.number().default(3001),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
-  CORS_ORIGINS: z.string().default("http://localhost:3000,http://localhost:8081"),
+  CORS_ORIGINS: z.string().default("https://dashmeal.vercel.app,https://hopeful-gentleness-production.up.railway.app,exp://,http://localhost:3000,http://localhost:8081"),
 
   SUPABASE_URL: z.string().url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),

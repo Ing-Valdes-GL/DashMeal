@@ -130,6 +130,26 @@ export async function getCollectDetails(req: Request, res: Response, next: NextF
   }
 }
 
+// ─── Côté admin : récupérer le QR code d'une commande collect ────────────────
+export async function getCollectQrForAdmin(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { data, error } = await supabase
+      .from("collect_orders")
+      .select(`
+        qr_code, pickup_status, picked_up_at,
+        orders!inner(id, status, total),
+        time_slots(date, start_time, end_time)
+      `)
+      .eq("order_id", req.params.orderId)
+      .single();
+
+    if (error || !data) throw new AppError(404, "NOT_FOUND", "QR code introuvable pour cette commande");
+    sendSuccess(res, data);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function listBranchCollects(req: Request, res: Response, next: NextFunction) {
   try {
     const { branchId } = req.params;

@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Spinner } from "@/components/ui/spinner";
 import {
   Megaphone, Plus, Trash2, Clock, TrendingUp,
-  Upload, X, Users, Banknote, Eye, Smartphone, CheckCircle2, XCircle, Circle,
+  Upload, X, Users, Banknote, Eye, Smartphone, CheckCircle2, XCircle, Circle, AlertTriangle,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -280,8 +280,16 @@ export default function AdsPage({ params }: { params: Promise<{ locale: string }
                           <span className="text-xs text-slate-400 shrink-0">{progress}%</span>
                         </div>
                       )}
-                      {ad.status === "rejected" && ad.rejection_reason && (
-                        <p className="text-xs text-red-600 mt-1">Motif : {ad.rejection_reason}</p>
+                      {ad.status === "rejected" && (
+                        <div className="mt-2 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                          <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-semibold text-red-700">Publicité rejetée</p>
+                            <p className="text-xs text-red-600 mt-0.5">
+                              {ad.rejection_reason ?? "Aucun motif fourni — contactez le support."}
+                            </p>
+                          </div>
+                        </div>
                       )}
                     </div>
                     {["pending","rejected","expired"].includes(ad.status) && (

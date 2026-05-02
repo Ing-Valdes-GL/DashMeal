@@ -17,7 +17,7 @@ const MAP_W = Math.round(SCREEN_W - 32);
 const MAP_H = 220;
 const GPS_INTERVAL_MS = 15_000;
 
-const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000/api/v1")
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? "https://hopeful-gentleness-production.up.railway.app/api/v1")
   .replace(/\/api\/v1\/?$/, "");
 
 type Status = "assigned" | "picked_up" | "on_the_way" | "delivered" | "failed";

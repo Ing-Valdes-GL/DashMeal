@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Pagination } from "@/components/ui/pagination";
 import {
   Wallet, TrendingUp, TrendingDown, ArrowDownToLine,
-  RefreshCw, Plus, Minus, AlertCircle, Store,
+  RefreshCw, Plus, Minus, AlertCircle, Store, Calendar,
 } from "lucide-react";
 
 interface BranchWallet {
@@ -57,6 +57,9 @@ export default function WalletPage() {
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter]     = useState("all");
   const [branchFilter, setBranchFilter] = useState("all");
+  const [datePreset, setDatePreset]     = useState("all");
+  const [dateFrom, setDateFrom]         = useState("");
+  const [dateTo, setDateTo]             = useState("");
   const [withdrawOpen, setWithdrawOpen]   = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawPhone, setWithdrawPhone]   = useState("");
@@ -69,12 +72,24 @@ export default function WalletPage() {
     refetchOnWindowFocus: true,
   });
 
+  const resolvedDateFrom = (() => {
+    if (datePreset === "7d")  return new Date(Date.now() - 7  * 864e5).toISOString();
+    if (datePreset === "30d") return new Date(Date.now() - 30 * 864e5).toISOString();
+    if (datePreset === "custom" && dateFrom) return new Date(dateFrom).toISOString();
+    return undefined;
+  })();
+  const resolvedDateTo = datePreset === "custom" && dateTo
+    ? new Date(dateTo + "T23:59:59").toISOString()
+    : undefined;
+
   const { data: txData, isLoading: txLoading } = useQuery<{ data: Transaction[]; pagination: any }>({
-    queryKey: ["wallet-transactions", page, typeFilter, branchFilter],
+    queryKey: ["wallet-transactions", page, typeFilter, branchFilter, datePreset, dateFrom, dateTo],
     queryFn: () => apiGet("/wallet/transactions", {
       page, limit: 20,
       ...(typeFilter   !== "all" && { type:      typeFilter }),
       ...(branchFilter !== "all" && { branch_id: branchFilter }),
+      ...(resolvedDateFrom      && { date_from:  resolvedDateFrom }),
+      ...(resolvedDateTo        && { date_to:    resolvedDateTo }),
     }) as any,
   });
 
@@ -287,33 +302,55 @@ export default function WalletPage() {
 
       {/* Historique */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3 gap-2 flex-wrap">
-          <CardTitle className="text-base">Historique des transactions</CardTitle>
-          <div className="flex gap-2">
-            {/* Filtre agence */}
-            <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Toutes les agences" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes les agences</SelectItem>
-                {branches.map((b) => (
-                  <SelectItem key={b.branch_id} value={b.branch_id}>{b.branch_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {/* Filtre type */}
-            <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
-              <SelectTrigger className="w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes</SelectItem>
-                <SelectItem value="credit">Crédits</SelectItem>
-                <SelectItem value="withdrawal">Retraits</SelectItem>
-              </SelectContent>
-            </Select>
+        <CardHeader className="pb-3">
+          <div className="flex flex-row items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base">Historique des transactions</CardTitle>
+            <div className="flex gap-2 flex-wrap">
+              {/* Filtre agence */}
+              <Select value={branchFilter} onValueChange={(v) => { setBranchFilter(v); setPage(1); }}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Toutes les agences" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes les agences</SelectItem>
+                  {branches.map((b) => (
+                    <SelectItem key={b.branch_id} value={b.branch_id}>{b.branch_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {/* Filtre type */}
+              <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
+                <SelectTrigger className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes</SelectItem>
+                  <SelectItem value="credit">Crédits</SelectItem>
+                  <SelectItem value="withdrawal">Retraits</SelectItem>
+                </SelectContent>
+              </Select>
+              {/* Filtre dates */}
+              <Select value={datePreset} onValueChange={(v) => { setDatePreset(v); setDateFrom(""); setDateTo(""); setPage(1); }}>
+                <SelectTrigger className="w-36">
+                  <Calendar className="h-3.5 w-3.5 mr-1 text-slate-400" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toute période</SelectItem>
+                  <SelectItem value="7d">7 derniers jours</SelectItem>
+                  <SelectItem value="30d">30 derniers jours</SelectItem>
+                  <SelectItem value="custom">Personnalisé</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          {datePreset === "custom" && (
+            <div className="flex gap-2 mt-2 items-center">
+              <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-40 text-sm" />
+              <span className="text-slate-400 text-sm">→</span>
+              <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-40 text-sm" />
+            </div>
+          )}
         </CardHeader>
         <Table>
           <TableHeader>
