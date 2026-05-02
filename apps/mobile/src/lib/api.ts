@@ -2,7 +2,7 @@ import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://hopeful-gentleness-production.up.railway.app/api";
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://hopeful-gentleness-production.up.railway.app/api/v1";
 
 export const api = axios.create({
   baseURL: API_URL,
