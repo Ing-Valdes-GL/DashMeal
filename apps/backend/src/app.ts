@@ -36,9 +36,20 @@ const app: Application = express();
 
 // ─── Sécurité ─────────────────────────────────────────────────────────────────
 app.use(helmet());
+const allowedOrigins = env.CORS_ORIGINS.split(",").map((o) => o.trim());
 app.use(
   cors({
-    origin: env.CORS_ORIGINS.split(",").map((o) => o.trim()),
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        /^https:\/\/[a-z0-9-]+(\.vercel\.app)$/.test(origin) ||
+        /^exp:\/\//.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   })
 );
