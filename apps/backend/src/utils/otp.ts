@@ -42,7 +42,7 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
   }
 
   try {
-    const response = await fetch("https://v3.api.termii.com/api/sms/send", {
+    const response = await fetch(`${env.TERMII_BASE_URL}/api/sms/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
