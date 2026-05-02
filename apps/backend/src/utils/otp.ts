@@ -40,30 +40,40 @@ export async function sendOtp(phone: string): Promise<void> {
     username: env.AT_USERNAME,
     to: phone,
     message: `Votre code de vérification Dash Meal : ${code}. Valable ${OTP_EXPIRES_IN_MINUTES} minutes.`,
-    ...(env.AT_SENDER_ID ? { from: env.AT_SENDER_ID } : {}),
   });
 
-  const response = await fetch(
-    "https://api.africastalking.com/version1/messaging",
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/x-www-form-urlencoded",
-        apiKey: env.AT_API_KEY,
-      },
-      body,
+  try {
+    const response = await fetch(
+      "https://api.africastalking.com/version1/messaging",
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
+          apiKey: env.AT_API_KEY,
+        },
+        body,
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`❌ Échec envoi SMS OTP (${response.status}): ${errText}`);
+      return;
     }
-  );
 
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error(`❌ Échec envoi SMS OTP (${response.status}): ${errText}`);
-    throw new Error(`Échec envoi SMS OTP: ${response.statusText}`);
+    const result = await response.json() as { SMSMessageData?: { Recipients?: { status: string; number: string }[] } };
+    const recipients = result.SMSMessageData?.Recipients ?? [];
+    recipients.forEach((r) => {
+      if (r.status === "Success") {
+        console.log(`✅ SMS OTP envoyé à ${r.number}`);
+      } else {
+        console.warn(`⚠️  SMS OTP échoué pour ${r.number} : ${r.status}`);
+      }
+    });
+  } catch (err) {
+    console.error("❌ Erreur réseau envoi SMS OTP:", err);
   }
-
-  const result = await response.json() as { SMSMessageData?: { Recipients?: { status: string; number: string }[] } };
-  console.log("✅ SMS envoyé:", JSON.stringify(result.SMSMessageData?.Recipients));
 }
 
 export async function verifyOtp(
