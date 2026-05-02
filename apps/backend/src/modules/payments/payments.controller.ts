@@ -198,6 +198,10 @@ export async function getPaymentStatus(req: Request, res: Response, next: NextFu
       if (intent.status === "failed") {
         return sendSuccess(res, { status: "failed" });
       }
+      // Création en cours par un autre poll — attendre
+      if (intent.status === "processing") {
+        return sendSuccess(res, { status: "pending" });
+      }
 
       // Intent expiré
       if (new Date(intent.expires_at) < new Date()) {
@@ -216,8 +220,28 @@ export async function getPaymentStatus(req: Request, res: Response, next: NextFu
       }
 
       if (campayData.status === "SUCCESSFUL") {
-        // ── Créer la commande maintenant que le paiement est confirmé ─────────
-        // NE PAS mettre dans un try/catch silencieux — on veut que les erreurs remontent
+        // ── Verrou atomique : seul le premier poll qui passe "pending" → "processing" crée la commande
+        const { data: claimed } = await supabase
+          .from("payment_intents")
+          .update({ status: "processing" })
+          .eq("id", intent.id)
+          .eq("status", "pending")
+          .select("id")
+          .single();
+
+        if (!claimed) {
+          // Un autre poll a déjà verrouillé — attendre que l'order_id soit disponible
+          const { data: latest } = await supabase
+            .from("payment_intents")
+            .select("status, order_id, operator")
+            .eq("id", intent.id)
+            .single();
+          if (latest?.status === "paid" && latest.order_id) {
+            return sendSuccess(res, { status: "paid", order_id: latest.order_id, operator: latest.operator });
+          }
+          return sendSuccess(res, { status: "pending" });
+        }
+
         const d = intent.order_data as Record<string, unknown>;
         console.log(`[Poll] Paiement SUCCESSFUL pour intent ${intent.id}, création commande...`);
         const order_id = await createOrderFromIntent(intent.user_id, intent.id, campayData.operator, d);
