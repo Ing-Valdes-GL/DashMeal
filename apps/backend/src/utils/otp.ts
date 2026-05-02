@@ -11,7 +11,15 @@ function generateCode(): string {
     .padStart(OTP_LENGTH, "0");
 }
 
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (phone.startsWith("+")) return `+${digits}`;
+  if (digits.startsWith("237")) return `+${digits}`;
+  return `+237${digits}`;
+}
+
 export async function sendOtp(phone: string): Promise<void> {
+  const normalized = normalizePhone(phone);
   const code = generateCode();
   const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
 
@@ -25,7 +33,7 @@ export async function sendOtp(phone: string): Promise<void> {
 
   // Toujours logger en console (utile pour debug)
   console.log(`\n🔑 OTP ──────────────────────────────`);
-  console.log(`   Téléphone : ${phone}`);
+  console.log(`   Téléphone : ${normalized}`);
   console.log(`   Code      : ${code}`);
   console.log(`   Expire    : ${expiresAt.toLocaleTimeString()}`);
   console.log(`─────────────────────────────────────\n`);
@@ -38,7 +46,7 @@ export async function sendOtp(phone: string): Promise<void> {
 
   const body = new URLSearchParams({
     username: env.AT_USERNAME,
-    to: phone,
+    to: normalized,
     message: `Votre code de vérification Dash Meal : ${code}. Valable ${OTP_EXPIRES_IN_MINUTES} minutes.`,
   });
 
