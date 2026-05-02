@@ -124,10 +124,13 @@ app.use((_req, res) => {
 app.use(errorHandler);
 
 // ─── Démarrage du serveur ────────────────────────────────────────────────────
-app.listen(env.PORT, () => {
+app.listen(env.PORT, "0.0.0.0", () => {
+  const host = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : `http://localhost:${env.PORT}`;
   console.log(`🚀 Dash Meal Backend démarré sur le port ${env.PORT}`);
   console.log(`   Environnement : ${env.NODE_ENV}`);
-  console.log(`   API : http://localhost:${env.PORT}${API_PREFIX}`);
+  console.log(`   API : ${host}${API_PREFIX}`);
   startStaleOrderNotifier();
 });
 
