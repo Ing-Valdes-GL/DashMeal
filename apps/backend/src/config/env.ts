@@ -47,9 +47,8 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
 
-  AT_API_KEY: z.string().min(1),
-  AT_USERNAME: z.string().min(1),
-  AT_SENDER_ID: z.string().default("DashMeal"),
+  TERMII_API_KEY: z.string().min(1),
+  TERMII_SENDER_ID: z.string().default("DashMeal"),
   OTP_EXPOSE_CODE: z.coerce.boolean().default(false),
 
   CAMPAY_APP_USERNAME: z.string().min(1),
