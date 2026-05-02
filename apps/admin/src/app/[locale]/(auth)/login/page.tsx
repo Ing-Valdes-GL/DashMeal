@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
+import logo from "@/assets/logo.png";
 import { useState } from "react";
 
 const LoginSchema = z.object({
@@ -98,7 +99,7 @@ export default function LoginPage({
     <div className="mx-auto max-w-sm w-full">
       <div className="flex flex-col items-center mb-8">
         <Image
-          src="/logo.png"
+          src={logo}
           alt="Dash Meal"
           width={180}
           height={140}
