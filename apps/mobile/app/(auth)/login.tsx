@@ -41,17 +41,17 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
 
   const loginMutation = useMutation({
-    mutationFn: () => apiPost("/auth/user/login", { phone, password }),
-    onSuccess: async (res) => {
-      const { user, tokens } = res.data;
-      await login(user, tokens.access_token, tokens.refresh_token);
+    mutationFn: () => apiPost<{ user: any; tokens: { access_token: string; refresh_token: string } }>("/auth/user/login", { phone, password }),
+    onSuccess: async (data) => {
+      await login(data.user, data.tokens.access_token, data.tokens.refresh_token);
       router.replace("/(tabs)");
     },
     onError: (err: any) => {
       const code = err?.response?.data?.error?.code;
       const msg  = err?.response?.data?.error?.message;
-      if (code === "PHONE_NOT_VERIFIED")   setError("Compte non vérifié");
-      else if (code === "ACCOUNT_SUSPENDED") setError("Ce compte a été suspendu");
+      if (code === "PHONE_NOT_VERIFIED") {
+        router.push({ pathname: "/(auth)/otp", params: { phone } });
+      } else if (code === "ACCOUNT_SUSPENDED") setError("Ce compte a été suspendu");
       else if (msg) setError(msg);
       else if (!err?.response) setError("Impossible de joindre le serveur");
       else setError(t("auth.invalidCredentials"));

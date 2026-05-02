@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from "react-native";
@@ -46,8 +46,11 @@ export default function OtpScreen() {
   });
 
   const resendMutation = useMutation({
-    mutationFn: () => apiPost("/auth/user/request-reset", { phone }),
-    onSuccess: () => setError(""),
+    mutationFn: () => apiPost<{ otp_code?: string }>("/auth/user/request-reset", { phone }),
+    onSuccess: (data) => {
+      setError("");
+      if (data.otp_code) setOtp(data.otp_code.split("").slice(0, 6));
+    },
   });
 
   const handleDigit = (val: string, idx: number) => {
@@ -59,13 +62,6 @@ export default function OtpScreen() {
   };
 
   const code = otp.join("");
-
-  useEffect(() => {
-    if (code.length === 6 && !verifyMutation.isPending) {
-      setError("");
-      verifyMutation.mutate();
-    }
-  }, [code]);
 
   return (
     <View style={styles.container}>
