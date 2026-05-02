@@ -30,17 +30,16 @@ const deco = StyleSheet.create({
 export default function OtpScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { phone, prefill } = useLocalSearchParams<{ phone: string; prefill?: string }>();
   const { login } = useAuthStore();
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState(prefill ? prefill.split("").slice(0, 6) : ["", "", "", "", "", ""]);
   const [error, setError] = useState("");
   const inputs = useRef<TextInput[]>([]);
 
   const verifyMutation = useMutation({
-    mutationFn: () => apiPost("/auth/user/verify-phone", { phone, code: otp.join("") }),
-    onSuccess: async (res) => {
-      const { user, tokens } = res.data;
-      await login(user, tokens.access_token, tokens.refresh_token);
+    mutationFn: () => apiPost<{ user: any; tokens: { access_token: string; refresh_token: string } }>("/auth/user/verify-phone", { phone, code: otp.join("") }),
+    onSuccess: async (data) => {
+      await login(data.user, data.tokens.access_token, data.tokens.refresh_token);
       router.replace("/(tabs)");
     },
     onError: () => setError("Code invalide ou expiré"),
@@ -86,9 +85,17 @@ export default function OtpScreen() {
 
           <Text style={styles.title}>Vérification</Text>
           <Text style={styles.subtitle}>
-            Nous avons envoyé un code à{"\n"}
+            {prefill
+              ? `SMS non reçu ? Le code a été pré-rempli automatiquement pour\n`
+              : `Nous avons envoyé un code à\n`}
             <Text style={styles.phone}>{phone}</Text>
           </Text>
+          {prefill ? (
+            <View style={styles.smsWarnBox}>
+              <Ionicons name="warning-outline" size={14} color="#f97316" />
+              <Text style={styles.smsWarnText}>SMS non livré — code inséré automatiquement</Text>
+            </View>
+          ) : null}
 
           {/* OTP boxes */}
           <View style={styles.otpRow}>
@@ -162,6 +169,12 @@ const styles = StyleSheet.create({
     textAlign: "center", fontSize: 22, fontWeight: "700", color: "#fff",
   },
   boxFilled: { borderColor: Colors.primary, backgroundColor: "rgba(255,122,47,0.1)" },
+  smsWarnBox: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: "rgba(249,115,22,0.12)", borderRadius: Radius.sm,
+    paddingHorizontal: 12, paddingVertical: 8, marginBottom: 20,
+  },
+  smsWarnText: { fontSize: 12, color: "#f97316", flexShrink: 1 },
   resendRow: { marginBottom: 24 },
   resendText: { fontSize: 13, color: Colors.textDark2 },
   resendTimer: { color: Colors.primary, fontWeight: "600" },

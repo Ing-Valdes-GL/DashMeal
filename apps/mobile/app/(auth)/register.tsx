@@ -36,9 +36,9 @@ export default function RegisterScreen() {
   const [error, setError] = useState("");
 
   const registerMutation = useMutation({
-    mutationFn: () => apiPost("/auth/user/register", { name, phone, password }),
-    onSuccess: () => {
-      router.push({ pathname: "/(auth)/otp", params: { phone } });
+    mutationFn: () => apiPost<{ user_id: string; otp_code?: string }>("/auth/user/register", { name, phone, password }),
+    onSuccess: (data) => {
+      router.push({ pathname: "/(auth)/otp", params: { phone, prefill: data.otp_code ?? "" } });
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.error?.message;
