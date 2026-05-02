@@ -251,11 +251,19 @@ export async function requestPasswordReset(phone: string) {
     .eq("phone", phone)
     .single();
 
-  // Ne pas révéler si le numéro existe ou non
-  if (user) {
-    await sendOtp(phone);
+  if (!user) {
+    return { message: "Si ce numéro est enregistré, un code OTP a été envoyé" };
   }
-  return { message: "Si ce numéro est enregistré, un code OTP a été envoyé" };
+
+  const { smsSent, code } = await sendOtp(phone);
+  const exposeCode = env.OTP_EXPOSE_CODE || !smsSent;
+
+  return {
+    message: smsSent && !env.OTP_EXPOSE_CODE
+      ? "Si ce numéro est enregistré, un code OTP a été envoyé"
+      : "SMS non livré — utilisez le code ci-dessous.",
+    ...(exposeCode ? { otp_code: code } : {}),
+  };
 }
 
 export async function resetPassword(input: ResetPasswordInput) {
