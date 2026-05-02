@@ -147,7 +147,7 @@ export default function CheckoutScreen() {
         }
       } catch { /* continuer */ }
       if (attempts >= 40) { stopPolling(); setPaymentPhase("failed"); }
-    }, 3000);
+    }, 5000);
   }, [stopPolling, clear, queryClient]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
