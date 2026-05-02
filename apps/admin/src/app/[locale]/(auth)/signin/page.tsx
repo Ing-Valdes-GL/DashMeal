@@ -69,7 +69,7 @@ export default function SignInPage({
       const message = error instanceof AxiosError
         ? error.response
           ? (error.response?.data as { error?: { message?: string } })?.error?.message
-          : "Backend indisponible (http://localhost:3001)"
+          : "Impossible de joindre le serveur"
         : undefined;
       toast.error(message ?? t("signUpError"));
     }

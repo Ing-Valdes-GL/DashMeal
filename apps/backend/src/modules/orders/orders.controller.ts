@@ -160,7 +160,7 @@ export async function createDeliveryOrder(req: Request, res: Response, next: Nex
 
 export async function listOrders(req: Request, res: Response, next: NextFunction) {
   try {
-    const { status, branch_id, page = "1", limit = "20" } = req.query as Record<string, string>;
+    const { status, branch_id, search, page = "1", limit = "20" } = req.query as Record<string, string>;
     const pageNum = Number(page);
     const limitNum = Number(limit);
     const offset = (pageNum - 1) * limitNum;
@@ -178,6 +178,43 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
       }
     }
 
+    // If searching, resolve matching order IDs upfront (avoids unreliable nested filters)
+    let searchFilterIds: string[] | null = null;
+    if (search) {
+      const trimmed = search.trim().replace(/^#/, "");
+      const isIdSearch = /^[0-9a-f-]{4,36}$/i.test(trimmed);
+
+      if (isIdSearch) {
+        const { data: matched } = await supabase
+          .from("orders")
+          .select("id")
+          .ilike("id", `${trimmed}%`)
+          .limit(50);
+        searchFilterIds = (matched ?? []).map((o) => o.id);
+      } else {
+        // Search by customer name — resolve user IDs first
+        const { data: users } = await supabase
+          .from("users")
+          .select("id")
+          .ilike("name", `%${trimmed}%`)
+          .limit(100);
+        const userIds = (users ?? []).map((u) => u.id);
+        if (!userIds.length) {
+          return res.json({ success: true, data: [], pagination: { page: pageNum, limit: limitNum, total: 0, total_pages: 0 } });
+        }
+        const { data: matched } = await supabase
+          .from("orders")
+          .select("id")
+          .in("user_id", userIds)
+          .limit(200);
+        searchFilterIds = (matched ?? []).map((o) => o.id);
+      }
+
+      if (searchFilterIds !== null && !searchFilterIds.length) {
+        return res.json({ success: true, data: [], pagination: { page: pageNum, limit: limitNum, total: 0, total_pages: 0 } });
+      }
+    }
+
     let query = supabase
       .from("orders")
       .select("*, users(name, phone), branches(name), order_items(*, products(name_fr))", { count: "exact" })
@@ -187,6 +224,7 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
     if (allowedBranchIds) query = query.in("branch_id", allowedBranchIds);
     if (status) query = query.eq("status", status);
     if (branch_id) query = query.eq("branch_id", branch_id);
+    if (searchFilterIds !== null) query = query.in("id", searchFilterIds);
 
     const { data, count, error } = await query;
     if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");

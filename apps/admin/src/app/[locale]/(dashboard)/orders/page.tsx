@@ -21,7 +21,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Search, RefreshCw, MoreHorizontal, Eye, Truck, CheckSquare, X } from "lucide-react";
+import { Search, RefreshCw, MoreHorizontal, Eye, Truck, CheckSquare, X, QrCode, Download } from "lucide-react";
+import QRCodeSVG from "react-qr-code";
 
 interface Order {
   id: string; total: number; status: string; type: string;
@@ -55,6 +56,8 @@ export default function OrdersPage() {
   const [showDetail, setShowDetail] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showDriverModal, setShowDriverModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const { data, isLoading, refetch } = useQuery<{ data: Order[]; pagination: any }>({
     queryKey: ["orders", { page, status, search }],
@@ -72,6 +75,53 @@ export default function OrdersPage() {
     queryFn: () => apiGet("/admins/drivers"),
     enabled: showDriverModal,
   });
+
+  // QR code collect
+  const isConfirmedCollect = !!(
+    selectedOrder?.type === "collect" &&
+    ["confirmed", "preparing", "ready", "delivering", "delivered"].includes(selectedOrder?.status ?? "")
+  );
+  const { data: collectQr } = useQuery<{
+    qr_code: string; pickup_status: string;
+    time_slots: { date: string; start_time: string; end_time: string };
+  }>({
+    queryKey: ["collect-qr", selectedOrder?.id],
+    queryFn: () => apiGet(`/collect/admin/order/${selectedOrder!.id}`),
+    enabled: isConfirmedCollect && showDetail,
+    staleTime: Infinity,
+  });
+
+  const downloadCollectQr = () => {
+    const svg = document.getElementById("order-detail-qr-svg");
+    if (!svg || !selectedOrder) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement("canvas");
+    canvas.width = 300; canvas.height = 360;
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    const blob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      if (!ctx) return;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, 300, 360);
+      ctx.drawImage(img, 25, 20, 250, 250);
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 26px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(selectedOrder.users?.name ?? "", 150, 300);
+      ctx.font = "13px sans-serif";
+      ctx.fillStyle = "#6b7280";
+      ctx.fillText(`Commande #${selectedOrder.id.slice(0, 8)}`, 150, 325);
+      ctx.fillText(`${collectQr?.time_slots?.date ?? ""} ${collectQr?.time_slots?.start_time ?? ""}`, 150, 348);
+      URL.revokeObjectURL(url);
+      const link = document.createElement("a");
+      link.download = `qr-collect-${selectedOrder.id.slice(0, 8)}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    };
+    img.src = url;
+  };
 
   // Mutation : update status
   const updateStatus = useMutation({
@@ -120,7 +170,7 @@ export default function OrdersPage() {
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
               <Input
-                placeholder={`${t("customer")}...`}
+                placeholder={`${t("customer")} ou #ID...`}
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                 className="pl-9"
@@ -215,9 +265,9 @@ export default function OrdersPage() {
                           {["pending", "confirmed"].includes(order.status) && (
                             <DropdownMenuItem
                               destructive
-                              onClick={() => updateStatus.mutate({ id: order.id, status: "cancelled" })}
+                              onClick={() => { setSelectedOrder(order); setCancelReason(""); setShowCancelModal(true); }}
                             >
-                              <X className="mr-2 h-4 w-4" /> {t("cancelConfirm").slice(0, 20)}…
+                              <X className="mr-2 h-4 w-4" /> Annuler la commande
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>
@@ -266,10 +316,63 @@ export default function OrdersPage() {
                   {selectedOrder.notes}
                 </div>
               )}
+
+              {/* ── QR Code Click & Collect ── */}
+              {selectedOrder.type === "collect" && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <QrCode className="h-3.5 w-3.5" /> QR Code de retrait
+                  </p>
+
+                  {!isConfirmedCollect ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-700">
+                      <QrCode className="h-4 w-4 shrink-0" />
+                      Le QR code sera disponible après confirmation du paiement.
+                    </div>
+                  ) : !collectQr ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="h-5 w-5 border-2 border-slate-300 border-t-brand-500 rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-4">
+                      {/* Infos créneau */}
+                      {collectQr.time_slots && (
+                        <p className="text-xs text-slate-500">
+                          Créneau : <span className="font-semibold text-slate-700">
+                            {collectQr.time_slots.date} · {collectQr.time_slots.start_time} – {collectQr.time_slots.end_time}
+                          </span>
+                        </p>
+                      )}
+
+                      {/* QR SVG */}
+                      <div className="bg-white rounded-xl p-4 border border-slate-200">
+                        <QRCodeSVG
+                          id="order-detail-qr-svg"
+                          value={collectQr.qr_code}
+                          size={180}
+                          bgColor="#ffffff"
+                          fgColor="#111827"
+                        />
+                      </div>
+
+                      {/* Statut retrait */}
+                      <Badge variant={collectQr.pickup_status === "picked_up" ? "delivered" : "pending"}>
+                        {collectQr.pickup_status === "picked_up" ? "Déjà récupérée" : "En attente de retrait"}
+                      </Badge>
+
+                      {/* Bouton télécharger */}
+                      <Button variant="outline" size="sm" className="w-full gap-2" onClick={downloadCollectQr}>
+                        <Download className="h-4 w-4" />
+                        Télécharger le QR code
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDetail(false)}>{t("cancelConfirm").includes("?") ? "Fermer" : "Fermer"}</Button>
+            <Button variant="outline" onClick={() => setShowDetail(false)}>Fermer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -289,6 +392,55 @@ export default function OrdersPage() {
               onCancel={() => setShowStatusModal(false)}
               t={t}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal : Confirmation annulation */}
+      <Dialog open={showCancelModal} onOpenChange={(open) => { setShowCancelModal(open); if (!open) setCancelReason(""); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2">
+              <X className="h-5 w-5" /> Annuler la commande
+            </DialogTitle>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-slate-600">
+                Vous êtes sur le point d&apos;annuler la commande{" "}
+                <span className="font-mono font-semibold">#{selectedOrder.id.slice(0, 8)}</span>{" "}
+                de <span className="font-semibold">{selectedOrder.users?.name}</span>.
+              </p>
+              <div className="space-y-1.5">
+                <Label>
+                  Motif d&apos;annulation <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  placeholder="Ex : Client injoignable, rupture de stock…"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={3}
+                />
+                {cancelReason.trim().length === 0 && (
+                  <p className="text-xs text-red-400">Un motif est obligatoire</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCancelModal(false)}>Annuler</Button>
+                <Button
+                  variant="destructive"
+                  disabled={cancelReason.trim().length === 0 || updateStatus.isPending}
+                  onClick={() => {
+                    updateStatus.mutate(
+                      { id: selectedOrder.id, status: "cancelled", note: cancelReason.trim() },
+                      { onSuccess: () => { setShowCancelModal(false); setCancelReason(""); } }
+                    );
+                  }}
+                >
+                  {updateStatus.isPending ? "Annulation…" : "Confirmer l'annulation"}
+                </Button>
+              </DialogFooter>
+            </div>
           )}
         </DialogContent>
       </Dialog>

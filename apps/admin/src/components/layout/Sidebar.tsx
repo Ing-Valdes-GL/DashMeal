@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/auth";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api";
 import {
   LayoutDashboard, ShoppingCart, Store, Truck, QrCode,
   BarChart2, Bell, Settings, Building2, FileText,
@@ -36,6 +38,16 @@ export function Sidebar({ locale }: { locale: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const isSuperadmin = user?.role === "superadmin";
+
+  const { data: pendingData } = useQuery<{ pagination: { total: number } }>({
+    queryKey: ["orders-pending-count"],
+    queryFn: () => apiGet("/orders", { status: "pending", limit: 1 }) as any,
+    refetchInterval: 30_000,
+    enabled: !isSuperadmin,
+    staleTime: 0,
+  });
+  const pendingCount = pendingData?.pagination?.total ?? 0;
 
   const isActive = (href: string) => {
     const localePath = `/${locale}${href}`;
@@ -43,7 +55,6 @@ export function Sidebar({ locale }: { locale: string }) {
   };
 
   const handleLogout = () => {
-    const isSuperadmin = user?.role === "superadmin";
     logout();
     toast.success(t("logout"));
     router.push(`/${locale}/${isSuperadmin ? "superadmin/auth" : "login"}`);
@@ -51,7 +62,7 @@ export function Sidebar({ locale }: { locale: string }) {
 
   const adminNav: NavItem[] = [
     { href: "/dashboard",     label: t("dashboard"),     icon: LayoutDashboard },
-    { href: "/orders",        label: t("orders"),        icon: ShoppingCart },
+    { href: "/orders",        label: t("orders"),        icon: ShoppingCart, badge: pendingCount },
     { href: "/branches",      label: t("branches"),      icon: Store },
     { href: "/delivery",      label: t("delivery"),      icon: Truck },
     { href: "/drivers",       label: t("drivers"),       icon: UserCheck },
@@ -75,7 +86,6 @@ export function Sidebar({ locale }: { locale: string }) {
     { href: "/settings",                label: t("settings"),     icon: Settings },
   ];
 
-  const isSuperadmin = user?.role === "superadmin";
   const nav = isSuperadmin ? superadminNav : adminNav;
   const initials = user?.username?.slice(0, 2).toUpperCase() ?? "AD";
 
@@ -149,11 +159,14 @@ function NavLink({ item, locale, active }: { item: NavItem; locale: string; acti
       )} />
       <span className="flex-1">{item.label}</span>
       {item.badge != null && item.badge > 0 && (
-        <span className={cn(
-          "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold",
-          active ? "bg-white/20 text-white" : "bg-accent-100 text-accent-700"
-        )}>
-          {item.badge > 99 ? "99+" : item.badge}
+        <span className="relative flex">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 bg-orange-400" />
+          <span className={cn(
+            "relative flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-bold",
+            active ? "bg-white/30 text-white" : "bg-orange-500 text-white"
+          )}>
+            {item.badge > 99 ? "99+" : item.badge}
+          </span>
         </span>
       )}
       {active && <ChevronRight className="h-3 w-3 opacity-60 shrink-0" />}

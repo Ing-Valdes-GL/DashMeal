@@ -58,6 +58,8 @@ export async function getWalletTransactions(req: Request, res: Response, next: N
     const limit     = Math.min(50, parseInt(req.query.limit as string) || 20);
     const type      = req.query.type      as string | undefined;
     const branch_id = req.query.branch_id as string | undefined;
+    const date_from = req.query.date_from as string | undefined;
+    const date_to   = req.query.date_to   as string | undefined;
     const from      = (page - 1) * limit;
 
     let query = supabase
@@ -69,6 +71,8 @@ export async function getWalletTransactions(req: Request, res: Response, next: N
 
     if (type && type !== "all")   query = query.eq("type", type);
     if (branch_id)                query = query.eq("branch_id", branch_id);
+    if (date_from)                query = query.gte("created_at", date_from);
+    if (date_to)                  query = query.lte("created_at", date_to);
 
     const { data, count, error } = await query;
     if (error) throw new AppError(500, "DB_ERROR", error.message);
@@ -235,15 +239,24 @@ export async function platformWithdraw(req: Request, res: Response, next: NextFu
 
 export async function getPlatformTransactions(req: Request, res: Response, next: NextFunction) {
   try {
-    const page  = Math.max(1, parseInt(req.query.page  as string) || 1);
-    const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
-    const from  = (page - 1) * limit;
+    const page      = Math.max(1, parseInt(req.query.page  as string) || 1);
+    const limit     = Math.min(50, parseInt(req.query.limit as string) || 20);
+    const date_from = req.query.date_from as string | undefined;
+    const date_to   = req.query.date_to   as string | undefined;
+    const type      = req.query.type      as string | undefined;
+    const from      = (page - 1) * limit;
 
-    const { data, count, error } = await supabase
+    let txQuery = supabase
       .from("platform_wallet_transactions")
       .select("*, brands(name)", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, from + limit - 1);
+
+    if (type && type !== "all") txQuery = txQuery.eq("type", type);
+    if (date_from)              txQuery = txQuery.gte("created_at", date_from);
+    if (date_to)                txQuery = txQuery.lte("created_at", date_to);
+
+    const { data, count, error } = await txQuery;
 
     if (error) throw new AppError(500, "DB_ERROR", error.message);
 

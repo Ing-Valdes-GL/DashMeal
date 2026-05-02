@@ -48,7 +48,7 @@ const MAP_W = Math.round(SCREEN_W - 32); // 16px padding each side
 const MAP_H = 240;
 
 // URL de base de l'API (sans /api/v1, on l'ajoute manuellement pour le staticmap)
-const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000/api/v1")
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL ?? "https://hopeful-gentleness-production.up.railway.app/api/v1")
   .replace(/\/api\/v1\/?$/, "");
 
 function buildStaticMapUrl(
