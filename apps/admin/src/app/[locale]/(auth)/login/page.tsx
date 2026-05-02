@@ -100,7 +100,7 @@ export default function LoginPage({
       <div className="flex flex-col items-center mb-8">
         <Image
           src={logo}
-          alt="Dash Meal"
+          alt="logo image"
           width={180}
           height={140}
           className="mb-2 drop-shadow-2xl"
