@@ -58,7 +58,7 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
     const result = await response.json() as { message_id?: string; message?: string; code?: string };
 
     if (!response.ok || result.code === "error") {
-      console.error(`❌ Échec envoi SMS Termii (${response.status}): ${result.message ?? JSON.stringify(result)}`);
+      console.error(`❌ Échec envoi SMS Termii (${response.status}): ${JSON.stringify(result)}`);
       return { code, smsSent: false };
     }
 
