@@ -37,19 +37,19 @@ export default function OtpScreen() {
   const inputs = useRef<TextInput[]>([]);
 
   const verifyMutation = useMutation({
-    mutationFn: () => apiPost<{ user: any; tokens: { access_token: string; refresh_token: string } }>("/auth/user/verify-phone", { phone, code: otp.join("") }),
-    onSuccess: async (data) => {
-      await login(data.user, data.tokens.access_token, data.tokens.refresh_token);
+    mutationFn: () => apiPost<{ data: { user: any; tokens: { access_token: string; refresh_token: string } } }>("/auth/user/verify-phone", { phone, code: otp.join("") }),
+    onSuccess: async (res) => {
+      await login(res.data.user, res.data.tokens.access_token, res.data.tokens.refresh_token);
       router.replace("/(tabs)");
     },
     onError: () => setError("Code invalide ou expiré"),
   });
 
   const resendMutation = useMutation({
-    mutationFn: () => apiPost<{ otp_code?: string }>("/auth/user/request-reset", { phone }),
-    onSuccess: (data) => {
+    mutationFn: () => apiPost<{ data: { otp_code?: string } }>("/auth/user/request-reset", { phone }),
+    onSuccess: (res) => {
       setError("");
-      if (data.otp_code) setOtp(data.otp_code.split("").slice(0, 6));
+      if (res.data.otp_code) setOtp(res.data.otp_code.split("").slice(0, 6));
     },
   });
 

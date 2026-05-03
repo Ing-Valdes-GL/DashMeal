@@ -41,9 +41,9 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
 
   const loginMutation = useMutation({
-    mutationFn: () => apiPost<{ user: any; tokens: { access_token: string; refresh_token: string } }>("/auth/user/login", { phone, password }),
-    onSuccess: async (data) => {
-      await login(data.user, data.tokens.access_token, data.tokens.refresh_token);
+    mutationFn: () => apiPost<{ data: { user: any; tokens: { access_token: string; refresh_token: string } } }>("/auth/user/login", { phone, password }),
+    onSuccess: async (res) => {
+      await login(res.data.user, res.data.tokens.access_token, res.data.tokens.refresh_token);
       router.replace("/(tabs)");
     },
     onError: (err: any) => {
