@@ -34,6 +34,9 @@ import adsRoutes from "./modules/ads/ads.routes.js";
 
 const app: Application = express();
 
+// Railway / reverse-proxy — faire confiance au premier proxy
+app.set("trust proxy", 1);
+
 // ─── Sécurité ─────────────────────────────────────────────────────────────────
 app.use(helmet());
 const allowedOrigins = env.CORS_ORIGINS.split(",").map((o) => o.trim());
