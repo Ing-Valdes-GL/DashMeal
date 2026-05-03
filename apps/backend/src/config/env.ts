@@ -49,7 +49,7 @@ const EnvSchema = z.object({
 
   TERMII_API_KEY: z.string().min(1),
   TERMII_BASE_URL: z.string().url().default("https://v3.api.termii.com"),
-  TERMII_SENDER_ID: z.string().default("DashMeal"),
+  TERMII_SENDER_ID: z.string().default(""),
   OTP_EXPOSE_CODE: z.coerce.boolean().default(false),
 
   CAMPAY_APP_USERNAME: z.string().min(1),
