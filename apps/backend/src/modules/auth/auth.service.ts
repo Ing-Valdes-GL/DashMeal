@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { supabase } from "../../config/supabase.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../utils/jwt.js";
 import { sendOtp, verifyOtp } from "../../utils/otp.js";
-import { sendEmailOtp } from "../../utils/email.js";
+import { sendEmailOtp, sendCodeByEmail } from "../../utils/email.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { env } from "../../config/env.js";
 import type {
@@ -15,7 +15,7 @@ import type {
 } from "@dash-meal/shared";
 
 export async function registerUser(input: RegisterUserInput) {
-  const { name, phone, password } = input;
+  const { name, phone, password, email } = input;
 
   // Bloquer si le numéro est déjà un compte vérifié
   const { data: existing } = await supabase
@@ -28,6 +28,17 @@ export async function registerUser(input: RegisterUserInput) {
     throw new AppError(409, "PHONE_ALREADY_EXISTS", "Ce numéro est déjà utilisé");
   }
 
+  if (email) {
+    const { data: existingEmail } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
+    if (existingEmail) {
+      throw new AppError(409, "EMAIL_ALREADY_EXISTS", "Cet email est déjà utilisé");
+    }
+  }
+
   const password_hash = await bcrypt.hash(password, 12);
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
@@ -35,6 +46,7 @@ export async function registerUser(input: RegisterUserInput) {
   const { error: pendingErr } = await supabase.from("pending_registrations").upsert({
     phone,
     name,
+    email: email ?? null,
     password_hash,
     expires_at: expiresAt.toISOString(),
   });
@@ -44,6 +56,12 @@ export async function registerUser(input: RegisterUserInput) {
   }
 
   const { smsSent, code } = await sendOtp(phone);
+
+  // Envoyer le même code par email si fourni
+  if (email) {
+    await sendCodeByEmail(email, code);
+  }
+
   const exposeCode = env.OTP_EXPOSE_CODE || !smsSent;
 
   return {
@@ -65,7 +83,7 @@ export async function verifyUserPhone(input: VerifyOtpInput) {
   // Récupérer les données d'inscription en attente
   const { data: pending } = await supabase
     .from("pending_registrations")
-    .select("name, password_hash")
+    .select("name, email, password_hash")
     .eq("phone", phone)
     .gt("expires_at", new Date().toISOString())
     .single();
@@ -77,8 +95,14 @@ export async function verifyUserPhone(input: VerifyOtpInput) {
   // Créer le compte maintenant que l'OTP est validé
   const { data: user, error } = await supabase
     .from("users")
-    .insert({ name: pending.name, phone, password_hash: pending.password_hash, is_verified: true })
-    .select("id, name, phone, is_verified")
+    .insert({
+      name: pending.name,
+      phone,
+      email: pending.email ?? null,
+      password_hash: pending.password_hash,
+      is_verified: true,
+    })
+    .select("id, name, phone, email, is_verified")
     .single();
 
   if (error || !user) {
