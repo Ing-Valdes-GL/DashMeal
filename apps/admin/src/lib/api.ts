@@ -40,7 +40,7 @@ api.interceptors.response.use(
         const { access_token, refresh_token } = data.data;
 
         // Mettre à jour les cookies
-        setCookie("dm_access_token", access_token, 1);
+        setCookie("dm_access_token", access_token, 7);
         setCookie("dm_refresh_token", refresh_token, 30);
 
         original.headers!.Authorization = `Bearer ${access_token}`;

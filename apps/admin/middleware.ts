@@ -21,9 +21,11 @@ export default function middleware(request: NextRequest) {
     return intlMiddleware(request);
   }
 
-  // Vérifier le token JWT
-  const token = request.cookies.get("dm_access_token")?.value;
-  if (!token) {
+  // Vérifier la présence d'un token (access ou refresh)
+  // L'intercepteur Axios gère le renouvellement côté client si l'access token est expiré
+  const accessToken  = request.cookies.get("dm_access_token")?.value;
+  const refreshToken = request.cookies.get("dm_refresh_token")?.value;
+  if (!accessToken && !refreshToken) {
     const loginUrl = new URL(`/${locale}/login`, request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);

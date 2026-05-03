@@ -31,8 +31,8 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       login: (user, accessToken, refreshToken) => {
-        setCookie("dm_access_token", accessToken, 1);       // 1 jour (15min JWT + refresh)
-        setCookie("dm_refresh_token", refreshToken, 30);    // 30 jours
+        setCookie("dm_access_token", accessToken, 7);       // 7 jours cookie (JWT 24h, intercepteur renouvelle)
+        setCookie("dm_refresh_token", refreshToken, 30);   // 30 jours
         set({ user, isAuthenticated: true });
       },
 
