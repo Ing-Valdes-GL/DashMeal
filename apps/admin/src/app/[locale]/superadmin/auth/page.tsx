@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck, Mail, ArrowLeft } from "lucide-react";
 
 const RegisterSchema = z
   .object({
@@ -33,8 +33,13 @@ const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
+const OtpSchema = z.object({
+  code: z.string().length(6, "Code must be 6 digits"),
+});
+
 type RegisterData = z.infer<typeof RegisterSchema>;
 type LoginData = z.infer<typeof LoginSchema>;
+type OtpData = z.infer<typeof OtpSchema>;
 
 export default function SuperadminAuthPage({
   params,
@@ -47,6 +52,9 @@ export default function SuperadminAuthPage({
   const [mode, setMode] = useState<"register" | "login">("register");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loginStep, setLoginStep] = useState<"credentials" | "otp">("credentials");
+  const [pendingIdentifier, setPendingIdentifier] = useState("");
+  const [otpEmail, setOtpEmail] = useState("");
 
   const registerForm = useForm<RegisterData>({
     resolver: zodResolver(RegisterSchema),
@@ -56,6 +64,11 @@ export default function SuperadminAuthPage({
   const loginForm = useForm<LoginData>({
     resolver: zodResolver(LoginSchema),
     defaultValues: { identifier: "", password: "" },
+  });
+
+  const otpForm = useForm<OtpData>({
+    resolver: zodResolver(OtpSchema),
+    defaultValues: { code: "" },
   });
 
   const toMessage = (error: unknown, fallback: string) => {
@@ -103,6 +116,22 @@ export default function SuperadminAuthPage({
   const onLogin = async (data: LoginData) => {
     try {
       const response = await api.post("/auth/superadmin/login", data);
+      const payload = response.data.data as { requires_otp: true; email: string };
+      setPendingIdentifier(data.identifier);
+      setOtpEmail(payload.email);
+      setLoginStep("otp");
+      toast.success(`Code sent to ${payload.email}`);
+    } catch (error) {
+      toast.error(toMessage(error, "Unable to connect"));
+    }
+  };
+
+  const onOtpSubmit = async (data: OtpData) => {
+    try {
+      const response = await api.post("/auth/superadmin/verify-otp", {
+        identifier: pendingIdentifier,
+        code: data.code,
+      });
       const payload = response.data.data as {
         admin: { id: string; email: string; phone?: string };
         tokens: { access_token: string; refresh_token: string };
@@ -123,7 +152,7 @@ export default function SuperadminAuthPage({
       toast.success("Connected");
       router.push(`/${locale}/superadmin/platform`);
     } catch (error) {
-      toast.error(toMessage(error, "Unable to connect"));
+      toast.error(toMessage(error, "Invalid or expired code"));
     }
   };
 
@@ -246,7 +275,7 @@ export default function SuperadminAuthPage({
                 )}
               </Button>
             </form>
-          ) : (
+          ) : loginStep === "credentials" ? (
             <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="login_identifier">Email or phone</Label>
@@ -282,6 +311,54 @@ export default function SuperadminAuthPage({
                   "Connect"
                 )}
               </Button>
+            </form>
+          ) : (
+            <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-4">
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-brand-500/10 border border-brand-500/20">
+                <Mail className="h-4 w-4 text-brand-400 shrink-0" />
+                <p className="text-sm text-slate-300">Code sent to <span className="font-medium text-white">{otpEmail}</span></p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="otp_code">6-digit code</Label>
+                <Input
+                  id="otp_code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoFocus
+                  placeholder="123456"
+                  className="text-center text-xl tracking-widest font-mono"
+                  {...otpForm.register("code")}
+                />
+                {otpForm.formState.errors.code && (
+                  <p className="text-xs text-red-400">{otpForm.formState.errors.code.message}</p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-10 text-base font-semibold"
+                disabled={otpForm.formState.isSubmitting}
+              >
+                {otpForm.formState.isSubmitting ? (
+                  <>
+                    <Spinner size="sm" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Verify"
+                )}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => { setLoginStep("credentials"); otpForm.reset(); }}
+                className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-300 mx-auto"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back
+              </button>
             </form>
           )}
         </CardContent>
