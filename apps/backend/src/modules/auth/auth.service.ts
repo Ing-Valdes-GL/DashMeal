@@ -16,7 +16,7 @@ import type {
 export async function registerUser(input: RegisterUserInput) {
   const { name, phone, password } = input;
 
-  // Vérifier si le numéro existe déjà
+  // Bloquer si le numéro est déjà un compte vérifié
   const { data: existing } = await supabase
     .from("users")
     .select("id")
@@ -28,15 +28,18 @@ export async function registerUser(input: RegisterUserInput) {
   }
 
   const password_hash = await bcrypt.hash(password, 12);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-  const { data: user, error } = await supabase
-    .from("users")
-    .insert({ name, phone, password_hash, is_verified: false })
-    .select("id, name, phone, is_verified")
-    .single();
+  // Stocker temporairement — aucun compte créé avant la vérification OTP
+  const { error: pendingErr } = await supabase.from("pending_registrations").upsert({
+    phone,
+    name,
+    password_hash,
+    expires_at: expiresAt.toISOString(),
+  });
 
-  if (error || !user) {
-    throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte");
+  if (pendingErr) {
+    throw new AppError(500, "REGISTRATION_ERROR", "Échec de l'inscription temporaire");
   }
 
   const { smsSent, code } = await sendOtp(phone);
@@ -44,9 +47,8 @@ export async function registerUser(input: RegisterUserInput) {
 
   return {
     message: smsSent && !env.OTP_EXPOSE_CODE
-      ? "Compte créé. Un code OTP a été envoyé par SMS."
-      : "Compte créé. SMS non livré — utilisez le code ci-dessous.",
-    user_id: user.id,
+      ? "Code OTP envoyé par SMS. Vérifiez votre téléphone."
+      : "SMS non livré — utilisez le code ci-dessous.",
     ...(exposeCode ? { otp_code: code } : {}),
   };
 }
@@ -59,16 +61,31 @@ export async function verifyUserPhone(input: VerifyOtpInput) {
     throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
   }
 
-  const { data: user } = await supabase
-    .from("users")
-    .update({ is_verified: true })
+  // Récupérer les données d'inscription en attente
+  const { data: pending } = await supabase
+    .from("pending_registrations")
+    .select("name, password_hash")
     .eq("phone", phone)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+
+  if (!pending) {
+    throw new AppError(400, "REGISTRATION_EXPIRED", "Session d'inscription expirée. Recommencez l'inscription.");
+  }
+
+  // Créer le compte maintenant que l'OTP est validé
+  const { data: user, error } = await supabase
+    .from("users")
+    .insert({ name: pending.name, phone, password_hash: pending.password_hash, is_verified: true })
     .select("id, name, phone, is_verified")
     .single();
 
-  if (!user) {
-    throw new AppError(404, "USER_NOT_FOUND", "Utilisateur introuvable");
+  if (error || !user) {
+    throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte");
   }
+
+  // Nettoyer la session temporaire
+  await supabase.from("pending_registrations").delete().eq("phone", phone);
 
   const tokens = buildUserTokens(user);
   return { user, tokens };
