@@ -48,7 +48,7 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
       body: JSON.stringify({
         api_key: env.TERMII_API_KEY,
         to: normalized,
-        from: env.TERMII_SENDER_ID,
+        ...(env.TERMII_SENDER_ID ? { from: env.TERMII_SENDER_ID } : {}),
         sms: `Votre code de vérification Dash Meal : ${code}. Valable ${OTP_EXPIRES_IN_MINUTES} minutes.`,
         type: "plain",
         channel: "generic",
