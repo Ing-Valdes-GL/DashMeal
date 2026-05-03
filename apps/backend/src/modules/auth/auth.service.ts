@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { supabase } from "../../config/supabase.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../utils/jwt.js";
 import { sendOtp, verifyOtp } from "../../utils/otp.js";
+import { sendEmailOtp } from "../../utils/email.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { env } from "../../config/env.js";
 import type {
@@ -118,7 +119,7 @@ export async function loginUser(input: LoginUserInput): Promise<{ user: object; 
   return { user: safeUser, tokens };
 }
 
-export async function loginAdmin(input: LoginAdminInput): Promise<{ admin: object; tokens: AuthTokens }> {
+export async function loginAdmin(input: LoginAdminInput): Promise<{ requires_otp: true; email: string }> {
   const { identifier, password } = input;
 
   const isEmail = identifier.includes("@");
@@ -144,12 +145,42 @@ export async function loginAdmin(input: LoginAdminInput): Promise<{ admin: objec
     throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
   }
 
+  const { emailSent, code } = await sendEmailOtp(admin.email);
+  if (!emailSent) {
+    console.warn(`⚠️  Email OTP non envoyé pour ${admin.email} — code: ${code}`);
+  }
+
+  return { requires_otp: true, email: admin.email };
+}
+
+export async function verifyAdminOtp(input: { identifier: string; code: string }): Promise<{ admin: object; tokens: AuthTokens }> {
+  const { identifier, code } = input;
+
+  const isEmail = identifier.includes("@");
+  const query = supabase
+    .from("admins")
+    .select("id, username, email, phone, brand_id, role, is_active, password_hash");
+
+  const { data: admin } = await (isEmail
+    ? query.eq("email", identifier)
+    : query.eq("phone", identifier)
+  ).single();
+
+  if (!admin) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  const isValid = await verifyOtp(admin.email, code);
+  if (!isValid) {
+    throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
+  }
+
   const { password_hash: _, ...safeAdmin } = admin;
   const tokens = buildAdminTokens(admin);
   return { admin: safeAdmin, tokens };
 }
 
-export async function loginSuperAdmin(input: LoginAdminInput): Promise<{ admin: object; tokens: AuthTokens }> {
+export async function loginSuperAdmin(input: LoginAdminInput): Promise<{ requires_otp: true; email: string }> {
   const { identifier, password } = input;
 
   const isEmail = identifier.includes("@");
@@ -169,6 +200,36 @@ export async function loginSuperAdmin(input: LoginAdminInput): Promise<{ admin: 
   const valid = await bcrypt.compare(password, superAdmin.password_hash);
   if (!valid) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  const { emailSent, code } = await sendEmailOtp(superAdmin.email);
+  if (!emailSent) {
+    console.warn(`⚠️  Email OTP non envoyé pour ${superAdmin.email} — code: ${code}`);
+  }
+
+  return { requires_otp: true, email: superAdmin.email };
+}
+
+export async function verifySuperAdminOtp(input: { identifier: string; code: string }): Promise<{ admin: object; tokens: AuthTokens }> {
+  const { identifier, code } = input;
+
+  const isEmail = identifier.includes("@");
+  const query = supabase
+    .from("super_admins")
+    .select("id, email, phone, password_hash");
+
+  const { data: superAdmin } = await (isEmail
+    ? query.eq("email", identifier)
+    : query.eq("phone", identifier)
+  ).single();
+
+  if (!superAdmin) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  const isValid = await verifyOtp(superAdmin.email, code);
+  if (!isValid) {
+    throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
   }
 
   const { password_hash: _, ...safeSuperAdmin } = superAdmin;

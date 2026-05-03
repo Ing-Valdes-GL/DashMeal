@@ -46,9 +46,27 @@ export async function loginAdmin(req: Request, res: Response, next: NextFunction
   }
 }
 
+export async function verifyAdminOtp(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.verifyAdminOtp(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function loginSuperAdmin(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await authService.loginSuperAdmin(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifySuperAdminOtp(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.verifySuperAdminOtp(req.body);
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     next(err);

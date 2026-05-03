@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use } from "react";
+import { use, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,17 +16,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Mail, ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import logo from "@/assets/logo.png";
-import { useState } from "react";
 
 const LoginSchema = z.object({
   identifier: z.string().min(1),
   password: z.string().min(1),
 });
 
+const OtpSchema = z.object({
+  code: z.string().length(6, "Le code doit contenir 6 chiffres"),
+});
+
 type LoginData = z.infer<typeof LoginSchema>;
+type OtpData = z.infer<typeof OtpSchema>;
 
 export default function LoginPage({
   params,
@@ -35,6 +39,9 @@ export default function LoginPage({
 }) {
   const { locale } = use(params);
   const [showPassword, setShowPassword] = useState(false);
+  const [step, setStep] = useState<"credentials" | "otp">("credentials");
+  const [pendingIdentifier, setPendingIdentifier] = useState("");
+  const [otpEmail, setOtpEmail] = useState("");
   const t = useTranslations("auth");
   const router = useRouter();
   const { login } = useAuthStore();
@@ -45,9 +52,36 @@ export default function LoginPage({
     formState: { errors, isSubmitting },
   } = useForm<LoginData>({ resolver: zodResolver(LoginSchema) });
 
+  const {
+    register: registerOtp,
+    handleSubmit: handleOtpSubmit,
+    formState: { errors: otpErrors, isSubmitting: isOtpSubmitting },
+    reset: resetOtp,
+  } = useForm<OtpData>({ resolver: zodResolver(OtpSchema) });
+
   const onSubmit = async (data: LoginData) => {
     try {
       const res = await api.post("/auth/admin/login", data);
+      const payload = res.data.data as { requires_otp: true; email: string };
+      setPendingIdentifier(data.identifier);
+      setOtpEmail(payload.email);
+      setStep("otp");
+      toast.success(`Code envoyé à ${payload.email}`);
+    } catch (error) {
+      const message =
+        error instanceof AxiosError
+          ? (error.response?.data as { error?: { message?: string } })?.error?.message
+          : undefined;
+      toast.error(message ?? t("loginError"));
+    }
+  };
+
+  const onOtpSubmit = async (data: OtpData) => {
+    try {
+      const res = await api.post("/auth/admin/verify-otp", {
+        identifier: pendingIdentifier,
+        code: data.code,
+      });
       const payload = res.data.data as {
         admin: {
           id: string;
@@ -58,17 +92,9 @@ export default function LoginPage({
           brand_id?: string;
           brand_name?: string;
         };
-        tokens: {
-          access_token: string;
-          refresh_token: string;
-        };
+        tokens: { access_token: string; refresh_token: string };
       };
       const { admin, tokens } = payload;
-
-      if (admin.role !== "admin" && admin.role !== "superadmin") {
-        toast.error(t("loginError"));
-        return;
-      }
 
       login(
         {
@@ -91,9 +117,77 @@ export default function LoginPage({
         error instanceof AxiosError
           ? (error.response?.data as { error?: { message?: string } })?.error?.message
           : undefined;
-      toast.error(message ?? t("loginError"));
+      toast.error(message ?? "Code invalide ou expiré");
     }
   };
+
+  if (step === "otp") {
+    return (
+      <div className="mx-auto max-w-sm w-full">
+        <div className="flex flex-col items-center mb-8">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/10 border border-brand-500/30 mb-4">
+            <Mail className="h-7 w-7 text-brand-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">Vérification</h1>
+          <p className="mt-1 text-sm text-slate-500 text-center">
+            Code envoyé à<br />
+            <span className="font-medium text-slate-700">{otpEmail}</span>
+          </p>
+        </div>
+
+        <Card className="border-slate-200 bg-white shadow-card">
+          <CardContent className="pt-6">
+            <form onSubmit={handleOtpSubmit(onOtpSubmit)} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="code">Code OTP (6 chiffres)</Label>
+                <Input
+                  id="code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoFocus
+                  placeholder="123456"
+                  className={`text-center text-xl tracking-widest font-mono ${otpErrors.code ? "border-red-500" : ""}`}
+                  {...registerOtp("code")}
+                />
+                {otpErrors.code && (
+                  <p className="text-xs text-red-400">{otpErrors.code.message}</p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full h-10 text-base font-semibold"
+                disabled={isOtpSubmitting}
+              >
+                {isOtpSubmitting ? (
+                  <>
+                    <Spinner size="sm" />
+                    Vérification...
+                  </>
+                ) : (
+                  "Vérifier"
+                )}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => { setStep("credentials"); resetOtp(); }}
+                className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mx-auto"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Retour
+              </button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <p className="mt-6 text-center text-xs text-slate-400">
+          Dash Meal Cameroun {new Date().getFullYear()}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-sm w-full">

@@ -29,6 +29,11 @@ router.post(
 
 // ─── Admin (marque) ───────────────────────────────────────────────────────────
 router.post("/admin/login", validate(LoginAdminSchema), controller.loginAdmin);
+router.post(
+  "/admin/verify-otp",
+  validate(z.object({ identifier: z.string().min(1), code: z.string().length(6) })),
+  controller.verifyAdminOtp
+);
 
 // ─── Super Admin ──────────────────────────────────────────────────────────────
 router.post(
@@ -43,6 +48,11 @@ router.post(
   controller.registerSuperAdmin
 );
 router.post("/superadmin/login", validate(LoginAdminSchema), controller.loginSuperAdmin);
+router.post(
+  "/superadmin/verify-otp",
+  validate(z.object({ identifier: z.string().min(1), code: z.string().length(6) })),
+  controller.verifySuperAdminOtp
+);
 
 // ─── Demande d'accès marque (landing page) ───────────────────────────────────
 router.post(
