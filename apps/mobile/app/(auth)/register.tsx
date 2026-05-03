@@ -31,12 +31,13 @@ export default function RegisterScreen() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
 
   const registerMutation = useMutation({
-    mutationFn: () => apiPost<{ data: { otp_code?: string } }>("/auth/user/register", { name, phone, password }),
+    mutationFn: () => apiPost<{ data: { otp_code?: string } }>("/auth/user/register", { name, phone, password, ...(email.trim() ? { email: email.trim() } : {}) }),
     onSuccess: (res) => {
       router.push({ pathname: "/(auth)/otp", params: { phone, prefill: res.data.otp_code ?? "" } });
     },
@@ -87,6 +88,21 @@ export default function RegisterScreen() {
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
+              />
+            </View>
+
+            <Text style={[styles.label, { marginTop: 16 }]}>EMAIL <Text style={styles.optional}>(optionnel)</Text></Text>
+            <View style={styles.inputWrap}>
+              <Ionicons name="mail-outline" size={18} color={Colors.text3} style={styles.icon} />
+              <TextInput
+                style={styles.input}
+                placeholder="ex : jean@email.com"
+                placeholderTextColor={Colors.text3}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                value={email}
+                onChangeText={setEmail}
               />
             </View>
 
@@ -152,6 +168,7 @@ const styles = StyleSheet.create({
   },
   icon:  { marginRight: 10 },
   input: { flex: 1, color: "#fff", fontSize: 15 },
+  optional: { color: Colors.text3, fontWeight: "400", fontSize: 10, letterSpacing: 0 },
   error: { color: "#FF6B6B", fontSize: 13, textAlign: "center", marginTop: 8 },
   btn: {
     height: 52, borderRadius: Radius.full,

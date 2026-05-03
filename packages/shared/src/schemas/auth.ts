@@ -8,6 +8,7 @@ export const RegisterUserSchema = z.object({
     .string()
     .regex(/^\+?[1-9]\d{7,14}$/, "Numéro de téléphone invalide"),
   password: z.string().min(8).max(100),
+  email: z.string().email().optional(),
 });
 
 export const LoginUserSchema = z.object({
