@@ -17,9 +17,10 @@
 import { supabase } from "../config/supabase.js";
 import { notifyUser } from "../utils/push.js";
 
-const STALE_THRESHOLD_MS = 15 * 60 * 1000;  // commande figée depuis 15 min
-const CHECK_INTERVAL_MS  =  5 * 60 * 1000;  // vérifier toutes les 5 min
-const NOTIF_COOLDOWN_MS  =  2 * 60 * 60 * 1000; // pas de re-notif avant 2h
+const STALE_THRESHOLD_MS = 15 * 60 * 1000;       // commande figée depuis 15 min
+const STALE_MAX_AGE_MS   = 24 * 60 * 60 * 1000;  // ignorer commandes > 24h (abandonnées)
+const CHECK_INTERVAL_MS  =  5 * 60 * 1000;        // vérifier toutes les 5 min
+const NOTIF_COOLDOWN_MS  =  2 * 60 * 60 * 1000;   // pas de re-notif avant 2h
 const ACTIVE_STATUSES    = ["pending", "confirmed", "preparing", "delivering"];
 // "ready" exclu volontairement : l'admin envoie déjà une notif au changement de statut
 
@@ -63,13 +64,15 @@ function markNotified(orderId: string, status: string) {
 }
 
 async function checkStaleOrders() {
-  const threshold = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
+  const threshold   = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
+  const maxAge      = new Date(Date.now() - STALE_MAX_AGE_MS).toISOString();
 
   const { data: orders, error } = await supabase
     .from("orders")
     .select("id, user_id, status, updated_at")
     .in("status", ACTIVE_STATUSES)
-    .lt("updated_at", threshold);
+    .lt("updated_at", threshold)
+    .gt("updated_at", maxAge); // ignorer les commandes abandonnées depuis plus de 24h
 
   if (error) {
     console.error("[StaleNotifier] Erreur récupération commandes:", error.message);
