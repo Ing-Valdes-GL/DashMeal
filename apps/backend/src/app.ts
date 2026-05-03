@@ -36,6 +36,8 @@ const app: Application = express();
 
 // Railway / reverse-proxy — faire confiance au premier proxy
 app.set("trust proxy", 1);
+// Désactiver ETags — évite les 304 Not Modified sur les endpoints de polling (ex: payment status)
+app.disable("etag");
 
 // ─── Sécurité ─────────────────────────────────────────────────────────────────
 app.use(helmet());
