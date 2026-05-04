@@ -47,6 +47,13 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
       .in("branch_id", branchIds)
       .eq("stock_qty", 0);
 
+    // Commandes en attente (toutes, pas limitées à la période)
+    const { count: pendingOrders } = await supabase
+      .from("orders")
+      .select("id", { count: "exact" })
+      .in("branch_id", branchIds)
+      .eq("status", "pending");
+
     // CA par jour (delivered orders uniquement)
     const deliveredOrders = allOrders.filter((o) => o.status === "delivered");
     const byDay: Record<string, { revenue: number; orders: number }> = {};
@@ -110,6 +117,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
 
     sendSuccess(res, {
       period_days: days,
+      pending_orders: pendingOrders ?? 0,
       today: {
         revenue: Math.round(todayRevenue),
         orders: todayOrders.length,
@@ -139,6 +147,7 @@ export async function getDashboard(req: Request, res: Response, next: NextFuncti
 function emptyDashboard() {
   return {
     period_days: 30,
+    pending_orders: 0,
     today: { revenue: 0, orders: 0, avg_order: 0, out_of_stock: 0 },
     period: { revenue: 0, orders: 0, delivered: 0, avg_order: 0, conversion_rate: 0 },
     revenue_by_day: [],
