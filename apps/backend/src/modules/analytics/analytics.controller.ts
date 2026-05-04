@@ -8,19 +8,29 @@ import { sendSuccess } from "../../utils/response.js";
 
 export async function getDashboard(req: Request, res: Response, next: NextFunction) {
   try {
-    const brand_id = req.user!.brand_id;
-    if (!brand_id) throw new AppError(403, "FORBIDDEN", "Accès réservé aux admins de marque");
+    const role      = req.user!.role;
+    const brand_id  = req.user!.brand_id;
+    const branch_id = req.user!.branch_id; // branch_manager only
+
+    if (!brand_id && role !== "branch_manager") {
+      throw new AppError(403, "FORBIDDEN", "Accès réservé aux admins de marque");
+    }
 
     const days = Math.max(1, Math.min(365, parseInt(req.query.days as string) || 30));
     const since = new Date(Date.now() - days * 86400_000).toISOString();
     const todayStart = new Date().toISOString().split("T")[0] + "T00:00:00";
 
-    // Récupérer toutes les agences de la marque
-    const { data: branches } = await supabase
-      .from("branches")
-      .select("id")
-      .eq("brand_id", brand_id);
-    const branchIds = (branches ?? []).map((b: any) => b.id);
+    // Branch manager → une seule agence ; admin → toutes les agences de la marque
+    let branchIds: string[];
+    if (role === "branch_manager" && branch_id) {
+      branchIds = [branch_id];
+    } else {
+      const { data: branches } = await supabase
+        .from("branches")
+        .select("id")
+        .eq("brand_id", brand_id!);
+      branchIds = (branches ?? []).map((b: any) => b.id);
+    }
 
     if (branchIds.length === 0) {
       return sendSuccess(res, emptyDashboard());

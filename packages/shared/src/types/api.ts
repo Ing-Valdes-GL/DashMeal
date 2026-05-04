@@ -39,4 +39,5 @@ export interface AuthUser {
   email?: string;
   phone?: string;
   brand_id?: string;
+  branch_id?: string; // branch_manager only
 }

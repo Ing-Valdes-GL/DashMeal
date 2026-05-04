@@ -19,7 +19,27 @@
       "WebFetch(domain:documenter.getpostman.com)",
       "WebFetch(domain:www.postman.com)",
       "Bash(pnpm --filter @dash-meal/mobile typecheck)",
-      "Bash(pnpm --filter @dash-meal/backend typecheck)"
+      "Bash(pnpm --filter @dash-meal/backend typecheck)",
+      "Bash(eas build *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\NTS\\\\Documents\\\\Dash meal Admin et Super Admin\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(pnpm --filter @dash-meal/backend add resend)",
+      "Bash(git commit -m 'fix: shared tsconfig — disable implicit @types to prevent uuid resolution error on Vercel *)",
+      "Bash(git commit -m 'fix: admin tsconfig — pin types to node to prevent implicit uuid resolution on Vercel *)",
+      "Bash(git commit -m 'fix: unwrap API response envelope in auth screens *)",
+      "Bash(git commit -m 'fix: set verified Resend sender domain to support.alluvihealth.store *)",
+      "Bash(git commit -m 'feat: optional email at registration — OTP sent via SMS + email simultaneously *)",
+      "Bash(git commit -m 'fix: disable ETag to prevent 304 on payment polling + cap stale notifier at 24h *)",
+      "Bash(git commit -m 'fix: admin session — middleware accepts refresh token + extend access cookie to 7d *)",
+      "Bash(Get-ChildItem -Path \"apps/admin/src/app\" -Recurse -Force -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Recurse \"c:\\\\Users\\\\NTS\\\\Documents\\\\Dash meal Admin et Super Admin\\\\apps\\\\admin\\\\src\\\\app\\\\[locale]\\\\\\(branch\\)\" -Name)",
+      "Bash(Get-ChildItem -Path apps/backend/src/modules -Directory)",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(npm install *)"
     ]
   }
 }
