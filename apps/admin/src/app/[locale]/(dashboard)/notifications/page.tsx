@@ -55,18 +55,12 @@ export default function NotificationsPage() {
 
   const sendMutation = useMutation({
     mutationFn: (d: NotifForm) => {
-      if (mode === "broadcast") {
-        return apiPost("/notifications/broadcast", {
-          title: { fr: d.title_fr, en: d.title_en },
-          body: { fr: d.body_fr, en: d.body_en },
-          type: d.type,
-        });
-      }
-      return apiPost("/notifications/send", {
-        title: { fr: d.title_fr, en: d.title_en },
-        body: { fr: d.body_fr, en: d.body_en },
+      const payload = {
+        title_fr: d.title_fr, title_en: d.title_en,
+        body_fr: d.body_fr,   body_en: d.body_en,
         type: d.type,
-      });
+      };
+      return apiPost(mode === "broadcast" ? "/notifications/broadcast" : "/notifications/send", payload);
     },
     onSuccess: () => {
       toast.success(t("sent"));
