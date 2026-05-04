@@ -1,6 +1,11 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import * as Localization from "expo-localization";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const LANG_KEY = "dm_language";
+const SUPPORTED = ["fr", "en"] as const;
+type SupportedLang = (typeof SUPPORTED)[number];
 
 const fr = {
   common: {
@@ -232,19 +237,35 @@ const en: typeof fr = {
   },
 };
 
-const deviceLocale = Localization.getLocales()[0]?.languageCode ?? "fr";
+function getDeviceLang(): SupportedLang {
+  const code = Localization.getLocales()[0]?.languageCode ?? "fr";
+  return (SUPPORTED as readonly string[]).includes(code) ? (code as SupportedLang) : "fr";
+}
 
-i18n
-  .use(initReactI18next)
-  .init({
-    resources: {
-      fr: { translation: fr },
-      en: { translation: en },
-    },
-    lng: ["fr", "en"].includes(deviceLocale) ? deviceLocale : "fr",
-    fallbackLng: "fr",
-    interpolation: { escapeValue: false },
-    compatibilityJSON: "v3",
-  });
+// Initialisation synchrone avec la langue du device (sera éventuellement remplacée par la préférence sauvegardée)
+i18n.use(initReactI18next).init({
+  resources: {
+    fr: { translation: fr },
+    en: { translation: en },
+  },
+  lng: getDeviceLang(),
+  fallbackLng: "fr",
+  interpolation: { escapeValue: false },
+  compatibilityJSON: "v3",
+});
 
+// Charge la préférence sauvegardée de manière asynchrone et l'applique si elle diffère
+AsyncStorage.getItem(LANG_KEY).then((saved) => {
+  if (saved && (SUPPORTED as readonly string[]).includes(saved) && saved !== i18n.language) {
+    i18n.changeLanguage(saved);
+  }
+});
+
+/** Changer la langue manuellement (depuis les paramètres du profil) */
+export async function setLanguage(lang: SupportedLang) {
+  await AsyncStorage.setItem(LANG_KEY, lang);
+  await i18n.changeLanguage(lang);
+}
+
+export type { SupportedLang };
 export default i18n;
