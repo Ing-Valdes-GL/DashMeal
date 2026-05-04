@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { branchApiGet, branchApiPatch } from "@/lib/branch-api";
+import { branchApiGet, branchApiPatch, branchApiPost } from "@/lib/branch-api";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Clock, ChevronRight, X } from "lucide-react";
+import { Search, Clock, ChevronRight, X, QrCode, ScanLine } from "lucide-react";
 
 type OrderStatus = "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
 
@@ -67,6 +67,8 @@ export default function BranchOrdersPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Order | null>(null);
+  const [qrInput, setQrInput] = useState("");
+  const [showQrScan, setShowQrScan] = useState(false);
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ["branch-orders"],
@@ -84,6 +86,20 @@ export default function BranchOrdersPage() {
       setSelected(null);
     },
     onError: () => toast.error("Mise à jour échouée"),
+  });
+
+  const scanMutation = useMutation({
+    mutationFn: (qr_code: string) => branchApiPost("/collect/scan", { qr_code }),
+    onSuccess: (data: any) => {
+      toast.success(`Retrait validé — ${data?.customer?.name ?? "Client"}`);
+      qc.invalidateQueries({ queryKey: ["branch-orders"] });
+      setShowQrScan(false);
+      setQrInput("");
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.error?.message ?? "QR invalide ou commande non prête";
+      toast.error(msg);
+    },
   });
 
   const cancelMutation = useMutation({
@@ -115,14 +131,19 @@ export default function BranchOrdersPage() {
           <h1 className="text-2xl font-bold text-slate-900">Commandes</h1>
           <p className="text-sm text-slate-500 mt-0.5">Kanban en temps réel</p>
         </div>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Chercher commande, client..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 text-sm"
-          />
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowQrScan(true)}>
+            <QrCode className="h-4 w-4" />Scanner QR
+          </Button>
+          <div className="relative w-56">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Chercher..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 text-sm"
+            />
+          </div>
         </div>
       </div>
 
@@ -166,6 +187,39 @@ export default function BranchOrdersPage() {
           );
         })}
       </div>
+
+      {/* QR Scan dialog */}
+      <Dialog open={showQrScan} onOpenChange={(o) => { setShowQrScan(o); if (!o) setQrInput(""); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ScanLine className="h-5 w-5 text-brand-600" />
+              Scanner le QR Click & Collect
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl bg-brand-50 border border-brand-100 p-4 text-center">
+              <QrCode className="h-12 w-12 text-brand-400 mx-auto mb-2" />
+              <p className="text-xs text-slate-500">Scannez le QR code du client ou saisissez le code à 6 chiffres</p>
+            </div>
+            <Input
+              placeholder="Code QR ou code numérique à 6 chiffres"
+              value={qrInput}
+              onChange={(e) => setQrInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && qrInput.trim()) scanMutation.mutate(qrInput.trim()); }}
+              autoFocus
+              className="text-center text-lg tracking-widest font-mono"
+            />
+            <Button
+              className="w-full bg-brand-600 hover:bg-brand-700"
+              disabled={!qrInput.trim() || scanMutation.isPending}
+              onClick={() => scanMutation.mutate(qrInput.trim())}
+            >
+              {scanMutation.isPending ? "Vérification..." : "Valider le retrait"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Order detail dialog */}
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>

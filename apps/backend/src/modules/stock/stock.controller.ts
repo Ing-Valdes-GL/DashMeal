@@ -6,7 +6,7 @@ import { sendSuccess, sendPaginated } from "../../utils/response.js";
 // ─── GET /stock/:branch_id — liste le stock complet d'une agence ──────────────
 export async function getBranchStock(req: Request, res: Response, next: NextFunction) {
   try {
-    const branch_id = req.params.branch_id;
+    const branch_id = String(req.params.branch_id);
     await assertBranchAccess(req, branch_id);
 
     const { low_stock } = req.query;
@@ -30,7 +30,8 @@ export async function getBranchStock(req: Request, res: Response, next: NextFunc
 // ─── PATCH /stock/:branch_id/:product_id — ajuster le stock ──────────────────
 export async function updateStockItem(req: Request, res: Response, next: NextFunction) {
   try {
-    const { branch_id, product_id } = req.params;
+    const branch_id  = String(req.params.branch_id);
+    const product_id = String(req.params.product_id);
     await assertBranchAccess(req, branch_id);
 
     const { quantity, type, note } = req.body as {
@@ -81,7 +82,7 @@ export async function updateStockItem(req: Request, res: Response, next: NextFun
 // ─── POST /stock/:branch_id/bulk — mise à jour en masse ──────────────────────
 export async function bulkUpdateStock(req: Request, res: Response, next: NextFunction) {
   try {
-    const branch_id = req.params.branch_id;
+    const branch_id = String(req.params.branch_id);
     await assertBranchAccess(req, branch_id);
 
     const items = req.body.items as Array<{
@@ -130,7 +131,7 @@ export async function bulkUpdateStock(req: Request, res: Response, next: NextFun
 // ─── GET /stock/:branch_id/movements — historique ────────────────────────────
 export async function getStockMovements(req: Request, res: Response, next: NextFunction) {
   try {
-    const branch_id = req.params.branch_id;
+    const branch_id = String(req.params.branch_id);
     await assertBranchAccess(req, branch_id);
 
     const page       = Math.max(1, parseInt(req.query.page       as string) || 1);
@@ -161,7 +162,7 @@ export async function getStockMovements(req: Request, res: Response, next: NextF
 // ─── GET /stock/:branch_id/alerts — produits sous le seuil d'alerte ──────────
 export async function getStockAlerts(req: Request, res: Response, next: NextFunction) {
   try {
-    const branch_id = req.params.branch_id;
+    const branch_id = String(req.params.branch_id);
     await assertBranchAccess(req, branch_id);
 
     const threshold = parseInt(req.query.threshold as string) || 5;

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
@@ -59,43 +60,28 @@ export async function requestDriverWithdrawal(req: Request, res: Response, next:
 
     if (amount < 500) throw new AppError(400, "MIN_AMOUNT", "Montant minimum : 500 FCFA");
 
-    // Lock + check balance atomique
     const { data: wallet } = await supabase
       .from("driver_wallets")
-      .select("id, balance")
+      .select("id, balance, total_withdrawn")
       .eq("driver_id", driver_id)
       .single();
 
     if (!wallet)              throw new AppError(404, "NOT_FOUND",       "Wallet introuvable");
     if (wallet.balance < amount) throw new AppError(400, "INSUFFICIENT_BALANCE", "Solde insuffisant");
 
-    // Initier le paiement Campay
-    const campayRef = await campayWithdraw({ amount, phone, description: `Retrait livreur ${driver_id.slice(0, 8)}` });
-
-    const newBalance = Number(wallet.balance) - amount;
-
-    // Débit + transaction
-    await supabase.from("driver_wallets")
-      .update({ balance: newBalance, total_withdrawn: supabase.rpc as any, updated_at: new Date().toISOString() })
-      .eq("driver_id", driver_id);
-
-    // Plus simple — update manuelle
-    await supabase.rpc("decrement_driver_wallet", { p_driver_id: driver_id, p_amount: amount }).catch(() => {
-      // fallback si la fonction RPC n'existe pas encore
+    const txId = crypto.randomUUID();
+    const campayRef = await campayWithdraw({
+      amount,
+      phone,
+      description: `Retrait livreur ${driver_id.slice(0, 8)}`,
+      externalReference: txId,
     });
 
-    await supabase.from("driver_wallets")
-      .update({
-        balance:         newBalance,
-        total_withdrawn: supabase.rpc as any, // on fait un update direct
-        updated_at:      new Date().toISOString(),
-      })
-      .eq("driver_id", driver_id);
+    const newBalance = Number(wallet.balance) - amount;
+    const newWithdrawn = Number(wallet.total_withdrawn ?? 0) + amount;
 
-    // Recalcul propre
-    const { data: fresh } = await supabase.from("driver_wallets").select("total_withdrawn").eq("driver_id", driver_id).single();
     await supabase.from("driver_wallets")
-      .update({ balance: newBalance, total_withdrawn: (fresh?.total_withdrawn ?? 0) + amount, updated_at: new Date().toISOString() })
+      .update({ balance: newBalance, total_withdrawn: newWithdrawn, updated_at: new Date().toISOString() })
       .eq("driver_id", driver_id);
 
     await supabase.from("driver_wallet_transactions").insert({

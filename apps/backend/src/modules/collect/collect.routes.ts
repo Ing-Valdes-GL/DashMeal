@@ -8,7 +8,7 @@ const router: import("express").Router = Router();
 router.get("/slots/:branchId", controller.getSlots);
 
 // ─── Côté caisse / admin : scanner le QR code pour valider le retrait ─────────
-router.post("/scan", authenticate, requireRole("admin", "superadmin"), controller.scanQrCode);
+router.post("/scan", authenticate, requireRole("admin", "superadmin", "branch_manager"), controller.scanQrCode);
 
 // ─── Côté utilisateur : voir son QR code pour une commande ───────────────────
 router.get("/order/:orderId", authenticate, requireRole("user"), controller.getCollectDetails);

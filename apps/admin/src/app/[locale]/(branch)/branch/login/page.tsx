@@ -42,7 +42,7 @@ export default function BranchLoginPage({ params }: { params: Promise<{ locale: 
     onSuccess: (data) => {
       login(data.manager, data.tokens.access_token, data.tokens.refresh_token);
       toast.success("Connexion réussie");
-      router.push(`/${locale}/branch-dashboard`);
+      router.push(`/${locale}/branch/dashboard`);
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.error?.message ?? "Identifiants incorrects";

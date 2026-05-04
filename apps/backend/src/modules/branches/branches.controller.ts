@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from "express";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
+import { sendBranchLiveRequestEmail, sendBranchLiveDecisionEmail } from "../../utils/email.js";
+import { env } from "../../config/env.js";
 import type { BranchType } from "@dash-meal/shared";
 
 const DEFAULT_CATEGORIES: Record<BranchType, { name_fr: string; name_en: string; icon: string; sort_order: number }[]> = {
@@ -168,7 +170,7 @@ export async function createBranch(req: Request, res: Response, next: NextFuncti
 
     const { data, error } = await supabase
       .from("branches")
-      .insert({ ...req.body, brand_id })
+      .insert({ ...req.body, brand_id, status: "draft" })
       .select()
       .single();
 
@@ -277,6 +279,110 @@ export async function getDeliveryZones(req: Request, res: Response, next: NextFu
 
     if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
     sendSuccess(res, data);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Upload image agence ───────────────────────────────────────────────────────
+export async function uploadBranchImage(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) throw new AppError(400, "NO_FILE", "Aucun fichier reçu");
+
+    const { id } = req.params;
+    const ext = req.file.originalname.split(".").pop()?.toLowerCase() ?? "jpg";
+    const filename = `branches/${id}/cover.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from(env.STORAGE_BUCKET_PRODUCTS ?? "product-images")
+      .upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+
+    if (uploadErr) throw new AppError(500, "UPLOAD_ERROR", "Erreur upload image");
+
+    const { data: urlData } = supabase.storage
+      .from(env.STORAGE_BUCKET_PRODUCTS ?? "product-images")
+      .getPublicUrl(filename);
+
+    await supabase.from("branches").update({ image_url: urlData.publicUrl }).eq("id", id);
+    sendSuccess(res, { image_url: urlData.publicUrl });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Demande de mise en ligne ──────────────────────────────────────────────────
+export async function requestLive(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+
+    const { data: branch, error: bErr } = await supabase
+      .from("branches")
+      .select("*, brands(id, name, admins(email, username))")
+      .eq("id", id)
+      .single();
+
+    if (bErr || !branch) throw new AppError(404, "NOT_FOUND", "Agence introuvable");
+    if (branch.status === "live") throw new AppError(400, "ALREADY_LIVE", "L'agence est déjà en ligne");
+    if (branch.status === "pending_approval") throw new AppError(400, "PENDING", "Demande déjà en cours");
+
+    await supabase.from("branches")
+      .update({ status: "pending_approval", go_live_requested_at: new Date().toISOString() })
+      .eq("id", id);
+
+    // Notifier l'admin par email
+    const brand = branch.brands as any;
+    const adminList = Array.isArray(brand?.admins) ? brand.admins : [brand?.admins].filter(Boolean);
+    for (const admin of adminList) {
+      if (admin?.email) {
+        await sendBranchLiveRequestEmail({
+          adminEmail: admin.email,
+          adminName: admin.username ?? "Admin",
+          branchName: branch.name,
+          branchEmail: branch.email ?? "—",
+        });
+      }
+    }
+
+    sendSuccess(res, { status: "pending_approval" }, "Demande de mise en ligne envoyée");
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Approuver / Rejeter la mise en ligne ─────────────────────────────────────
+export async function reviewLiveRequest(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const { approved, reason } = req.body as { approved: boolean; reason?: string };
+
+    const { data: branch, error: bErr } = await supabase
+      .from("branches")
+      .select("name, email, status")
+      .eq("id", id)
+      .single();
+
+    if (bErr || !branch) throw new AppError(404, "NOT_FOUND", "Agence introuvable");
+    if (branch.status !== "pending_approval") throw new AppError(400, "NOT_PENDING", "Aucune demande en attente");
+
+    const newStatus = approved ? "live" : "draft";
+    await supabase.from("branches")
+      .update({
+        status: newStatus,
+        approved_at: approved ? new Date().toISOString() : null,
+        approved_by: req.user!.id,
+      })
+      .eq("id", id);
+
+    if (branch.email) {
+      await sendBranchLiveDecisionEmail({
+        to: branch.email,
+        branchName: branch.name,
+        approved,
+        reason,
+      });
+    }
+
+    sendSuccess(res, { status: newStatus }, approved ? "Agence mise en ligne" : "Demande refusée");
   } catch (err) {
     next(err);
   }

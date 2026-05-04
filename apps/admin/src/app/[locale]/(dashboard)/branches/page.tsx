@@ -1,12 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { useRouter, useParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete, apiUpload } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,14 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Pencil, Trash2, MapPin, Phone, Clock, Store, Package } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, MapPin, Phone, Clock, Store, Package, Camera, Radio, CheckCircle, XCircle, Loader2 } from "lucide-react";
+
+const BRANCH_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  draft:            { label: "Brouillon",    color: "bg-slate-100 text-slate-600" },
+  pending_approval: { label: "En attente",   color: "bg-yellow-100 text-yellow-800" },
+  live:             { label: "En ligne",     color: "bg-green-100 text-green-800" },
+  suspended:        { label: "Suspendu",     color: "bg-red-100 text-red-800" },
+};
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
@@ -62,6 +69,9 @@ interface Branch {
   id: string; name: string; address: string; city: string;
   phone: string | null; lat: number; lng: number; type: string;
   is_active: boolean;
+  email: string | null;
+  image_url: string | null;
+  status: "draft" | "pending_approval" | "live" | "suspended";
   opening_hours: {
     slot_duration: number;
     slot_capacity: number;
@@ -107,6 +117,11 @@ export default function BranchesPage() {
   const [editing, setEditing] = useState<Branch | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Branch | null>(null);
   const [schedule, setSchedule] = useState<WeekSchedule>(DEFAULT_WEEK_SCHEDULE);
+  const [reviewTarget, setReviewTarget] = useState<Branch | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [imageUploading, setImageUploading] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const [imageTargetId, setImageTargetId] = useState<string | null>(null);
 
   const { data: branches, isLoading } = useQuery<Branch[]>({
     queryKey: ["branches"],
@@ -166,6 +181,34 @@ export default function BranchesPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["branches"] }),
   });
 
+  const reviewLiveMutation = useMutation({
+    mutationFn: ({ id, approved, reason }: { id: string; approved: boolean; reason?: string }) =>
+      apiPost(`/branches/${id}/review-live`, { approved, reason }),
+    onSuccess: (_, { approved }) => {
+      qc.invalidateQueries({ queryKey: ["branches"] });
+      toast.success(approved ? "Agence mise en ligne" : "Demande refusée");
+      setReviewTarget(null);
+      setRejectReason("");
+    },
+    onError: () => toast.error("Erreur"),
+  });
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !imageTargetId) return;
+    setImageUploading(imageTargetId);
+    try {
+      await apiUpload(`/branches/${imageTargetId}/image`, file, "image");
+      qc.invalidateQueries({ queryKey: ["branches"] });
+      toast.success("Image mise à jour");
+    } catch {
+      toast.error("Erreur lors de l'upload");
+    } finally {
+      setImageUploading(null);
+      setImageTargetId(null);
+    }
+  };
+
   // ── Ouvrir modal ────────────────────────────────────────────────────────────
 
   const openCreate = () => {
@@ -217,26 +260,42 @@ export default function BranchesPage() {
         <Button onClick={openCreate}><Plus className="h-4 w-4" />{t("addBranch")}</Button>
       </div>
 
+      {/* hidden file input for image upload */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handleImageUpload}
+      />
+
       {/* Grille d'agences */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => (
               <Card key={i}><CardContent className="p-5"><Skeleton className="h-32 w-full" /></CardContent></Card>
             ))
-          : (branches ?? []).map((b) => (
+          : (branches ?? []).map((b) => {
+            const statusCfg = BRANCH_STATUS_CONFIG[b.status ?? "draft"] ?? BRANCH_STATUS_CONFIG.draft;
+            return (
               <Card key={b.id} className={b.is_active ? "" : "opacity-60"}>
+                {/* Branch image */}
+                {b.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={b.image_url} alt={b.name} className="w-full h-32 object-cover rounded-t-xl" />
+                )}
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
-                        <Store className="h-5 w-5 text-brand-400" />
-                      </div>
+                      {!b.image_url && (
+                        <div className="h-10 w-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center">
+                          <Store className="h-5 w-5 text-brand-400" />
+                        </div>
+                      )}
                       <div>
                         <CardTitle className="text-base">{b.name}</CardTitle>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <Badge variant={b.is_active ? "active" : "inactive"}>
-                            {b.is_active ? "Actif" : "Inactif"}
-                          </Badge>
+                          <Badge className={`text-[10px] ${statusCfg.color}`}>{statusCfg.label}</Badge>
                           <span className="text-xs text-slate-500">
                             {BRANCH_TYPE_OPTIONS.find((o) => o.value === b.type)?.label ?? "📦 Autre"}
                           </span>
@@ -251,7 +310,21 @@ export default function BranchesPage() {
                         <DropdownMenuItem onClick={() => router.push(`/${params.locale}/branches/${b.id}`)}>
                           <Package className="mr-2 h-4 w-4 text-brand-400" />Gérer les produits
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setImageTargetId(b.id);
+                          setTimeout(() => imageInputRef.current?.click(), 50);
+                        }}>
+                          {imageUploading === b.id
+                            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            : <Camera className="mr-2 h-4 w-4" />}
+                          Photo de l'agence
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openEdit(b)}><Pencil className="mr-2 h-4 w-4" />Modifier</DropdownMenuItem>
+                        {b.status === "pending_approval" && (
+                          <DropdownMenuItem onClick={() => setReviewTarget(b)} className="text-green-700">
+                            <Radio className="mr-2 h-4 w-4" />Examiner la demande live
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => toggleMutation.mutate(b)}>
                           {b.is_active ? "Désactiver" : "Activer"}
                         </DropdownMenuItem>
@@ -289,7 +362,8 @@ export default function BranchesPage() {
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+            );
+          })}
       </div>
 
       {/* Modal agence */}
@@ -432,6 +506,55 @@ export default function BranchesPage() {
               <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "..." : "Enregistrer"}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal examen mise en ligne */}
+      <Dialog open={!!reviewTarget} onOpenChange={() => { setReviewTarget(null); setRejectReason(""); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Radio className="h-5 w-5 text-brand-500" />
+              Mise en ligne — {reviewTarget?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Vérifiez la configuration de l'agence avant d'approuver.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {reviewTarget && (
+              <div className="rounded-lg bg-slate-50 p-3 text-sm space-y-1">
+                <p><span className="text-slate-500">Adresse :</span> <span className="text-slate-800">{reviewTarget.address}, {reviewTarget.city}</span></p>
+                <p><span className="text-slate-500">Email :</span> <span className="text-slate-800">{reviewTarget.email ?? "—"}</span></p>
+                <p><span className="text-slate-500">Type :</span> <span className="text-slate-800">{reviewTarget.type}</span></p>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-sm">Raison du refus (optionnel)</Label>
+              <Input
+                placeholder="Ex: Documents manquants, adresse incorrecte…"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700 gap-1.5"
+                disabled={reviewLiveMutation.isPending}
+                onClick={() => reviewLiveMutation.mutate({ id: reviewTarget!.id, approved: true })}
+              >
+                <CheckCircle className="h-4 w-4" />Approuver
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 border-red-200 text-red-600 hover:bg-red-50 gap-1.5"
+                disabled={reviewLiveMutation.isPending}
+                onClick={() => reviewLiveMutation.mutate({ id: reviewTarget!.id, approved: false, reason: rejectReason || undefined })}
+              >
+                <XCircle className="h-4 w-4" />Refuser
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
