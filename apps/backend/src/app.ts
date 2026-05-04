@@ -10,7 +10,12 @@ import { API_PREFIX } from "@dash-meal/shared";
 import { startStaleOrderNotifier } from "./services/staleOrderNotifier.js";
 
 // Routes
-import authRoutes from "./modules/auth/auth.routes.js";
+import authRoutes          from "./modules/auth/auth.routes.js";
+import branchAuthRoutes    from "./modules/branch-auth/branch-auth.routes.js";
+import branchManagersRoutes from "./modules/branch-managers/branch-managers.routes.js";
+import driverWalletRoutes  from "./modules/driver-wallet/driver-wallet.routes.js";
+import branchHoursRoutes   from "./modules/branch-hours/branch-hours.routes.js";
+import stockRoutes         from "./modules/stock/stock.routes.js";
 import brandsRoutes from "./modules/brands/brands.routes.js";
 import branchesRoutes from "./modules/branches/branches.routes.js";
 import productsRoutes from "./modules/products/products.routes.js";
@@ -95,7 +100,12 @@ app.get(`${API_PREFIX}/health`, (_req, res) => {
 });
 
 // ─── Routes API ───────────────────────────────────────────────────────────────
-app.use(`${API_PREFIX}/auth`, authLimiter, authRoutes);
+app.use(`${API_PREFIX}/auth`,             authLimiter, authRoutes);
+app.use(`${API_PREFIX}/branch-auth`,      authLimiter, branchAuthRoutes);
+app.use(`${API_PREFIX}/branch-managers`,  branchManagersRoutes);
+app.use(`${API_PREFIX}/driver-wallet`,    driverWalletRoutes);
+app.use(`${API_PREFIX}/branch-hours`,     branchHoursRoutes);
+app.use(`${API_PREFIX}/stock`,            stockRoutes);
 app.use(`${API_PREFIX}/brands`, brandsRoutes);
 app.use(`${API_PREFIX}/branches`, branchesRoutes);
 app.use(`${API_PREFIX}/products`, productsRoutes);

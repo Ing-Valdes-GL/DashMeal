@@ -13,7 +13,7 @@ import {
   LayoutDashboard, ShoppingCart, Store, Truck, QrCode,
   BarChart2, Bell, Settings, Building2, FileText,
   Users, Activity, Globe, ChevronRight, LogOut,
-  UserCheck, Wallet, DollarSign, Megaphone,
+  UserCheck, Wallet, DollarSign, Megaphone, UsersRound,
 } from "lucide-react";
 
 interface NavItem {
@@ -56,7 +56,8 @@ export function Sidebar({ locale }: { locale: string }) {
     { href: "/orders",        label: t("orders"),        icon: ShoppingCart, badge: pendingCount },
     { href: "/branches",      label: t("branches"),      icon: Store },
     { href: "/delivery",      label: t("delivery"),      icon: Truck },
-    { href: "/drivers",       label: t("drivers"),       icon: UserCheck },
+    { href: "/drivers",         label: t("drivers"),         icon: UserCheck },
+    { href: "/branch-managers", label: "Managers agence",    icon: UsersRound },
     { href: "/collect",       label: t("collect"),       icon: QrCode },
     { href: "/analytics",     label: t("analytics"),     icon: BarChart2 },
     { href: "/wallet",        label: t("wallet"),        icon: Wallet },

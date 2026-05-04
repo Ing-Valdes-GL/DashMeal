@@ -1,4 +1,4 @@
-export type UserRole = "user" | "admin" | "superadmin" | "driver";
+export type UserRole = "user" | "admin" | "superadmin" | "driver" | "branch_manager";
 
 export type AdminRole = "admin" | "superadmin";
 

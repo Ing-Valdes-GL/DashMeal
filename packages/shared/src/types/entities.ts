@@ -13,6 +13,76 @@ import type {
 
 // ─── Identités ───────────────────────────────────────────────────────────────
 
+export interface BranchManager {
+  id: string;
+  branch_id: string;
+  brand_id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DriverWallet {
+  id: string;
+  driver_id: string;
+  brand_id: string;
+  balance: number;
+  total_earned: number;
+  total_withdrawn: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DriverWalletTransaction {
+  id: string;
+  driver_id: string;
+  brand_id: string;
+  type: "earning" | "withdrawal";
+  amount: number;
+  balance_after: number;
+  description: string | null;
+  order_id: string | null;
+  campay_reference: string | null;
+  status: "pending" | "completed" | "failed";
+  created_at: string;
+}
+
+export interface StockMovement {
+  id: string;
+  branch_id: string;
+  product_id: string;
+  branch_manager_id: string | null;
+  admin_id: string | null;
+  type: "restock" | "adjustment" | "sale" | "removal" | "loss";
+  quantity_change: number;
+  quantity_before: number;
+  quantity_after: number;
+  note: string | null;
+  created_at: string;
+}
+
+export interface BranchHour {
+  id: string;
+  branch_id: string;
+  day_of_week: number; // 0=dimanche … 6=samedi
+  open_time: string;   // "HH:mm"
+  close_time: string;  // "HH:mm"
+  is_closed: boolean;
+}
+
+export interface OrderStatusHistoryEntry {
+  id: string;
+  order_id: string;
+  status: string;
+  changed_at: string;
+  changed_by: string | null;
+  changed_by_role: string | null;
+  note: string | null;
+}
+
 export interface SuperAdmin {
   id: string;
   email: string;

@@ -165,9 +165,12 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
     const limitNum = Number(limit);
     const offset = (pageNum - 1) * limitNum;
 
-    // Resolve allowed branch IDs for brand-scoped admins (avoids unreliable nested PostgREST filters)
+    // Resolve allowed branch IDs for brand-scoped admins and branch managers
     let allowedBranchIds: string[] | null = null;
-    if (req.user?.role === "admin" && req.user.brand_id) {
+    if (req.user?.role === "branch_manager" && req.user.branch_id) {
+      // Branch manager voit uniquement sa propre agence
+      allowedBranchIds = [req.user.branch_id];
+    } else if (req.user?.role === "admin" && req.user.brand_id) {
       const { data: branches } = await supabase
         .from("branches")
         .select("id")
@@ -325,6 +328,21 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
     }
 
     sendSuccess(res, { status }, "Statut mis à jour");
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getOrderHistory(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { data, error } = await supabase
+      .from("order_status_history")
+      .select("*")
+      .eq("order_id", req.params.id)
+      .order("changed_at", { ascending: true });
+
+    if (error) throw new AppError(500, "DB_ERROR", error.message);
+    sendSuccess(res, data ?? []);
   } catch (err) {
     next(err);
   }

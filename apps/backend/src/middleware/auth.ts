@@ -69,6 +69,24 @@ export function optionalAuthenticate(req: Request, res: Response, next: NextFunc
   next();
 }
 
+// Vérifie que le branch_manager accède uniquement à sa propre agence
+export function requireBranchAccess(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) {
+    res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Non authentifié" } });
+    return;
+  }
+  if (req.user.role === "superadmin" || req.user.role === "admin") return next();
+  if (req.user.role === "branch_manager") {
+    const branchId = req.params.branchId ?? req.params.branch_id ?? (req.body?.branch_id as string | undefined);
+    if (branchId && branchId !== req.user.branch_id) {
+      res.status(403).json({ success: false, error: { code: "BRANCH_ACCESS_DENIED", message: "Accès à cette agence refusé" } });
+      return;
+    }
+    return next();
+  }
+  res.status(403).json({ success: false, error: { code: "FORBIDDEN", message: "Accès refusé" } });
+}
+
 // Vérifie que l'admin accède uniquement à sa propre marque
 export function requireOwnBrand(req: Request, res: Response, next: NextFunction) {
   const brandId = req.params.brandId ?? req.body.brand_id;

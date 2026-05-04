@@ -3,6 +3,7 @@ import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
 import { notifyUser, notifyOrderStatus } from "../../utils/push.js";
+import { creditDriverEarning } from "../driver-wallet/driver-wallet.controller.js";
 
 export async function getDriverProfile(req: Request, res: Response, next: NextFunction) {
   try {
@@ -301,20 +302,45 @@ export async function updateDeliveryStatus(req: Request, res: Response, next: Ne
         .from("orders")
         .update({ status: orderStatus })
         .eq("id", delivery.order_id)
-        .select("user_id")
+        .select("user_id, delivery_fee, branch_id")
         .single();
 
       await supabase.from("order_status_history").insert({
-        order_id: delivery.order_id,
-        status: orderStatus,
-        changed_by: req.user!.id,
+        order_id:        delivery.order_id,
+        status:          orderStatus,
+        changed_by:      req.user!.id,
         changed_by_role: req.user!.role,
-        note: note ?? null,
+        note:            note ?? null,
       });
 
       if (order?.user_id) {
         notifyOrderStatus(order.user_id, delivery.order_id, orderStatus, delivery.order_id).catch(() => {});
       }
+
+      // Répartir les frais de livraison (70% livreur, 20% admin, 10% superadmin)
+      if (orderStatus === "delivered" && delivery.driver_id && order?.delivery_fee) {
+        const { data: branch } = await supabase
+          .from("branches").select("brand_id").eq("id", order.branch_id).single();
+        if (branch?.brand_id) {
+          creditDriverEarning(delivery.driver_id, branch.brand_id, delivery.order_id, Number(order.delivery_fee)).catch(console.error);
+        }
+      }
+    }
+
+    // Mettre à jour les stats du livreur
+    if (status === "delivered" && delivery.driver_id) {
+      await supabase.from("drivers")
+        .update({ total_deliveries: supabase.rpc as any }) // handled via raw increment below
+        .eq("id", delivery.driver_id);
+      // Incrément simple
+      const { data: drv } = await supabase.from("drivers").select("total_deliveries").eq("id", delivery.driver_id).single();
+      await supabase.from("drivers").update({ total_deliveries: (drv?.total_deliveries ?? 0) + 1 }).eq("id", delivery.driver_id);
+    }
+
+    // Mettre à jour la position du livreur dans drivers
+    const { lat, lng } = req.body as { lat?: number; lng?: number };
+    if (delivery.driver_id && lat != null && lng != null) {
+      await supabase.from("drivers").update({ latitude: lat, longitude: lng, location_updated_at: new Date().toISOString() }).eq("id", delivery.driver_id);
     }
 
     sendSuccess(res, { status }, "Statut de livraison mis à jour");
@@ -329,15 +355,19 @@ export async function updateDriverPosition(req: Request, res: Response, next: Ne
   try {
     const { lat, lng } = req.body;
 
-    await supabase
-      .from("driver_positions")
-      .upsert({
+    await Promise.all([
+      supabase.from("driver_positions").upsert({
         delivery_id: req.params.id,
-        driver_id: req.user!.id,
-        lat,
-        lng,
-        updated_at: new Date().toISOString(),
-      });
+        driver_id:   req.user!.id,
+        lat, lng,
+        updated_at:  new Date().toISOString(),
+      }),
+      // Aussi persister sur la table drivers pour le dispatch géolocalisé
+      supabase.from("drivers").update({
+        latitude: lat, longitude: lng,
+        location_updated_at: new Date().toISOString(),
+      }).eq("id", req.user!.id),
+    ]);
 
     sendSuccess(res, { lat, lng }, "Position mise à jour");
   } catch (err) {
