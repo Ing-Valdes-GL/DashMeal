@@ -331,7 +331,7 @@ export async function listUsers(req: Request, res: Response, next: NextFunction)
 
     let query = supabase
       .from("users")
-      .select("id, name, phone, is_verified, preferred_locale, created_at", { count: "exact" })
+      .select("id, name, phone, is_verified, is_active, preferred_locale, created_at", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(offset, offset + limitNum - 1);
 

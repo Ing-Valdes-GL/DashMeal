@@ -16,6 +16,9 @@ const SendNotificationSchema = z.object({
   data: z.record(z.unknown()).optional(),
 });
 
+// ─── Admin / Superadmin : historique des notifications ───────────────────────
+router.get("/", authenticate, requireRole("admin", "superadmin"), controller.listNotifications);
+
 // ─── Admin / Superadmin : envoyer une notification ────────────────────────────
 router.post("/send", authenticate, requireRole("admin", "superadmin"), validate(SendNotificationSchema), controller.sendNotification);
 

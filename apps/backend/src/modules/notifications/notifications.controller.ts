@@ -40,6 +40,54 @@ async function dispatchExpoPush(messages: ExpoPushMessage[]): Promise<void> {
   }
 }
 
+// ─── Admin / Superadmin : historique des notifications envoyées ───────────────
+export async function listNotifications(req: Request, res: Response, next: NextFunction) {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page  as string) || 1);
+    const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
+    const from  = (page - 1) * limit;
+
+    let query = supabase
+      .from("notifications")
+      .select("id, title_fr, title_en, body_fr, body_en, type, is_read, created_at, user_id", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, from + limit - 1);
+
+    // Admin : limiter aux notifs de sa marque (via les utilisateurs ayant commandé)
+    if (req.user?.role === "admin" && req.user.brand_id) {
+      const { data: brandUserIds } = await supabase
+        .from("orders")
+        .select("user_id, branches!inner(brand_id)")
+        .eq("branches.brand_id", req.user.brand_id)
+        .limit(5000);
+      const ids = [...new Set((brandUserIds ?? []).map((r: any) => r.user_id as string))];
+      if (ids.length > 0) query = query.in("user_id", ids);
+    }
+
+    const { data, count, error } = await query;
+    if (error) throw new AppError(500, "DB_ERROR", error.message);
+
+    res.json({
+      success: true,
+      data: (data ?? []).map((n: any) => ({
+        id:         n.id,
+        title:      n.title_fr,
+        body:       n.body_fr,
+        type:       n.type,
+        is_read:    n.is_read,
+        created_at: n.created_at,
+      })),
+      pagination: {
+        page, limit,
+        total: count ?? 0,
+        total_pages: Math.ceil((count ?? 0) / limit),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ─── Admin / Superadmin : envoyer à des utilisateurs ciblés (ou à la marque) ──
 export async function sendNotification(req: Request, res: Response, next: NextFunction) {
   try {
