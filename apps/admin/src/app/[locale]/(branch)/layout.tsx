@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { useBranchAuthStore } from "@/stores/branch-auth";
@@ -22,16 +22,11 @@ const NAV: NavItem[] = [
   { href: "/branch/hours",     label: "Horaires",        icon: Clock },
 ];
 
-export default function BranchLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: { locale: string };
-}) {
+export default function BranchLayout({ children }: { children: React.ReactNode }) {
   const { manager, isAuthenticated, logout } = useBranchAuthStore();
   const router   = useRouter();
   const pathname = usePathname();
+  const params   = useParams<{ locale: string }>();
 
   const isLoginPage = pathname.includes("/branch/login");
 
