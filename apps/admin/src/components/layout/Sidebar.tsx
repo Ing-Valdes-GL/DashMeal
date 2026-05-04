@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useAuthStore } from "@/stores/auth";
@@ -7,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { apiGet } from "@/lib/api";
+import logo from "@/assets/logo.png";
 import {
   LayoutDashboard, ShoppingCart, Store, Truck, QrCode,
   BarChart2, Bell, Settings, Building2, FileText,
@@ -21,17 +23,6 @@ interface NavItem {
   badge?: number;
 }
 
-function DashMealLogo({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="10" fill="#16a34a"/>
-      <path d="M20 8C13.373 8 8 13.373 8 20s5.373 12 12 12 12-5.373 12-12S26.627 8 20 8z" fill="#22c55e" opacity="0.4"/>
-      <path d="M14 16h2v10h-2V16zm4-2h2v14h-2V14zm4 4h2v10h-2V18zm4-3h2v13h-2V15z" fill="white"/>
-      <circle cx="30" cy="12" r="4" fill="#eab308"/>
-      <path d="M29 11l1 1 2-2" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
 
 export function Sidebar({ locale }: { locale: string }) {
   const t = useTranslations("nav");
@@ -94,7 +85,7 @@ export function Sidebar({ locale }: { locale: string }) {
 
       {/* ── Logo ──────────────────────────────────────────────────── */}
       <div className="flex h-16 items-center gap-3 px-5 border-b border-slate-100">
-        <DashMealLogo className="h-9 w-9 shrink-0" />
+        <Image src={logo} alt="Dash Meal" width={36} height={36} className="shrink-0 rounded-lg" unoptimized />
         <div>
           <span className="text-base font-bold text-slate-900 tracking-tight">Dash Meal</span>
           <p className="text-[10px] font-medium text-slate-400 -mt-0.5 uppercase tracking-wider">

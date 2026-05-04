@@ -8,28 +8,42 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
-  TrendingUp, TrendingDown, ShoppingCart, DollarSign,
+  TrendingUp, ShoppingCart, DollarSign,
   Clock, AlertTriangle, ArrowRight,
 } from "lucide-react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import Link from "next/link";
 import { use } from "react";
 
-interface DashboardStats {
-  today_orders: number;
-  today_revenue: number;
+interface DashboardData {
+  period_days: number;
   pending_orders: number;
-  out_of_stock: number;
+  today: {
+    revenue: number;
+    orders: number;
+    avg_order: number;
+    out_of_stock: number;
+  };
+  period: {
+    revenue: number;
+    orders: number;
+    delivered: number;
+    avg_order: number;
+    conversion_rate: number;
+  };
+  revenue_by_day: { date: string; revenue: number; orders: number }[];
+  top_products: { name: string; revenue: number; quantity: number }[];
+  orders_by_status: { status: string; count: number }[];
+  orders_by_type: { type: string; count: number }[];
+  orders_by_payment: { method: string; count: number }[];
 }
 
-interface RevenuePoint { date: string; revenue: number; orders: number }
 interface RecentOrder {
   id: string; total: number; status: string; type: string; created_at: string;
   users: { name: string }; branches: { name: string };
 }
-interface TopProduct { name_fr: string; name_en: string; total_sold: number; revenue: number }
 
 const STATUS_VARIANT: Record<string, string> = {
   pending: "pending", confirmed: "confirmed", preparing: "preparing",
@@ -41,14 +55,9 @@ export default function DashboardPage({ params }: { params: Promise<{ locale: st
   const t = useTranslations("dashboard");
   const tOrders = useTranslations("orders");
 
-  const { data: stats, isLoading: loadingStats } = useQuery<DashboardStats>({
+  const { data: dash, isLoading: loadingStats } = useQuery<DashboardData>({
     queryKey: ["dashboard"],
     queryFn: () => apiGet("/analytics/dashboard"),
-  });
-
-  const { data: revenue } = useQuery<RevenuePoint[]>({
-    queryKey: ["revenue", "30d"],
-    queryFn: () => apiGet("/analytics/revenue", { period: "30d" }),
   });
 
   const { data: recentOrders } = useQuery<{ data: RecentOrder[] }>({
@@ -56,37 +65,35 @@ export default function DashboardPage({ params }: { params: Promise<{ locale: st
     queryFn: () => apiGet("/orders", { limit: 8, page: 1 }) as Promise<{ data: RecentOrder[] }>,
   });
 
-  const { data: topProducts } = useQuery<TopProduct[]>({
-    queryKey: ["top-products"],
-    queryFn: () => apiGet("/analytics/top-products", { limit: 5 }),
-  });
-
   const statCards = [
     {
       label: t("todayRevenue"), icon: DollarSign, color: "text-brand-600",
       bg: "bg-brand-50 border-brand-100",
-      value: stats ? formatCurrency(stats.today_revenue) : "—",
-      sub: t("vsLastWeek"), trend: "up",
+      value: dash ? formatCurrency(dash.today.revenue) : "—",
+      sub: t("vsLastWeek"), trend: "up" as const,
     },
     {
       label: t("todayOrders"), icon: ShoppingCart, color: "text-blue-600",
       bg: "bg-blue-50 border-blue-100",
-      value: stats ? String(stats.today_orders) : "—",
-      sub: t("vsLastWeek"), trend: "up",
+      value: dash ? String(dash.today.orders) : "—",
+      sub: t("vsLastWeek"), trend: "up" as const,
     },
     {
       label: t("pendingOrders"), icon: Clock, color: "text-yellow-600",
       bg: "bg-yellow-50 border-yellow-100",
-      value: stats ? String(stats.pending_orders) : "—",
-      urgent: (stats?.pending_orders ?? 0) > 5,
+      value: dash ? String(dash.pending_orders) : "—",
+      urgent: (dash?.pending_orders ?? 0) > 5,
     },
     {
       label: t("outOfStock"), icon: AlertTriangle, color: "text-red-600",
       bg: "bg-red-50 border-red-100",
-      value: stats ? String(stats.out_of_stock) : "—",
-      urgent: (stats?.out_of_stock ?? 0) > 0,
+      value: dash ? String(dash.today.out_of_stock) : "—",
+      urgent: (dash?.today.out_of_stock ?? 0) > 0,
     },
   ];
+
+  const topProducts = dash?.top_products ?? [];
+  const maxQty = topProducts[0]?.quantity || 1;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -113,11 +120,7 @@ export default function DashboardPage({ params }: { params: Promise<{ locale: st
                     )}
                     {card.sub && (
                       <div className="mt-1 flex items-center gap-1 text-xs text-slate-400">
-                        {card.trend === "up" ? (
-                          <TrendingUp className="h-3 w-3 text-green-600" />
-                        ) : (
-                          <TrendingDown className="h-3 w-3 text-red-500" />
-                        )}
+                        <TrendingUp className="h-3 w-3 text-green-600" />
                         {card.sub}
                       </div>
                     )}
@@ -143,9 +146,9 @@ export default function DashboardPage({ params }: { params: Promise<{ locale: st
             <CardTitle className="text-sm font-semibold text-slate-700">{t("revenueChart")}</CardTitle>
           </CardHeader>
           <CardContent>
-            {revenue && revenue.length > 0 ? (
+            {dash && dash.revenue_by_day.length > 0 ? (
               <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={revenue} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                <LineChart data={dash.revenue_by_day} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false}
@@ -161,7 +164,11 @@ export default function DashboardPage({ params }: { params: Promise<{ locale: st
               </ResponsiveContainer>
             ) : (
               <div className="h-[220px] flex items-center justify-center">
-                <Skeleton className="h-full w-full" />
+                {loadingStats ? (
+                  <Skeleton className="h-full w-full" />
+                ) : (
+                  <p className="text-sm text-slate-400">Aucune donnée pour la période</p>
+                )}
               </div>
             )}
           </CardContent>
@@ -173,28 +180,28 @@ export default function DashboardPage({ params }: { params: Promise<{ locale: st
             <CardTitle className="text-sm font-semibold text-slate-700">{t("topProducts")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {topProducts ? (
-              topProducts.slice(0, 5).map((p, i) => (
-                <div key={`${p.name_fr ?? ""}-${i}`} className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-800 truncate font-medium">
-                      {locale === "en" ? p.name_en : p.name_fr}
-                    </p>
-                    <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-brand-500 rounded-full"
-                        style={{ width: `${(p.total_sold / (topProducts[0]?.total_sold || 1)) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-xs text-slate-500 shrink-0">{p.total_sold}</span>
-                </div>
-              ))
-            ) : (
+            {loadingStats ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-8 w-full" />
               ))
+            ) : topProducts.length > 0 ? (
+              topProducts.slice(0, 5).map((p, i) => (
+                <div key={`${p.name}-${i}`} className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-800 truncate font-medium">{p.name}</p>
+                    <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-brand-500 rounded-full"
+                        style={{ width: `${(p.quantity / maxQty) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <span className="text-xs text-slate-500 shrink-0">{p.quantity}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-slate-400 text-center py-4">Aucune vente sur la période</p>
             )}
           </CardContent>
         </Card>
