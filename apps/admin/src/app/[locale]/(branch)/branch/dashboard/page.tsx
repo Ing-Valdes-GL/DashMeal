@@ -1,12 +1,14 @@
 "use client";
-import { useQuery } from "@tanstack/react-query";
-import { branchApiGet } from "@/lib/branch-api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { branchApiGet, branchApiPost } from "@/lib/branch-api";
 import { useBranchAuthStore } from "@/stores/branch-auth";
 import { formatCurrency } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { DollarSign, ShoppingCart, Clock, AlertTriangle, TrendingUp, Package } from "lucide-react";
+import { DollarSign, ShoppingCart, Clock, AlertTriangle, TrendingUp, Package, Radio } from "lucide-react";
 
 interface DashboardData {
   pending_orders: number;
@@ -16,6 +18,12 @@ interface DashboardData {
   top_products: { name: string; revenue: number; quantity: number }[];
 }
 
+interface BranchInfo {
+  id: string;
+  name: string;
+  status: "draft" | "pending_approval" | "live" | "suspended";
+}
+
 interface StockAlert {
   stock_qty: number;
   products: { name_fr: string };
@@ -23,11 +31,27 @@ interface StockAlert {
 
 export default function BranchDashboardPage() {
   const { manager } = useBranchAuthStore();
+  const qc = useQueryClient();
 
   const { data: dash, isLoading } = useQuery<DashboardData>({
     queryKey: ["branch-dashboard"],
     queryFn:  () => branchApiGet("/analytics/dashboard"),
     refetchInterval: 60_000,
+  });
+
+  const { data: branchInfo } = useQuery<BranchInfo>({
+    queryKey: ["branch-info", manager?.branch_id],
+    queryFn: () => branchApiGet(`/branches/${manager?.branch_id}`),
+    enabled: !!manager?.branch_id,
+  });
+
+  const requestLiveMutation = useMutation({
+    mutationFn: () => branchApiPost(`/branches/${manager?.branch_id}/request-live`, {}),
+    onSuccess: () => {
+      toast.success("Demande de mise en ligne envoyée à l'admin");
+      qc.invalidateQueries({ queryKey: ["branch-info"] });
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.error?.message ?? "Erreur"),
   });
 
   const { data: alerts } = useQuery<StockAlert[]>({
@@ -43,12 +67,50 @@ export default function BranchDashboardPage() {
     { label: "Ruptures de stock",  value: dash ? String(dash.today.out_of_stock)     : "—", icon: AlertTriangle, bg: "bg-red-50    border-red-100",     color: "text-red-600",    urgent: (dash?.today.out_of_stock ?? 0) > 0 },
   ];
 
+  const branchStatus = branchInfo?.status ?? "draft";
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Tableau de bord</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Vue en temps réel de votre agence</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Tableau de bord</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Vue en temps réel de votre agence</p>
+        </div>
       </div>
+
+      {/* Live status banner */}
+      {branchStatus !== "live" && (
+        <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
+          branchStatus === "pending_approval"
+            ? "bg-yellow-50 border-yellow-200"
+            : "bg-slate-50 border-slate-200"
+        }`}>
+          <div className="flex items-center gap-3">
+            <Radio className={`h-5 w-5 shrink-0 ${branchStatus === "pending_approval" ? "text-yellow-600" : "text-slate-400"}`} />
+            <div>
+              <p className={`text-sm font-semibold ${branchStatus === "pending_approval" ? "text-yellow-700" : "text-slate-700"}`}>
+                {branchStatus === "pending_approval" ? "Demande de mise en ligne en attente" : "Agence en mode Brouillon"}
+              </p>
+              <p className="text-xs text-slate-500">
+                {branchStatus === "pending_approval"
+                  ? "Votre demande est en cours d'examen par l'admin."
+                  : "Configurez vos produits, horaires et localisation, puis demandez votre mise en ligne."}
+              </p>
+            </div>
+          </div>
+          {branchStatus === "draft" && (
+            <Button
+              size="sm"
+              className="bg-brand-600 hover:bg-brand-700 shrink-0 gap-1.5"
+              onClick={() => requestLiveMutation.mutate()}
+              disabled={requestLiveMutation.isPending}
+            >
+              <Radio className="h-4 w-4" />
+              {requestLiveMutation.isPending ? "Envoi..." : "Demander la mise en ligne"}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">

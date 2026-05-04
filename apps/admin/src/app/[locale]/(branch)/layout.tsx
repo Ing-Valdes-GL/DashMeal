@@ -15,11 +15,11 @@ import {
 interface NavItem { href: string; label: string; icon: React.ComponentType<{ className?: string }> }
 
 const NAV: NavItem[] = [
-  { href: "/branch-dashboard", label: "Tableau de bord", icon: LayoutDashboard },
-  { href: "/branch-orders",    label: "Commandes",       icon: ShoppingCart },
-  { href: "/branch-stock",     label: "Stock",           icon: Package },
-  { href: "/branch-wallet",    label: "Wallet",          icon: Wallet },
-  { href: "/branch-hours",     label: "Horaires",        icon: Clock },
+  { href: "/branch/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
+  { href: "/branch/orders",    label: "Commandes",       icon: ShoppingCart },
+  { href: "/branch/stock",     label: "Stock",           icon: Package },
+  { href: "/branch/wallet",    label: "Wallet",          icon: Wallet },
+  { href: "/branch/hours",     label: "Horaires",        icon: Clock },
 ];
 
 export default function BranchLayout({
@@ -33,12 +33,16 @@ export default function BranchLayout({
   const router   = useRouter();
   const pathname = usePathname();
 
+  const isLoginPage = pathname.includes("/branch/login");
+
   useEffect(() => {
-    if (!isAuthenticated && !pathname.endsWith("/branch/login")) {
+    if (!isAuthenticated && !isLoginPage) {
       router.replace(`/${params.locale}/branch/login`);
     }
-  }, [isAuthenticated, pathname, params.locale, router]);
+  }, [isAuthenticated, isLoginPage, params.locale, router]);
 
+  // Render login page without sidebar
+  if (isLoginPage) return <>{children}</>;
   if (!isAuthenticated) return null;
 
   const isActive = (href: string) => pathname.includes(href);

@@ -2,9 +2,10 @@ import type { Request, Response, NextFunction } from "express";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
-import { generateQrCode } from "../../utils/qrcode.js";
+import { generateQrCode, generateQrCodeImage, numericCode } from "../../utils/qrcode.js";
 import { campayCollect } from "../../services/campay.js";
 import { notifyOrderStatus, notifyDriversNewDelivery } from "../../utils/push.js";
+import { sendCollectQrEmail } from "../../utils/email.js";
 
 // ─── Création unifiée avec items + paiement Campay ───────────────────────────
 export async function createOrder(req: Request, res: Response, next: NextFunction) {
@@ -56,6 +57,30 @@ export async function createOrder(req: Request, res: Response, next: NextFunctio
       const qr_code = await generateQrCode(order.id);
       await supabase.rpc("increment_slot_booking", { slot_id });
       await supabase.from("collect_orders").insert({ order_id: order.id, slot_id, qr_code, pickup_status: "waiting" });
+
+      // Envoyer l'email QR au client (fire-and-forget)
+      void (async () => {
+        try {
+          const { data: user } = await supabase.from("users").select("name, email").eq("id", user_id).single();
+          const { data: slot } = await supabase.from("time_slots").select("date, start_time, end_time, branches(name)").eq("id", slot_id).single();
+          if (user?.email && slot) {
+            const qrImage = await generateQrCodeImage(qr_code);
+            const branch = (slot as any).branches;
+            await sendCollectQrEmail({
+              to: user.email,
+              customerName: user.name ?? "Client",
+              orderId: order.id,
+              qrToken: qr_code,
+              qrImageDataUrl: qrImage,
+              numericCode: numericCode(qr_code),
+              branchName: branch?.name ?? "Agence",
+              slotDate: (slot as any).date,
+              slotTime: `${(slot as any).start_time} – ${(slot as any).end_time}`,
+              total,
+            });
+          }
+        } catch (e) { console.error("[QR email] erreur:", e); }
+      })();
     } else if (type === "delivery") {
       const { data: branch } = await supabase.from("branches").select("brand_id").eq("id", branch_id).single();
       const { error: deliveryErr } = await supabase.from("deliveries").insert({

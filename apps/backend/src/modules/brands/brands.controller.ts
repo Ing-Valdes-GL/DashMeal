@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from "express";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated } from "../../utils/response.js";
+import { sendLegalDocsSubmittedEmail, sendLegalDocsDecisionEmail } from "../../utils/email.js";
+import { env } from "../../config/env.js";
 import bcrypt from "bcryptjs";
 
 export async function applyForBrand(req: Request, res: Response, next: NextFunction) {
@@ -248,6 +250,74 @@ export async function updateBrand(req: Request, res: Response, next: NextFunctio
   } catch (err) {
     next(err);
   }
+}
+
+// ─── Upload logo marque ────────────────────────────────────────────────────────
+export async function uploadBrandLogo(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) throw new AppError(400, "NO_FILE", "Aucun fichier reçu");
+    const brandId = req.user?.role === "admin" ? req.user.brand_id! : req.params.id;
+    const ext = req.file.originalname.split(".").pop()?.toLowerCase() ?? "jpg";
+    const filename = `brands/${brandId}/logo.${ext}`;
+    const { error } = await supabase.storage
+      .from(env.STORAGE_BUCKET_PRODUCTS ?? "product-images")
+      .upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: true });
+    if (error) throw new AppError(500, "UPLOAD_ERROR", "Erreur upload logo");
+    const { data: urlData } = supabase.storage.from(env.STORAGE_BUCKET_PRODUCTS ?? "product-images").getPublicUrl(filename);
+    await supabase.from("brands").update({ logo_url: urlData.publicUrl }).eq("id", brandId);
+    sendSuccess(res, { logo_url: urlData.publicUrl });
+  } catch (err) { next(err); }
+}
+
+// ─── Upload document légal ─────────────────────────────────────────────────────
+export async function uploadLegalDoc(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.file) throw new AppError(400, "NO_FILE", "Aucun fichier reçu");
+    const brandId = req.user?.role === "admin" ? req.user.brand_id! : req.params.id;
+    const filename = `brands/${brandId}/legal/${Date.now()}_${req.file.originalname}`;
+    const { error } = await supabase.storage
+      .from(env.STORAGE_BUCKET_PRODUCTS ?? "product-images")
+      .upload(filename, req.file.buffer, { contentType: req.file.mimetype, upsert: false });
+    if (error) throw new AppError(500, "UPLOAD_ERROR", "Erreur upload document");
+    const { data: urlData } = supabase.storage.from(env.STORAGE_BUCKET_PRODUCTS ?? "product-images").getPublicUrl(filename);
+    // Append to legal_docs array
+    const { data: brand } = await supabase.from("brands").select("legal_docs").eq("id", brandId).single();
+    const docs = Array.isArray(brand?.legal_docs) ? brand.legal_docs : [];
+    docs.push({ url: urlData.publicUrl, name: req.file.originalname, uploaded_at: new Date().toISOString() });
+    await supabase.from("brands").update({ legal_docs: docs }).eq("id", brandId);
+    sendSuccess(res, { url: urlData.publicUrl });
+  } catch (err) { next(err); }
+}
+
+// ─── Soumettre les documents légaux au superadmin ──────────────────────────────
+export async function submitLegalDocs(req: Request, res: Response, next: NextFunction) {
+  try {
+    const brandId = req.user?.role === "admin" ? req.user.brand_id! : req.params.id;
+    const { data: brand } = await supabase.from("brands").select("name, legal_docs").eq("id", brandId).single();
+    if (!brand) throw new AppError(404, "NOT_FOUND", "Marque introuvable");
+    const docs = Array.isArray(brand.legal_docs) ? brand.legal_docs : [];
+    if (docs.length === 0) throw new AppError(400, "NO_DOCS", "Aucun document uploadé");
+    await supabase.from("brands").update({ legal_docs_status: "submitted", legal_docs_submitted_at: new Date().toISOString() }).eq("id", brandId);
+    const { data: admin } = await supabase.from("admins").select("email").eq("brand_id", brandId).single();
+    await sendLegalDocsSubmittedEmail({ brandName: brand.name, adminEmail: admin?.email ?? "—" });
+    sendSuccess(res, { status: "submitted" }, "Documents soumis pour approbation");
+  } catch (err) { next(err); }
+}
+
+// ─── Approuver / Rejeter les documents légaux (superadmin) ────────────────────
+export async function reviewLegalDocs(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { approved, reason } = req.body as { approved: boolean; reason?: string };
+    const { data: brand } = await supabase.from("brands").select("name").eq("id", req.params.id).single();
+    if (!brand) throw new AppError(404, "NOT_FOUND", "Marque introuvable");
+    const status = approved ? "approved" : "rejected";
+    await supabase.from("brands").update({ legal_docs_status: status }).eq("id", req.params.id);
+    const { data: admin } = await supabase.from("admins").select("email").eq("brand_id", req.params.id).single();
+    if (admin?.email) {
+      await sendLegalDocsDecisionEmail({ to: admin.email, brandName: brand.name, approved, reason });
+    }
+    sendSuccess(res, { status }, approved ? "Documents approuvés" : "Documents refusés");
+  } catch (err) { next(err); }
 }
 
 export async function suspendBrand(req: Request, res: Response, next: NextFunction) {
