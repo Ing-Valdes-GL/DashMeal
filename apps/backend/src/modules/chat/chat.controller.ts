@@ -9,6 +9,18 @@ import { notifyUser } from "../../utils/push.js";
 
 type ConvType = "client_driver" | "client_support";
 
+// ─── Typing indicators (in-memory, TTL 4s) ────────────────────────────────────
+// key: `${conversationId}:${userId}` → timestamp de fin
+const typingMap = new Map<string, number>();
+
+// Nettoyage automatique toutes les 30s
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, until] of typingMap) {
+    if (until < now) typingMap.delete(key);
+  }
+}, 30_000);
+
 // ─── Récupérer ou créer une conversation pour une commande ───────────────────
 
 export async function getOrCreateConversation(req: Request, res: Response, next: NextFunction) {
@@ -116,10 +128,28 @@ export async function getMessages(req: Request, res: Response, next: NextFunctio
       .range(offset, offset + limitNum - 1);
 
     if (error) throw new AppError(500, "FETCH_ERROR", "Erreur lors de la récupération");
-    sendSuccess(res, data ?? []);
+
+    // Typing indicator — quelqu'un d'autre dans cette conversation est-il en train d'écrire ?
+    const now = Date.now();
+    const isCounterpartTyping = [...typingMap.entries()].some(
+      ([key, until]) =>
+        key.startsWith(`${conversationId}:`) &&
+        !key.endsWith(`:${req.user!.id}`) &&
+        until > now
+    );
+
+    sendSuccess(res, { messages: data ?? [], is_counterpart_typing: isCounterpartTyping });
   } catch (err) {
     next(err);
   }
+}
+
+// ─── Typing indicator ─────────────────────────────────────────────────────────
+
+export async function setTyping(req: Request, res: Response) {
+  const { conversationId } = req.params;
+  typingMap.set(`${conversationId}:${req.user!.id}`, Date.now() + 4000);
+  res.status(204).send();
 }
 
 // ─── Envoyer un message (texte, image, voix) ─────────────────────────────────

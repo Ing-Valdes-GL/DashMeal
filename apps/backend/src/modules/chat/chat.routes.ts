@@ -14,6 +14,7 @@ router.get("/conversations/order/:orderId", authenticate, controller.getOrCreate
 // ─── Messages ─────────────────────────────────────────────────────────────────
 router.get("/conversations/:conversationId/messages", authenticate, controller.getMessages);
 router.post("/conversations/:conversationId/messages", authenticate, controller.sendMessage);
+router.post("/conversations/:conversationId/typing", authenticate, controller.setTyping);
 router.patch("/conversations/:conversationId/read", authenticate, controller.markAsRead);
 
 // ─── Upload média (photo ou audio) ───────────────────────────────────────────

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Modal,
-  Dimensions,
+  Dimensions, Animated,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -82,6 +82,54 @@ function buildFlatItems(messages: ChatMessage[]): FlatItem[] {
   return items;
 }
 
+// ─── Typing dots animation ────────────────────────────────────────────────────
+
+function TypingDots() {
+  const dots = [
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+    useRef(new Animated.Value(0)).current,
+  ];
+
+  useEffect(() => {
+    const anims = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 160),
+          Animated.timing(dot, { toValue: -5, duration: 280, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 280, useNativeDriver: true }),
+          Animated.delay(500),
+        ])
+      )
+    );
+    anims.forEach((a) => a.start());
+    return () => anims.forEach((a) => a.stop());
+  }, []);
+
+  return (
+    <View style={typingStyles.row}>
+      <View style={typingStyles.avatar}>
+        <Text style={{ fontSize: 10 }}>💬</Text>
+      </View>
+      <View style={typingStyles.bubble}>
+        {dots.map((dot, i) => (
+          <Animated.View
+            key={i}
+            style={[typingStyles.dot, { transform: [{ translateY: dot }] }]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const typingStyles = StyleSheet.create({
+  row:    { flexDirection: "row", alignItems: "flex-end", gap: 8, marginVertical: 4, paddingHorizontal: 16 },
+  avatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#F0F0F0", alignItems: "center", justifyContent: "center" },
+  bubble: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#F0F0F0", borderRadius: 18, borderBottomLeftRadius: 4, paddingHorizontal: 14, paddingVertical: 12 },
+  dot:    { width: 7, height: 7, borderRadius: 4, backgroundColor: "#999" },
+});
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ChatScreen() {
@@ -93,6 +141,7 @@ export default function ChatScreen() {
 
   const [text, setText] = useState("");
   const flatListRef = useRef<FlatList>(null);
+  const lastTypingCallRef = useRef<number>(0);
 
   // Recording state
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -112,14 +161,15 @@ export default function ChatScreen() {
   const conversationId = conversation?.id;
 
   // ── 2. Messages (poll every 5s) ───────────────────────────────────────────
-  const { data: msgsResp, isLoading: msgsLoading } = useQuery<{ success: boolean; data: ChatMessage[] }>({
+  const { data: msgsResp, isLoading: msgsLoading } = useQuery<{ success: boolean; data: { messages: ChatMessage[]; is_counterpart_typing: boolean } }>({
     queryKey: ["messages", conversationId],
     queryFn: () => apiGet(`/chat/conversations/${conversationId}/messages`),
-    refetchInterval: 5000,
+    refetchInterval: 3000,
     staleTime: 0,
     enabled: !!conversationId,
   });
-  const messages = msgsResp?.data ?? [];
+  const messages = msgsResp?.data?.messages ?? [];
+  const isCounterpartTyping = msgsResp?.data?.is_counterpart_typing ?? false;
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -145,6 +195,16 @@ export default function ChatScreen() {
     },
     onError: () => Alert.alert("Erreur", "Impossible d'envoyer le message."),
   });
+
+  const handleTextChange = (value: string) => {
+    setText(value);
+    if (!conversationId || !value.trim()) return;
+    const now = Date.now();
+    if (now - lastTypingCallRef.current > 2000) {
+      lastTypingCallRef.current = now;
+      apiPost(`/chat/conversations/${conversationId}/typing`, {}).catch(() => {});
+    }
+  };
 
   const handleSend = () => {
     const trimmed = text.trim();
@@ -455,6 +515,7 @@ export default function ChatScreen() {
             contentContainerStyle={styles.messagesList}
             showsVerticalScrollIndicator={false}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+            ListFooterComponent={isCounterpartTyping ? <TypingDots /> : null}
             renderItem={({ item }) => {
               if (item.type === "date") {
                 return (
@@ -495,7 +556,7 @@ export default function ChatScreen() {
               placeholder="Écrire un message…"
               placeholderTextColor={Colors.text3}
               value={text}
-              onChangeText={setText}
+              onChangeText={handleTextChange}
               multiline
               maxLength={500}
               returnKeyType="default"
