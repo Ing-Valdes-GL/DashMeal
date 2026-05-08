@@ -431,54 +431,92 @@ async function createOrderFromIntent(
 }
 
 // ─── Webhook CamPay (push) ────────────────────────────────────────────────────
+// Sécurité : secret validé dans payments.routes.ts avant d'arriver ici.
 
 export async function campayWebhook(req: Request, res: Response, next: NextFunction) {
   try {
-    const { reference, status, external_reference } = req.body;
+    const { reference, status, external_reference, amount: webhookAmount } = req.body as {
+      reference?: string;
+      status?: string;
+      external_reference?: string;
+      amount?: string | number;
+    };
+
+    // Valider les champs obligatoires
+    if (!reference || !status || !external_reference) {
+      res.status(400).json({ status: "error", message: "Payload incomplet" });
+      return;
+    }
+
+    // ── Vérification d'idempotence : ne pas retraiter un paiement déjà confirmé ──
+    const { data: existingPayment } = await supabase
+      .from("payments")
+      .select("id, status, amount, order_id, orders(branch_id, branches(brand_id))")
+      .eq("provider_ref", reference)
+      .single();
 
     if (status === "SUCCESSFUL") {
-      const { data: payment } = await supabase
-        .from("payments")
-        .update({ status: "paid" })
-        .eq("provider_ref", reference)
-        .select("id, amount, order_id, orders(branch_id, branches(brand_id))")
-        .single();
+      // Paiement déjà traité → répondre 200 sans retraiter
+      if (existingPayment?.status === "paid") {
+        res.status(200).json({ status: "ok" });
+        return;
+      }
 
-      if (payment) {
-        const { data: updatedOrder } = await supabase
-          .from("orders")
-          .update({ status: "confirmed" })
-          .eq("id", external_reference)
-          .select("id, user_id")
+      // Vérification du montant (si fourni par CamPay)
+      if (webhookAmount != null && existingPayment && Number(webhookAmount) !== Number(existingPayment.amount)) {
+        console.error(`[webhook] Montant invalide pour ${reference}: reçu ${webhookAmount}, attendu ${existingPayment.amount}`);
+        res.status(400).json({ status: "error", message: "Montant invalide" });
+        return;
+      }
+
+      if (existingPayment) {
+        const { data: updatedPayment } = await supabase
+          .from("payments")
+          .update({ status: "paid" })
+          .eq("provider_ref", reference)
+          .eq("status", "pending") // Verrou atomique : uniquement si encore pending
+          .select("id, amount, order_id, orders(branch_id, branches(brand_id))")
           .single();
 
-        const webhookOrder = payment.orders as unknown as { branch_id: string; branches: { brand_id: string } };
-        const wBranchId = webhookOrder?.branch_id;
-        const wBrandId  = webhookOrder?.branches?.brand_id;
-        if (wBranchId && wBrandId) {
-          await supabase.rpc("credit_branch_wallet", {
-            p_branch_id:   wBranchId,
-            p_brand_id:    wBrandId,
-            p_amount:      payment.amount as number,
-            p_payment_id:  payment.id,
-            p_order_id:    external_reference,
-            p_description: `Commande #${String(external_reference).slice(0, 8)} — paiement en ligne`,
-          }).then(({ error }) => { if (error) console.error("[webhook] wallet credit:", error.message); });
-        }
+        if (updatedPayment) {
+          const { data: updatedOrder } = await supabase
+            .from("orders")
+            .update({ status: "confirmed" })
+            .eq("id", external_reference)
+            .select("id, user_id")
+            .single();
 
-        if (updatedOrder?.user_id) {
-          notifyOrderStatus(updatedOrder.user_id, external_reference, "confirmed", external_reference).catch(() => {});
+          const webhookOrder = updatedPayment.orders as unknown as { branch_id: string; branches: { brand_id: string } };
+          const wBranchId = webhookOrder?.branch_id;
+          const wBrandId  = webhookOrder?.branches?.brand_id;
+          if (wBranchId && wBrandId) {
+            await supabase.rpc("credit_branch_wallet", {
+              p_branch_id:   wBranchId,
+              p_brand_id:    wBrandId,
+              p_amount:      updatedPayment.amount as number,
+              p_payment_id:  updatedPayment.id,
+              p_order_id:    external_reference,
+              p_description: `Commande #${String(external_reference).slice(0, 8)} — paiement en ligne`,
+            }).then(({ error }) => { if (error) console.error("[webhook] wallet credit:", error.message); });
+          }
+
+          if (updatedOrder?.user_id) {
+            notifyOrderStatus(updatedOrder.user_id, external_reference, "confirmed", external_reference).catch(() => {});
+          }
         }
       }
     } else if (status === "FAILED") {
-      await supabase.from("payments").update({ status: "failed" }).eq("provider_ref", reference);
-      const { data: failedOrder } = await supabase
-        .from("orders")
-        .select("user_id")
-        .eq("id", external_reference)
-        .single();
-      if (failedOrder?.user_id) {
-        notifyPaymentFailed(failedOrder.user_id, external_reference, external_reference).catch(() => {});
+      // Idempotence : ne rien faire si déjà échoué
+      if (existingPayment?.status !== "failed") {
+        await supabase.from("payments").update({ status: "failed" }).eq("provider_ref", reference);
+        const { data: failedOrder } = await supabase
+          .from("orders")
+          .select("user_id")
+          .eq("id", external_reference)
+          .single();
+        if (failedOrder?.user_id) {
+          notifyPaymentFailed(failedOrder.user_id, external_reference, external_reference).catch(() => {});
+        }
       }
     }
 

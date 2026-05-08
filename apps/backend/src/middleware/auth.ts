@@ -78,7 +78,13 @@ export function requireBranchAccess(req: Request, res: Response, next: NextFunct
   if (req.user.role === "superadmin" || req.user.role === "admin") return next();
   if (req.user.role === "branch_manager") {
     const branchId = req.params.branchId ?? req.params.branch_id ?? (req.body?.branch_id as string | undefined);
-    if (branchId && branchId !== req.user.branch_id) {
+    // Si aucun branchId n'est fourni, on refuse : un endpoint sans branchId
+    // ne doit pas être accessible à tous les branch_managers indistinctement.
+    if (!branchId) {
+      res.status(400).json({ success: false, error: { code: "MISSING_BRANCH_ID", message: "Identifiant d'agence requis" } });
+      return;
+    }
+    if (branchId !== req.user.branch_id) {
       res.status(403).json({ success: false, error: { code: "BRANCH_ACCESS_DENIED", message: "Accès à cette agence refusé" } });
       return;
     }

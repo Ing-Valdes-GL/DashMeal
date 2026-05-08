@@ -3,6 +3,8 @@ import { authenticate, requireRole } from "../../middleware/auth.js";
 import { validate } from "../../middleware/validate.js";
 import { InitiatePaymentSchema, RecordInPersonPaymentSchema, CreateOrderSchema } from "@dash-meal/shared";
 import * as controller from "./payments.controller.js";
+import { env } from "../../config/env.js";
+import type { Request, Response, NextFunction } from "express";
 
 const router: import("express").Router = Router();
 
@@ -11,7 +13,16 @@ router.post("/initiate-order", authenticate, requireRole("user"), validate(Creat
 
 // ─── Paiement en ligne sur commande existante ─────────────────────────────────
 router.post("/initiate", authenticate, requireRole("user"), validate(InitiatePaymentSchema), controller.initiatePayment);
-router.post("/webhook/campay", controller.campayWebhook); // webhook public (signature vérifiée)
+// Webhook CamPay — secret token dans le query param (embarqué dans CAMPAY_CALLBACK_URL)
+function verifyWebhookSecret(req: Request, res: Response, next: NextFunction) {
+  const secret = req.query.secret as string | undefined;
+  if (!secret || secret !== env.CAMPAY_WEBHOOK_SECRET) {
+    res.status(401).json({ success: false, error: { code: "UNAUTHORIZED", message: "Webhook non autorisé" } });
+    return;
+  }
+  next();
+}
+router.post("/webhook/campay", verifyWebhookSecret, controller.campayWebhook);
 
 // ─── Paiement en présentiel (enregistré par l'admin/caissier) ────────────────
 router.post("/inperson", authenticate, requireRole("admin", "superadmin"), validate(RecordInPersonPaymentSchema), controller.recordInPersonPayment);

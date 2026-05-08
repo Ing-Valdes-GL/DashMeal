@@ -56,6 +56,7 @@ const EnvSchema = z.object({
   CAMPAY_APP_PASSWORD: z.string().min(1),
   CAMPAY_BASE_URL: z.string().url(),
   CAMPAY_CALLBACK_URL: z.string().url(),
+  CAMPAY_WEBHOOK_SECRET: z.string().min(16),
 
   GOOGLE_MAPS_API_KEY: z.string().min(1),
   EXPO_ACCESS_TOKEN: z.string().optional(),

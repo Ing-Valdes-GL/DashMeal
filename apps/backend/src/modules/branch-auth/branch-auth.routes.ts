@@ -8,16 +8,21 @@ const router = Router();
 
 const LoginSchema = z.object({
   phone:    z.string().min(8),
-  password: z.string().min(6),
+  password: z.string().min(8),
 });
 
 const RefreshSchema = z.object({
   refresh_token: z.string().min(1),
 });
 
+const StrongPasswordSchema = z.string()
+  .min(8, "Le mot de passe doit contenir au moins 8 caractères")
+  .refine((p) => /[A-Z]/.test(p), "Le mot de passe doit contenir au moins une majuscule")
+  .refine((p) => /[0-9]/.test(p), "Le mot de passe doit contenir au moins un chiffre");
+
 const PasswordSchema = z.object({
-  current_password: z.string().min(6),
-  new_password:     z.string().min(6),
+  current_password: z.string().min(8),
+  new_password:     StrongPasswordSchema,
 });
 
 router.post("/login",   validate(LoginSchema),   controller.loginBranchManager);

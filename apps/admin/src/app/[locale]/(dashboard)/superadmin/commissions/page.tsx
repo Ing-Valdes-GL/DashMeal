@@ -1,126 +1,203 @@
 "use client";
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useTranslations } from "next-intl";
-import { apiGet, apiPost, apiPatch } from "@/lib/api";
-import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { toast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { useAuthStore } from "@/stores/auth";
+import { apiGet } from "@/lib/api";
+import { formatCurrency } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pagination } from "@/components/ui/pagination";
-import { DollarSign, TrendingUp, CheckCircle, Clock, RefreshCw } from "lucide-react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend,
+} from "recharts";
+import {
+  DollarSign, Clock, CheckCircle2, TrendingUp,
+  ShieldAlert, RefreshCw, BarChart3,
+} from "lucide-react";
 
-interface Commission {
-  id: string; type: "online" | "inperson"; rate: number; amount: number;
-  settled_at: string | null; created_at: string;
-  orders?: { id: string; total: number };
-  brands?: { name: string };
+interface CommissionEntry {
+  brand_id: string;
+  brand_name: string;
+  online_commissions: number;
+  inperson_commissions: number;
+  total: number;
+  settled: boolean;
 }
 
-interface Summary {
-  total: number; online: number; inperson: number;
-  settled: number; pending: number; count: number;
+interface CommissionsByDay {
+  date: string;
+  amount: number;
 }
 
-export default function CommissionsPage() {
-  const t = useTranslations("commissions");
-  const qc = useQueryClient();
-  const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [selected, setSelected] = useState<string[]>([]);
+interface CommissionsData {
+  total_online: number;
+  total_inperson: number;
+  pending_settlement: number;
+  total_settled: number;
+  commissions_by_day: CommissionsByDay[];
+  entries: CommissionEntry[];
+}
 
-  const { data: summary, isLoading: sumLoading } = useQuery<Summary>({
-    queryKey: ["commissions-summary"],
-    queryFn: () => apiGet("/commissions/summary"),
+interface PlatformStats {
+  total_brands: number;
+  total_orders: number;
+  total_revenue: number;
+  total_commissions: number;
+  active_brands: number;
+}
+
+export default function SuperadminCommissionsPage() {
+  const { user } = useAuthStore();
+  const [period, setPeriod] = useState("30");
+
+  const { data, isLoading, refetch } = useQuery<CommissionsData>({
+    queryKey: ["sa-commissions", period],
+    queryFn: () => apiGet("/analytics/commissions", { days: period }),
+    enabled: user?.role === "superadmin",
+    staleTime: 60_000,
   });
 
-  const { data, isLoading, refetch } = useQuery<{ data: Commission[]; pagination: any }>({
-    queryKey: ["commissions", { page, statusFilter }],
-    queryFn: () => apiGet("/commissions", {
-      page, limit: 20,
-      ...(statusFilter !== "all" && { settled: statusFilter === "settled" ? "true" : "false" }),
-    }) as any,
+  const { data: platform, isLoading: platformLoading } = useQuery<PlatformStats>({
+    queryKey: ["sa-platform"],
+    queryFn: () => apiGet("/analytics/platform"),
+    enabled: user?.role === "superadmin",
+    staleTime: 60_000,
   });
 
-  const settleMutation = useMutation({
-    mutationFn: (id: string) => apiPatch(`/commissions/${id}/settle`, {}),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["commissions"] });
-      qc.invalidateQueries({ queryKey: ["commissions-summary"] });
-      toast.success("Commission marquée comme reversée");
+  // Guard — non-superadmin users
+  if (user?.role !== "superadmin") {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <div className="h-16 w-16 rounded-2xl bg-red-500/10 flex items-center justify-center">
+          <ShieldAlert className="h-8 w-8 text-red-400" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900">Accès restreint</h2>
+        <p className="text-sm text-slate-400 text-center max-w-sm">
+          Cette page est réservée aux administrateurs de la plateforme (superadmin).
+        </p>
+      </div>
+    );
+  }
+
+  const chartData = (data?.commissions_by_day ?? []).map((d) => ({
+    date: new Date(d.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
+    Commissions: d.amount,
+  }));
+
+  const totalCommissions = (data?.total_online ?? 0) + (data?.total_inperson ?? 0);
+
+  const kpiCards = [
+    {
+      label: "Commissions totales",
+      value: formatCurrency(totalCommissions),
+      icon: DollarSign,
+      color: "text-brand-400",
+      bg: "bg-brand-500/10",
     },
-    onError: () => toast.error("Erreur"),
-  });
-
-  const settleBatchMutation = useMutation({
-    mutationFn: (ids: string[]) => apiPost("/commissions/settle-batch", { ids }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["commissions"] });
-      qc.invalidateQueries({ queryKey: ["commissions-summary"] });
-      toast.success(`${selected.length} commissions reversées`);
-      setSelected([]);
+    {
+      label: "En ligne",
+      value: formatCurrency(data?.total_online ?? 0),
+      icon: TrendingUp,
+      color: "text-blue-400",
+      bg: "bg-blue-500/10",
     },
-    onError: () => toast.error("Erreur"),
-  });
-
-  const commissions = data?.data ?? [];
-
-  const summaryCards = [
-    { label: t("total"), value: formatCurrency(summary?.total ?? 0), icon: DollarSign, color: "text-brand-400", bg: "bg-brand-500/10" },
-    { label: t("online"), value: formatCurrency(summary?.online ?? 0), icon: TrendingUp, color: "text-blue-400", bg: "bg-blue-500/10" },
-    { label: t("inperson"), value: formatCurrency(summary?.inperson ?? 0), icon: TrendingUp, color: "text-purple-400", bg: "bg-purple-500/10" },
-    { label: t("pending"), value: formatCurrency(summary?.pending ?? 0), icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10" },
-    { label: t("settled"), value: formatCurrency(summary?.settled ?? 0), icon: CheckCircle, color: "text-green-400", bg: "bg-green-500/10" },
+    {
+      label: "Présentiel",
+      value: formatCurrency(data?.total_inperson ?? 0),
+      icon: TrendingUp,
+      color: "text-purple-400",
+      bg: "bg-purple-500/10",
+    },
+    {
+      label: "En attente de reversement",
+      value: formatCurrency(data?.pending_settlement ?? 0),
+      icon: Clock,
+      color: "text-amber-400",
+      bg: "bg-amber-500/10",
+    },
+    {
+      label: "Reversées",
+      value: formatCurrency(data?.total_settled ?? 0),
+      icon: CheckCircle2,
+      color: "text-green-400",
+      bg: "bg-green-500/10",
+    },
   ];
 
-  const toggleSelect = (id: string) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
-  const toggleAll = () => {
-    const unsettled = commissions.filter((c) => !c.settled_at).map((c) => c.id);
-    if (selected.length === unsettled.length) {
-      setSelected([]);
-    } else {
-      setSelected(unsettled);
-    }
-  };
-
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">{t("title")}</h1>
-          <p className="text-sm text-slate-400">{t("subtitle")}</p>
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <BarChart3 className="h-6 w-6 text-brand-400" />
+            Commissions Plateforme
+          </h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Vue globale des commissions générées par toutes les marques.
+          </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">7 derniers jours</SelectItem>
+              <SelectItem value="30">30 derniers jours</SelectItem>
+              <SelectItem value="90">90 derniers jours</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="sm" onClick={() => refetch()} className="text-slate-400">
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {summaryCards.map((s) => {
-          const Icon = s.icon;
+      {/* Platform stats */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {[
+          { label: "Marques actives", value: platform?.active_brands ?? 0, color: "text-brand-500" },
+          { label: "Total marques", value: platform?.total_brands ?? 0, color: "text-slate-900" },
+          { label: "Commandes totales", value: platform?.total_orders ?? 0, color: "text-blue-500" },
+          { label: "CA Plateforme", value: formatCurrency(platform?.total_revenue ?? 0), color: "text-green-500" },
+        ].map((s) => (
+          <Card key={s.label}>
+            <CardContent className="p-4">
+              {platformLoading ? (
+                <Skeleton className="h-12 w-full" />
+              ) : (
+                <>
+                  <p className="text-xs text-slate-400">{s.label}</p>
+                  <p className={`text-xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        {kpiCards.map((card) => {
+          const Icon = card.icon;
           return (
-            <Card key={s.label}>
+            <Card key={card.label}>
               <CardContent className="p-4">
-                {sumLoading ? (
+                {isLoading ? (
                   <Skeleton className="h-14 w-full" />
                 ) : (
                   <div className="flex items-center gap-2.5">
-                    <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${s.bg}`}>
-                      <Icon className={`h-4 w-4 ${s.color}`} />
+                    <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${card.bg}`}>
+                      <Icon className={`h-4 w-4 ${card.color}`} />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500">{s.label}</p>
-                      <p className="text-base font-bold text-slate-900">{s.value}</p>
+                      <p className="text-xs text-slate-400 leading-tight">{card.label}</p>
+                      <p className="text-sm font-bold text-slate-900 mt-0.5">{card.value}</p>
                     </div>
                   </div>
                 )}
@@ -130,121 +207,126 @@ export default function CommissionsPage() {
         })}
       </div>
 
-      {/* Filters + batch action */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); setSelected([]); }}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Toutes</SelectItem>
-            <SelectItem value="pending">{t("pending")}</SelectItem>
-            <SelectItem value="settled">{t("settled")}</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {selected.length > 0 && (
-          <Button
-            onClick={() => settleBatchMutation.mutate(selected)}
-            disabled={settleBatchMutation.isPending}
-          >
-            <CheckCircle className="h-4 w-4 mr-2" />
-            {t("settleSelected")} ({selected.length})
-          </Button>
-        )}
-      </div>
-
-      {/* Table */}
+      {/* Line chart */}
       <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 bg-slate-50 accent-brand-500"
-                  checked={selected.length > 0 && selected.length === commissions.filter(c => !c.settled_at).length}
-                  onChange={toggleAll}
+        <CardHeader>
+          <CardTitle className="text-base">Évolution des commissions — {period} derniers jours</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : chartData.length === 0 ? (
+            <div className="flex items-center justify-center h-64 text-slate-400 gap-2">
+              <BarChart3 className="h-5 w-5 opacity-40" />
+              Aucune donnée sur cette période
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  tickLine={false}
                 />
-              </TableHead>
-              <TableHead>{t("brand")}</TableHead>
-              <TableHead>{t("payment")}</TableHead>
-              <TableHead>{t("type")}</TableHead>
-              <TableHead>{t("rate")}</TableHead>
-              <TableHead>{t("amount")}</TableHead>
-              <TableHead>{t("settledAt")}</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading
-              ? Array.from({ length: 8 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((_, j) => (
-                      <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              : commissions.map((c) => (
-                  <TableRow key={c.id} className={selected.includes(c.id) ? "bg-slate-100" : ""}>
-                    <TableCell>
-                      {!c.settled_at && (
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-slate-300 bg-slate-50 accent-brand-500"
-                          checked={selected.includes(c.id)}
-                          onChange={() => toggleSelect(c.id)}
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium text-slate-900">
-                      {c.brands?.name ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-xs text-slate-500">
-                        #{c.orders?.id?.slice(0, 8) ?? "—"}
-                      </span>
-                      <p className="text-sm text-slate-900">{formatCurrency(c.orders?.total ?? 0)}</p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={c.type === "online" ? "info" : "pending"}>
-                        {c.type === "online" ? "En ligne" : "Présentiel"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-slate-700">{(c.rate * 100).toFixed(1)}%</TableCell>
-                    <TableCell className="font-bold text-brand-400">{formatCurrency(c.amount)}</TableCell>
-                    <TableCell>
-                      {c.settled_at ? (
-                        <span className="text-xs text-green-400">{formatDateTime(c.settled_at)}</span>
-                      ) : (
-                        <Badge variant="pending">En attente</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {!c.settled_at && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm(t("confirmSettle"))) settleMutation.mutate(c.id);
-                          }}
-                          disabled={settleMutation.isPending}
-                        >
-                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                          Reverser
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-          </TableBody>
-        </Table>
-        {data?.pagination && (
-          <div className="p-4 border-t border-slate-200">
-            <Pagination page={data.pagination.page} totalPages={data.pagination.total_pages}
-              total={data.pagination.total} limit={data.pagination.limit} onPageChange={setPage} />
-          </div>
-        )}
+                <YAxis
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "#ffffff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                  }}
+                  formatter={(v: number) => [formatCurrency(v), "Commissions"]}
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="Commissions"
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, fill: "#f97316" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Per-brand table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Commissions par marque</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Marque</TableHead>
+                <TableHead>Commissions en ligne</TableHead>
+                <TableHead>Commissions présentiel</TableHead>
+                <TableHead>Total</TableHead>
+                <TableHead>Statut</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={i}>
+                      {Array.from({ length: 5 }).map((_, j) => (
+                        <TableCell key={j}><Skeleton className="h-5 w-full" /></TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                : !data?.entries || data.entries.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        <div className="flex flex-col items-center justify-center py-10 gap-2 text-slate-400">
+                          <BarChart3 className="h-8 w-8 opacity-30" />
+                          <p className="text-sm">Aucune commission sur cette période</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                : data.entries.map((entry) => (
+                    <TableRow key={entry.brand_id}>
+                      <TableCell className="font-semibold text-slate-900">{entry.brand_name}</TableCell>
+                      <TableCell className="text-blue-500 font-medium">
+                        {formatCurrency(entry.online_commissions)}
+                      </TableCell>
+                      <TableCell className="text-purple-500 font-medium">
+                        {formatCurrency(entry.inperson_commissions)}
+                      </TableCell>
+                      <TableCell className="font-bold text-brand-500">
+                        {formatCurrency(entry.total)}
+                      </TableCell>
+                      <TableCell>
+                        {entry.settled ? (
+                          <Badge
+                            variant="outline"
+                            className="border-green-500/30 bg-green-500/10 text-green-400 text-xs gap-1"
+                          >
+                            <CheckCircle2 className="h-3 w-3" /> Reversée
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-500/30 bg-amber-500/10 text-amber-400 text-xs gap-1"
+                          >
+                            <Clock className="h-3 w-3" /> En attente
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+            </TableBody>
+          </Table>
+        </CardContent>
       </Card>
     </div>
   );

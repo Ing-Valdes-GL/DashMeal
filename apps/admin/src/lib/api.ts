@@ -58,12 +58,14 @@ api.interceptors.response.use(
 // ─── Helpers cookies ─────────────────────────────────────────────────────────
 export function setCookie(name: string, value: string, days: number) {
   const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Strict`;
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${name}=${value}; expires=${expires}; path=/; SameSite=Strict${secure}`;
 }
 
 export function clearAuthCookies() {
-  document.cookie = "dm_access_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
-  document.cookie = "dm_refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `dm_access_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict${secure}`;
+  document.cookie = `dm_refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Strict${secure}`;
 }
 
 function getCurrentLocale() {

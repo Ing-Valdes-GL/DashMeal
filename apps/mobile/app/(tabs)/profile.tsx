@@ -94,7 +94,8 @@ export default function ProfileScreen() {
       title: "Activité",
       items: [
         { icon: "receipt-outline",       iconColor: "#9C27B0", iconBg: "#F3E5F5", label: "Mes commandes",   onPress: () => router.push("/(tabs)/orders") },
-        { icon: "heart-outline",         iconColor: "#E91E63", iconBg: "#FCE4EC", label: "Mes favoris",     onPress: () => router.push("/profile/favorites") },
+        { icon: "heart-outline",         iconColor: "#E91E63", iconBg: "#FCE4EC", label: "Mes favoris",     onPress: () => router.push("/(tabs)/favorites") },
+        { icon: "star-outline",          iconColor: "#FFC107", iconBg: "#FFF9C4", label: "Points de fidélité", onPress: () => router.push("/profile/loyalty") },
         { icon: "notifications-outline", iconColor: "#FF9800", iconBg: "#FFF3E0", label: "Notifications",   onPress: () => {} },
       ],
     },
@@ -102,7 +103,7 @@ export default function ProfileScreen() {
       title: "Aide & Support",
       items: [
         { icon: "help-circle-outline", iconColor: "#00BCD4", iconBg: "#E0F7FA", label: "FAQ",        onPress: () => {} },
-        { icon: "settings-outline",    iconColor: "#795548", iconBg: "#EFEBE9", label: "Paramètres", onPress: () => {} },
+        { icon: "settings-outline",    iconColor: "#795548", iconBg: "#EFEBE9", label: "Paramètres", onPress: () => router.push("/profile/settings") },
       ],
     },
     {
