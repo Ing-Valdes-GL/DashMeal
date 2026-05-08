@@ -36,6 +36,14 @@ import auditRoutes from "./modules/audit/audit.routes.js";
 import mapsRoutes from "./modules/maps/maps.routes.js";
 import walletRoutes from "./modules/wallet/wallet.routes.js";
 import adsRoutes from "./modules/ads/ads.routes.js";
+import promotionsRoutes from "./modules/promotions/promotions.routes.js";
+import loyaltyRoutes from "./modules/loyalty/loyalty.routes.js";
+import deliveryZonesRoutes from "./modules/delivery-zones/delivery-zones.routes.js";
+import driverDocsRoutes from "./modules/driver-docs/driver-docs.routes.js";
+import reportsRoutes from "./modules/reports/reports.routes.js";
+import favoritesRoutes from "./modules/favorites/favorites.routes.js";
+import trackingRoutes from "./modules/tracking/tracking.routes.js";
+import groupOrdersRoutes from "./modules/group-orders/group-orders.routes.js";
 
 const app: Application = express();
 
@@ -46,19 +54,14 @@ app.disable("etag");
 
 // ─── Sécurité ─────────────────────────────────────────────────────────────────
 app.use(helmet());
-const allowedOrigins = env.CORS_ORIGINS.split(",").map((o) => o.trim());
+const allowedOrigins = env.CORS_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean);
 app.use(
   cors({
     origin: (origin, callback) => {
+      // Appels server-to-server (webhooks, Railway cron) n'ont pas d'origin
       if (!origin) return callback(null, true);
-      if (
-        allowedOrigins.includes(origin) ||
-        /^https:\/\/[a-z0-9-]+(\.vercel\.app)$/.test(origin) ||
-        /^exp:\/\//.test(origin)
-      ) {
-        return callback(null, true);
-      }
-      callback(new Error("Not allowed by CORS"));
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS: origine non autorisée — ${origin}`));
     },
     credentials: true,
   })
@@ -82,8 +85,30 @@ const authLimiter = rateLimit({
   message: { success: false, error: { code: "RATE_LIMIT", message: "Trop de tentatives" } },
 });
 
+// Reset de mot de passe : 5 tentatives / 15 min par IP
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: { code: "RATE_LIMIT", message: "Trop de demandes de réinitialisation" } },
+});
+
+// Inscription : 10 tentatives / 1 heure par IP
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: { success: false, error: { code: "RATE_LIMIT", message: "Trop d'inscriptions depuis cette adresse" } },
+});
+
+// Candidature marque : 5 tentatives / heure par IP
+const applyLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: { code: "RATE_LIMIT", message: "Trop de candidatures depuis cette adresse" } },
+});
+
 // ─── Parsing ──────────────────────────────────────────────────────────────────
-app.use(express.json({ limit: "10mb" }));
+// 1 MB suffit pour les requêtes JSON ; multer gère séparément les uploads binaires
+app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
@@ -93,15 +118,19 @@ if (env.NODE_ENV !== "test") {
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", env: env.NODE_ENV, timestamp: new Date().toISOString() });
+  res.json({ status: "ok" });
 });
 app.get(`${API_PREFIX}/health`, (_req, res) => {
-  res.json({ status: "ok", env: env.NODE_ENV, timestamp: new Date().toISOString() });
+  res.json({ status: "ok" });
 });
 
 // ─── Routes API ───────────────────────────────────────────────────────────────
-app.use(`${API_PREFIX}/auth`,             authLimiter, authRoutes);
-app.use(`${API_PREFIX}/branch-auth`,      authLimiter, branchAuthRoutes);
+// Rate limiters spécifiques appliqués avant les routes d'auth globales
+app.use(`${API_PREFIX}/auth/user/register`,      registerLimiter);
+app.use(`${API_PREFIX}/auth/user/request-reset`, resetLimiter);
+app.use(`${API_PREFIX}/auth/apply`,              applyLimiter);
+app.use(`${API_PREFIX}/auth`,                    authLimiter, authRoutes);
+app.use(`${API_PREFIX}/branch-auth`,             authLimiter, branchAuthRoutes);
 app.use(`${API_PREFIX}/branch-managers`,  branchManagersRoutes);
 app.use(`${API_PREFIX}/driver-wallet`,    driverWalletRoutes);
 app.use(`${API_PREFIX}/branch-hours`,     branchHoursRoutes);
@@ -125,7 +154,15 @@ app.use(`${API_PREFIX}/documents`, documentsRoutes);
 app.use(`${API_PREFIX}/audit`, auditRoutes);
 app.use(`${API_PREFIX}/maps`,   mapsRoutes);
 app.use(`${API_PREFIX}/wallet`, walletRoutes);
-app.use(`${API_PREFIX}/ads`,    adsRoutes);
+app.use(`${API_PREFIX}/ads`,            adsRoutes);
+app.use(`${API_PREFIX}/promotions`,    promotionsRoutes);
+app.use(`${API_PREFIX}/loyalty`,       loyaltyRoutes);
+app.use(`${API_PREFIX}/delivery-zones`, deliveryZonesRoutes);
+app.use(`${API_PREFIX}/driver-docs`,   driverDocsRoutes);
+app.use(`${API_PREFIX}/reports`,       reportsRoutes);
+app.use(`${API_PREFIX}/favorites`,     favoritesRoutes);
+app.use(`${API_PREFIX}/tracking`,      trackingRoutes);
+app.use(`${API_PREFIX}/group-orders`,  groupOrdersRoutes);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {

@@ -36,13 +36,19 @@ router.post(
 );
 
 // ─── Super Admin ──────────────────────────────────────────────────────────────
+const StrongPassword = z.string()
+  .min(12, "Le mot de passe doit contenir au moins 12 caractères")
+  .refine((p) => /[A-Z]/.test(p), "Doit contenir une majuscule")
+  .refine((p) => /[0-9]/.test(p), "Doit contenir un chiffre")
+  .refine((p) => /[!@#$%^&*\-_]/.test(p), "Doit contenir un caractère spécial");
+
 router.post(
   "/superadmin/register",
   validate(
     z.object({
       email: z.string().email(),
       phone: z.string().regex(/^\+?[1-9]\d{7,14}$/),
-      password: z.string().min(8),
+      password: StrongPassword,
     })
   ),
   controller.registerSuperAdmin

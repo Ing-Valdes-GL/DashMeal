@@ -14,6 +14,7 @@ import {
   BarChart2, Bell, Settings, Building2, FileText,
   Users, Activity, Globe, ChevronRight, LogOut,
   UserCheck, Wallet, DollarSign, Megaphone, UsersRound,
+  Tag, LayoutGrid, ClipboardCheck, Download, MapPin,
 } from "lucide-react";
 
 interface NavItem {
@@ -52,18 +53,23 @@ export function Sidebar({ locale }: { locale: string }) {
   };
 
   const adminNav: NavItem[] = [
-    { href: "/dashboard",     label: t("dashboard"),     icon: LayoutDashboard },
-    { href: "/orders",        label: t("orders"),        icon: ShoppingCart, badge: pendingCount },
-    { href: "/branches",      label: t("branches"),      icon: Store },
-    { href: "/delivery",      label: t("delivery"),      icon: Truck },
-    { href: "/drivers",         label: t("drivers"),         icon: UserCheck },
-    { href: "/branch-managers", label: "Managers agence",    icon: UsersRound },
-    { href: "/collect",       label: t("collect"),       icon: QrCode },
-    { href: "/analytics",     label: t("analytics"),     icon: BarChart2 },
-    { href: "/wallet",        label: t("wallet"),        icon: Wallet },
-    { href: "/ads",           label: t("ads"),           icon: Megaphone },
-    { href: "/notifications", label: t("notifications"), icon: Bell },
-    { href: "/settings",      label: t("settings"),      icon: Settings },
+    { href: "/dashboard",       label: t("dashboard"),      icon: LayoutDashboard },
+    { href: "/orders",          label: t("orders"),         icon: ShoppingCart, badge: pendingCount },
+    { href: "/orders/global",   label: t("globalOrders"),   icon: LayoutGrid },
+    { href: "/branches",        label: t("branches"),       icon: Store },
+    { href: "/delivery",        label: t("delivery"),       icon: Truck },
+    { href: "/delivery-zones",  label: t("deliveryZones"),  icon: MapPin },
+    { href: "/drivers",         label: t("drivers"),        icon: UserCheck },
+    { href: "/drivers/kyc",     label: t("kyc"),            icon: ClipboardCheck },
+    { href: "/branch-managers", label: t("branchManagers"), icon: UsersRound },
+    { href: "/collect",         label: t("collect"),        icon: QrCode },
+    { href: "/analytics",       label: t("analytics"),      icon: BarChart2 },
+    { href: "/promotions",      label: t("promotions"),     icon: Tag },
+    { href: "/wallet",          label: t("wallet"),         icon: Wallet },
+    { href: "/ads",             label: t("ads"),            icon: Megaphone },
+    { href: "/reports",         label: t("reports"),        icon: Download },
+    { href: "/notifications",   label: t("notifications"),  icon: Bell },
+    { href: "/settings",        label: t("settings"),       icon: Settings },
   ];
 
   const superadminNav: NavItem[] = [

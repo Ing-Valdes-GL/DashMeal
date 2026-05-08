@@ -169,9 +169,9 @@ export async function loginAdmin(input: LoginAdminInput): Promise<{ requires_otp
     throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
   }
 
-  const { emailSent, code } = await sendEmailOtp(admin.email);
+  const { emailSent } = await sendEmailOtp(admin.email);
   if (!emailSent) {
-    console.warn(`⚠️  Email OTP non envoyé pour ${admin.email} — code: ${code}`);
+    console.warn(`⚠️  Email OTP non envoyé pour l'admin — vérifier la config RESEND`);
   }
 
   return { requires_otp: true, email: admin.email };
@@ -226,9 +226,9 @@ export async function loginSuperAdmin(input: LoginAdminInput): Promise<{ require
     throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
   }
 
-  const { emailSent, code } = await sendEmailOtp(superAdmin.email);
+  const { emailSent } = await sendEmailOtp(superAdmin.email);
   if (!emailSent) {
-    console.warn(`⚠️  Email OTP non envoyé pour ${superAdmin.email} — code: ${code}`);
+    console.warn(`⚠️  Email OTP non envoyé pour le superadmin — vérifier la config RESEND`);
   }
 
   return { requires_otp: true, email: superAdmin.email };

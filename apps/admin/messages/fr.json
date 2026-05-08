@@ -60,6 +60,12 @@
     "platform": "Plateforme",
     "wallet": "Wallet",
     "ads": "Publicités",
+    "promotions": "Promotions",
+    "globalOrders": "Commandes globales",
+    "kyc": "KYC Livreurs",
+    "reports": "Rapports",
+    "deliveryZones": "Zones de livraison",
+    "branchManagers": "Managers agence",
     "logout": "Déconnexion"
   },
   "auth": {
