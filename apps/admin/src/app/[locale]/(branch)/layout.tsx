@@ -23,7 +23,7 @@ const NAV: NavItem[] = [
 ];
 
 export default function BranchLayout({ children }: { children: React.ReactNode }) {
-  const { manager, isAuthenticated, logout } = useBranchAuthStore();
+  const { manager, isAuthenticated, _hasHydrated, logout } = useBranchAuthStore();
   const router   = useRouter();
   const pathname = usePathname();
   const params   = useParams<{ locale: string }>();
@@ -31,13 +31,16 @@ export default function BranchLayout({ children }: { children: React.ReactNode }
   const isLoginPage = pathname.includes("/branch/login");
 
   useEffect(() => {
+    if (!_hasHydrated) return; // wait for localStorage to load
     if (!isAuthenticated && !isLoginPage) {
       router.replace(`/${params.locale}/branch/login`);
     }
-  }, [isAuthenticated, isLoginPage, params.locale, router]);
+  }, [_hasHydrated, isAuthenticated, isLoginPage, params.locale, router]);
 
   // Render login page without sidebar
   if (isLoginPage) return <>{children}</>;
+  // Show nothing until hydrated (avoids flash redirect on refresh)
+  if (!_hasHydrated) return null;
   if (!isAuthenticated) return null;
 
   const isActive = (href: string) => pathname.includes(href);
