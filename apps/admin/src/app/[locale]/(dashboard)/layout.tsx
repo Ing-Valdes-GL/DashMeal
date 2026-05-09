@@ -15,11 +15,12 @@ export default function DashboardLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = use(params);
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, _hasHydrated } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    if (!_hasHydrated) return; // wait for localStorage to load
     if (!isAuthenticated || !user) {
       router.push(`/${locale}/login`);
       return;
@@ -33,9 +34,10 @@ export default function DashboardLayout({
     if (!isSuperadmin && pathname.includes("/superadmin/")) {
       router.replace(`/${locale}/dashboard`);
     }
-  }, [isAuthenticated, user, locale, pathname, router]);
+  }, [_hasHydrated, isAuthenticated, user, locale, pathname, router]);
 
-  if (!isAuthenticated || !user) {
+  // Show spinner while Zustand rehydrates from localStorage (avoids false logout on refresh)
+  if (!_hasHydrated || !isAuthenticated || !user) {
     return (
       <div className="flex h-screen items-center justify-center bg-surface-950">
         <Spinner size="lg" />

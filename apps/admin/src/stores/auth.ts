@@ -19,9 +19,11 @@ export interface AuthUser {
 interface AuthState {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  _hasHydrated: boolean;
   login: (user: AuthUser, accessToken: string, refreshToken: string) => void;
   logout: () => void;
   updateUser: (partial: Partial<AuthUser>) => void;
+  setHasHydrated: (v: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -29,10 +31,13 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       isAuthenticated: false,
+      _hasHydrated: false,
+
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
 
       login: (user, accessToken, refreshToken) => {
-        setCookie("dm_access_token", accessToken, 7);       // 7 jours cookie (JWT 24h, intercepteur renouvelle)
-        setCookie("dm_refresh_token", refreshToken, 30);   // 30 jours
+        setCookie("dm_access_token", accessToken, 7);
+        setCookie("dm_refresh_token", refreshToken, 30);
         set({ user, isAuthenticated: true });
       },
 
@@ -49,6 +54,9 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "dash-meal-auth",
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

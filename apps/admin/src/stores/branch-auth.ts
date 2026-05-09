@@ -15,8 +15,10 @@ export interface BranchManager {
 interface BranchAuthState {
   manager: BranchManager | null;
   isAuthenticated: boolean;
+  _hasHydrated: boolean;
   login: (manager: BranchManager, accessToken: string, refreshToken: string) => void;
   logout: () => void;
+  setHasHydrated: (v: boolean) => void;
 }
 
 export const useBranchAuthStore = create<BranchAuthState>()(
@@ -24,6 +26,9 @@ export const useBranchAuthStore = create<BranchAuthState>()(
     (set) => ({
       manager: null,
       isAuthenticated: false,
+      _hasHydrated: false,
+
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
 
       login: (manager, accessToken, refreshToken) => {
         setCookie("dm_branch_access_token",  accessToken,  7);
@@ -40,6 +45,9 @@ export const useBranchAuthStore = create<BranchAuthState>()(
     {
       name: "dash-meal-branch-auth",
       partialize: (state) => ({ manager: state.manager, isAuthenticated: state.isAuthenticated }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
