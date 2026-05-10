@@ -91,36 +91,43 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
     console.log(`[OTP DEV] Code envoyé à ***${normalized.slice(-4)} — expire ${expiresAt.toLocaleTimeString()}`);
   }
 
-  if (!env.TERMII_API_KEY) {
-    console.warn("⚠️  TERMII_API_KEY manquant — SMS non envoyé");
+  if (!env.AT_API_KEY || !env.AT_USERNAME) {
+    console.warn("⚠️  AT_API_KEY / AT_USERNAME manquants — SMS non envoyé");
     return { code, smsSent: false };
   }
 
   try {
-    const response = await fetch(`${env.TERMII_BASE_URL}/api/sms/send`, {
+    const params = new URLSearchParams({
+      username: env.AT_USERNAME,
+      to:       normalized,
+      message:  `Votre code de vérification Dash Meal : ${code}. Valable ${OTP_EXPIRES_IN_MINUTES} minutes.`,
+    });
+    if (env.AT_SENDER_ID) params.set("from", env.AT_SENDER_ID);
+
+    const response = await fetch("https://api.africastalking.com/version1/messaging", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: env.TERMII_API_KEY,
-        to: normalized,
-        from: env.TERMII_SENDER_ID || "N-Alert",
-        sms: `Votre code de vérification Dash Meal : ${code}. Valable ${OTP_EXPIRES_IN_MINUTES} minutes.`,
-        type: "plain",
-        channel: "generic",
-      }),
+      headers: {
+        "apiKey":       env.AT_API_KEY,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept":       "application/json",
+      },
+      body: params.toString(),
     });
 
-    const result = await response.json() as { message_id?: string; message?: string; code?: string };
+    const result = await response.json() as {
+      SMSMessageData?: { Recipients?: { statusCode: number; messageId: string }[] };
+    };
 
-    if (!response.ok || result.code === "error") {
-      console.error(`❌ Échec envoi SMS Termii (${response.status}): ${JSON.stringify(result)}`);
+    const recipient = result.SMSMessageData?.Recipients?.[0];
+    if (!response.ok || !recipient || recipient.statusCode !== 101) {
+      console.error(`❌ Échec envoi SMS Africa's Talking (${response.status}): ${JSON.stringify(result)}`);
       return { code, smsSent: false };
     }
 
-    console.log(`✅ SMS OTP Termii envoyé à ***${normalized.slice(-4)} (id: ${result.message_id ?? "n/a"})`);
+    console.log(`✅ SMS OTP AT envoyé à ***${normalized.slice(-4)} (id: ${recipient.messageId})`);
     return { code, smsSent: true };
   } catch (err) {
-    console.error("❌ Erreur réseau envoi SMS Termii:", err);
+    console.error("❌ Erreur réseau envoi SMS Africa's Talking:", err);
     return { code, smsSent: false };
   }
 }
