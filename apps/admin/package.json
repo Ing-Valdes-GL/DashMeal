@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@dash-meal/shared": "workspace:*",
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-avatar": "^1.1.1",
     "@radix-ui/react-dialog": "^1.1.3",
