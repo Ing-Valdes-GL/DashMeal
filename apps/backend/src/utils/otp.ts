@@ -91,30 +91,3 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean> {
   return true;
 }
 
-export async function sendEmailOtp(email: string): Promise<{ code: string; sent: boolean }> {
-  const code = generateCode();
-  const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
-
-  await supabase.from("otps").upsert(
-    { email, otp: code, expires_at: expiresAt.toISOString() },
-    { onConflict: "email" }
-  );
-
-  console.log(`[OTP EMAIL] Code pour ${email} : ${code}`);
-  return { code, sent: false };
-}
-
-export async function verifyEmailOtp(email: string, code: string): Promise<boolean> {
-  const { data } = await supabase
-    .from("otps")
-    .select("id")
-    .eq("email", email)
-    .eq("otp", code)
-    .gt("expires_at", new Date().toISOString())
-    .single();
-
-  if (!data) return false;
-
-  await supabase.from("otps").delete().eq("id", data.id);
-  return true;
-}

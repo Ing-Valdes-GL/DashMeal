@@ -199,7 +199,7 @@ export default function ReelsPage() {
                   <Play className="w-12 h-12 text-white/50" />
                 )}
                 <div className="absolute top-2 right-2">
-                  <Badge variant={r.is_active ? "default" : "secondary"} className="gap-1">
+                  <Badge variant={r.is_active ? "default" : "outline"} className="gap-1">
                     {r.is_active ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                     {r.is_active ? "Actif" : "Inactif"}
                   </Badge>
