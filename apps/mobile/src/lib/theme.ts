@@ -1,7 +1,7 @@
 // ─── Dash Meal — Nectar-inspired Design System ────────────────────────────────
 
 export const Colors = {
-  // Backgrounds
+  // Backgrounds (light app)
   bg:        "#FFFFFF",
   pageBg:    "#F2F3F2",
   card:      "#FFFFFF",
@@ -12,7 +12,7 @@ export const Colors = {
   primaryLight: "#F2F9F0",
   primaryDark:  "#3E8C58",
 
-  // Text
+  // Text (light)
   text:    "#181725",
   text2:   "#7C7C7C",
   text3:   "#B3B3B3",
@@ -30,6 +30,11 @@ export const Colors = {
   // Tabs
   tabActive:   "#53B175",
   tabInactive: "#B3B3B3",
+
+  // Dark surfaces — used by auth screens (welcome, login, register, otp)
+  darkBg:    "#0D0D0D",
+  darkInput: "rgba(255,255,255,0.07)",
+  textDark2: "rgba(255,255,255,0.55)",
 } as const;
 
 export const Radius = {

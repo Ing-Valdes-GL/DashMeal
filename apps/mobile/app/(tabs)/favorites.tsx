@@ -1,364 +1,149 @@
-/**
- * Favoris — (tabs)/favorites.tsx
- *
- * Grille 2 colonnes de produits favoris avec suppression inline.
- * API : GET /favorites  →  [{ id, product_id, products: { id, name_fr, price, image_url } }]
- *       DELETE /favorites/:product_id
- */
-
-import React, { useCallback } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Dimensions,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiGet, apiDelete } from "@/lib/api";
-import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Colors, Radius, Shadow } from "@/lib/theme";
+import { useTranslation } from "react-i18next";
+import { useAuthStore } from "@/stores/auth";
+import { useCartStore } from "@/stores/cart";
+import { apiGet, apiDelete } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { Colors, Radius, Shadow } from "@/lib/theme";
 
 interface FavoriteProduct {
   id: string;
   product_id: string;
-  products: {
-    id: string;
-    name_fr: string;
-    price: number;
-    image_url: string | null;
+  product: {
+    id: string; name: string; price: number;
+    image_url?: string; unit?: string;
+    branch?: { name: string };
   };
 }
 
-interface FavoritesResponse {
-  success: boolean;
-  data: FavoriteProduct[];
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const { width: SCREEN_W } = Dimensions.get("window");
-const CARD_GAP = 12;
-const CARD_H_PADDING = 16;
-const CARD_W = (SCREEN_W - CARD_H_PADDING * 2 - CARD_GAP) / 2;
-
-// ─── Skeleton Card ────────────────────────────────────────────────────────────
-
-function SkeletonCard() {
-  return (
-    <View style={[styles.card, { width: CARD_W }]}>
-      <View style={[styles.cardImage, styles.skeleton]} />
-      <View style={styles.cardBody}>
-        <View style={[styles.skeleton, { height: 12, borderRadius: 6, marginBottom: 6 }]} />
-        <View style={[styles.skeleton, { height: 12, borderRadius: 6, width: "60%" }]} />
-        <View style={[styles.skeleton, { height: 14, borderRadius: 6, width: "40%", marginTop: 8 }]} />
-      </View>
-    </View>
-  );
-}
-
-// ─── Product Card ─────────────────────────────────────────────────────────────
-
-interface ProductCardProps {
-  item: FavoriteProduct;
-  onPress: () => void;
-  onRemove: () => void;
-  removing: boolean;
-}
-
-const ProductCard = React.memo(function ProductCard({
-  item,
-  onPress,
-  onRemove,
-  removing,
-}: ProductCardProps) {
-  const product = item.products;
-
-  return (
-    <TouchableOpacity
-      style={[styles.card, { width: CARD_W }]}
-      activeOpacity={0.88}
-      onPress={onPress}
-    >
-      {/* Image */}
-      <View style={styles.cardImageWrap}>
-        {product.image_url ? (
-          <Image
-            source={{ uri: product.image_url }}
-            style={styles.cardImage}
-            contentFit="cover"
-            transition={200}
-          />
-        ) : (
-          <View style={[styles.cardImage, styles.cardImageFallback]}>
-            <Ionicons name="image-outline" size={28} color={Colors.border} />
-          </View>
-        )}
-        {/* Remove button */}
-        <TouchableOpacity
-          style={styles.heartBtn}
-          onPress={onRemove}
-          disabled={removing}
-          activeOpacity={0.8}
-          hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
-        >
-          {removing ? (
-            <ActivityIndicator size="small" color={Colors.error} />
-          ) : (
-            <Ionicons name="heart" size={16} color={Colors.error} />
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Body */}
-      <View style={styles.cardBody}>
-        <Text style={styles.cardName} numberOfLines={2}>
-          {product.name_fr}
-        </Text>
-        <Text style={styles.cardPrice}>{formatCurrency(product.price)}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
-
-export default function FavoritesScreen() {
+export default function FavouritesScreen() {
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+  const { isAuthenticated, isGuest } = useAuthStore();
+  const addItem = useCartStore((s) => s.addItem);
+  const qc = useQueryClient();
 
-  const { data, isLoading, refetch, isRefetching } = useQuery<FavoritesResponse>({
+  const { data, isLoading } = useQuery<{ data: FavoriteProduct[] }>({
     queryKey: ["favorites"],
-    queryFn: () => apiGet("/favorites"),
-    staleTime: 1000 * 60,
+    queryFn: () => apiGet("/user/favorites"),
+    enabled: isAuthenticated,
+    staleTime: 60_000,
   });
+
+  const { mutate: removeFav } = useMutation({
+    mutationFn: (productId: string) => apiDelete(`/user/favorites/${productId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["favorites"] }),
+  });
+
+  if (isGuest || !isAuthenticated) {
+    return (
+      <View style={s.container}>
+        <StatusBar style="dark" />
+        <SafeAreaView edges={["top"]}><View style={s.header}><Text style={s.headerTitle}>Favourite</Text></View></SafeAreaView>
+        <View style={s.authWall}>
+          <View style={s.authIcon}><Ionicons name="heart-outline" size={56} color={Colors.text3} /></View>
+          <Text style={s.authTitle}>Vos favoris vous attendent</Text>
+          <Text style={s.authSub}>Connectez-vous pour sauvegarder vos produits préférés</Text>
+          <TouchableOpacity style={s.loginBtn} onPress={() => router.push("/(auth)/login")}>
+            <Text style={s.loginBtnText}>Se connecter</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   const favorites = data?.data ?? [];
 
-  const removeMutation = useMutation({
-    mutationFn: (productId: string) => apiDelete(`/favorites/${productId}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["favorites"] });
-    },
-    onError: () => Alert.alert("Erreur", "Impossible de retirer ce favori."),
-  });
-
-  const handleRemove = useCallback(
-    (item: FavoriteProduct) => {
-      Alert.alert(
-        "Retirer des favoris",
-        `Retirer "${item.products.name_fr}" de vos favoris ?`,
-        [
-          { text: "Annuler", style: "cancel" },
-          {
-            text: "Retirer",
-            style: "destructive",
-            onPress: () => removeMutation.mutate(item.product_id),
-          },
-        ]
-      );
-    },
-    [removeMutation]
-  );
-
-  const renderItem = useCallback(
-    ({ item }: { item: FavoriteProduct }) => (
-      <ProductCard
-        item={item}
-        onPress={() => router.push(`/product/${item.products.id}`)}
-        onRemove={() => handleRemove(item)}
-        removing={
-          removeMutation.isPending &&
-          removeMutation.variables === item.product_id
-        }
-      />
-    ),
-    [router, handleRemove, removeMutation.isPending, removeMutation.variables]
-  );
-
   return (
-    <View style={styles.container}>
+    <View style={s.container}>
       <StatusBar style="dark" />
-
-      {/* Header */}
-      <SafeAreaView style={styles.headerSafe} edges={["top"]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Mes favoris</Text>
-          {favorites.length > 0 && (
-            <View style={styles.headerBadge}>
-              <Text style={styles.headerBadgeText}>{favorites.length}</Text>
-            </View>
-          )}
-        </View>
+      <SafeAreaView style={s.safe} edges={["top"]}>
+        <View style={s.header}><Text style={s.headerTitle}>Favourite</Text></View>
       </SafeAreaView>
 
-      {/* Content */}
       {isLoading ? (
-        // Skeleton grid
-        <View style={styles.skeletonGrid}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <SkeletonCard key={i} />
-          ))}
+        <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />
+      ) : favorites.length === 0 ? (
+        <View style={s.authWall}>
+          <View style={s.authIcon}><Ionicons name="heart-outline" size={56} color={Colors.text3} /></View>
+          <Text style={s.authTitle}>{t("favorites.empty")}</Text>
+          <Text style={s.authSub}>{t("favorites.emptySubtitle")}</Text>
+          <TouchableOpacity style={s.loginBtn} onPress={() => router.push("/(tabs)/explore" as any)}>
+            <Text style={s.loginBtnText}>{t("favorites.browse")}</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
           data={favorites}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
-              tintColor={Colors.primary}
-            />
-          }
-          renderItem={renderItem}
-          initialNumToRender={8}
-          maxToRenderPerBatch={6}
-          windowSize={5}
-          removeClippedSubviews
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <View style={styles.emptyIconWrap}>
-                <Ionicons name="heart-outline" size={44} color={Colors.primary} />
-              </View>
-              <Text style={styles.emptyTitle}>Aucun favori</Text>
-              <Text style={styles.emptySubtitle}>
-                Ajoutez des produits en favoris pour les retrouver rapidement ici
-              </Text>
+          keyExtractor={(i) => i.id}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          renderItem={({ item }) => {
+            const p = item.product;
+            return (
               <TouchableOpacity
-                style={styles.emptyBtn}
-                onPress={() => router.push("/(tabs)/catalog")}
-                activeOpacity={0.85}
+                style={s.item}
+                onPress={() => router.push({ pathname: "/product/[id]", params: { id: p.id } })}
+                activeOpacity={0.88}
               >
-                <Ionicons name="grid-outline" size={16} color="#fff" />
-                <Text style={styles.emptyBtnText}>Parcourir les produits</Text>
+                <View style={s.imgWrap}>
+                  {p.image_url
+                    ? <Image source={{ uri: p.image_url }} style={s.img} contentFit="cover" />
+                    : <View style={[s.img, s.imgFallback]}><Ionicons name="fast-food-outline" size={28} color={Colors.primary} /></View>
+                  }
+                </View>
+                <View style={s.body}>
+                  <Text style={s.name} numberOfLines={2}>{p.name}</Text>
+                  {p.unit && <Text style={s.unit}>{p.unit}, Prix</Text>}
+                  {p.branch && <Text style={s.branch}>{p.branch.name}</Text>}
+                  <Text style={s.price}>{formatCurrency(p.price)}</Text>
+                </View>
+                <View style={s.actions}>
+                  <TouchableOpacity style={s.heartBtn} onPress={() => removeFav(p.id)}>
+                    <Ionicons name="heart" size={20} color={Colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.addBtn} onPress={() => addItem({ product_id: p.id, product_name: p.name, product_image: p.image_url, unit_price: p.price, quantity: 1 })}>
+                    <Ionicons name="add" size={18} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={Colors.text3} style={{ marginLeft: 4 }} />
               </TouchableOpacity>
-            </View>
-          }
+            );
+          }}
         />
       )}
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.pageBg },
-
-  headerSafe: { backgroundColor: Colors.bg },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: Colors.bg,
-    gap: 10,
-  },
-  headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.text },
-  headerBadge: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  headerBadgeText: { fontSize: 13, fontWeight: "700", color: Colors.primary },
-
-  list: { padding: CARD_H_PADDING, paddingBottom: 90 },
-  row: { justifyContent: "space-between", marginBottom: CARD_GAP },
-
-  // Product card
-  card: {
-    backgroundColor: Colors.bg,
-    borderRadius: Radius.lg,
-    overflow: "hidden",
-    ...Shadow.sm,
-  },
-  cardImageWrap: { position: "relative" },
-  cardImage: { width: "100%", height: CARD_W * 0.8 },
-  cardImageFallback: {
-    backgroundColor: Colors.inputBg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heartBtn: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.92)",
-    alignItems: "center",
-    justifyContent: "center",
-    ...Shadow.sm,
-  },
-  cardBody: { padding: 10 },
-  cardName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.text,
-    lineHeight: 18,
-    marginBottom: 6,
-  },
-  cardPrice: { fontSize: 14, fontWeight: "800", color: Colors.primary },
-
-  // Skeleton
-  skeleton: { backgroundColor: Colors.border, opacity: 0.5 },
-  skeletonGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    padding: CARD_H_PADDING,
-    gap: CARD_GAP,
-  },
-
-  // Empty state
-  empty: {
-    alignItems: "center",
-    paddingTop: 80,
-    paddingHorizontal: 40,
-    gap: 12,
-  },
-  emptyIconWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: Colors.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  emptyTitle: { fontSize: 18, fontWeight: "700", color: Colors.text },
-  emptySubtitle: {
-    fontSize: 13,
-    color: Colors.text3,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  emptyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.full,
-    paddingHorizontal: 24,
-    paddingVertical: 13,
-    marginTop: 8,
-    ...Shadow.primary,
-  },
-  emptyBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.bg },
+  safe: { backgroundColor: Colors.bg },
+  header: { paddingHorizontal: 16, paddingVertical: 14 },
+  headerTitle: { fontSize: 20, fontWeight: "800", color: Colors.text },
+  authWall: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
+  authIcon: { width: 120, height: 120, borderRadius: 60, backgroundColor: Colors.pageBg, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  authTitle: { fontSize: 18, fontWeight: "700", color: Colors.text, textAlign: "center" },
+  authSub: { fontSize: 14, color: Colors.text2, textAlign: "center", lineHeight: 22 },
+  loginBtn: { marginTop: 12, height: 52, paddingHorizontal: 32, borderRadius: Radius.full, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center" },
+  loginBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  item: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.divider },
+  imgWrap: { width: 64, height: 64, borderRadius: Radius.md, backgroundColor: Colors.pageBg, overflow: "hidden" },
+  img: { width: 64, height: 64 },
+  imgFallback: { alignItems: "center", justifyContent: "center" },
+  body: { flex: 1 },
+  name: { fontSize: 14, fontWeight: "700", color: Colors.text, marginBottom: 2, lineHeight: 18 },
+  unit: { fontSize: 11, color: Colors.text3, marginBottom: 2 },
+  branch: { fontSize: 11, color: Colors.text3, marginBottom: 4 },
+  price: { fontSize: 14, fontWeight: "800", color: Colors.text },
+  actions: { alignItems: "center", gap: 8 },
+  heartBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderColor: Colors.primary, alignItems: "center", justifyContent: "center" },
+  addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center" },
 });

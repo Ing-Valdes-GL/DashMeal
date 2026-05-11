@@ -118,3 +118,21 @@ export async function resetPassword(req: Request, res: Response, next: NextFunct
     next(err);
   }
 }
+
+export async function sendDriverOtp(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.sendDriverOtp(req.body.phone);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function verifyDriverOtp(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.verifyDriverOtp(req.body.phone, req.body.code);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
