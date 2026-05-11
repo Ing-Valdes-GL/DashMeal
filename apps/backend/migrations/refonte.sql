@@ -54,6 +54,18 @@ CREATE TABLE IF NOT EXISTS otps (
   CONSTRAINT otps_identifier_check CHECK (phone IS NOT NULL OR email IS NOT NULL)
 );
 
+-- Contraintes UNIQUE pour upsert onConflict
+ALTER TABLE otps ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE otps ADD COLUMN IF NOT EXISTS email TEXT;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'otps_phone_unique') THEN
+    ALTER TABLE otps ADD CONSTRAINT otps_phone_unique UNIQUE (phone);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'otps_email_unique') THEN
+    ALTER TABLE otps ADD CONSTRAINT otps_email_unique UNIQUE (email);
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_otps_phone ON otps(phone) WHERE phone IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_otps_email ON otps(email) WHERE email IS NOT NULL;
 
