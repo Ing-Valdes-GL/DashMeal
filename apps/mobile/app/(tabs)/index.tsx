@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList,
   ActivityIndicator, RefreshControl, Dimensions,
-  NativeScrollEvent, NativeSyntheticEvent,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -19,51 +18,58 @@ import { Colors, Radius } from "@/lib/theme";
 const { width: W } = Dimensions.get("window");
 
 interface Product {
-  id: string; name: string; price: number;
-  original_price?: number; image_url?: string;
+  id: string; name: string; name_fr?: string; name_en?: string;
+  price: number; original_price?: number; image_url?: string;
   discount_pct?: number; branch?: { name: string }; unit?: string;
+  product_images?: { url: string; is_primary: boolean }[];
 }
 
 const CATEGORIES = [
-  { key: "restaurant",  label: "Restaurants",   icon: "restaurant-outline" as const,  bg: "#FFF3E0", color: "#FF9800" },
-  { key: "supermarket", label: "Supermarché",   icon: "storefront-outline" as const,   bg: "#E3F2FD", color: "#2196F3" },
-  { key: "bakery",      label: "Boulangerie",   icon: "cafe-outline" as const,         bg: "#FFF8E1", color: "#FFC107" },
-  { key: "cafe",        label: "Cafés & Bars",  icon: "wine-outline" as const,         bg: "#EFEBE9", color: "#795548" },
-  { key: "pharmacy",    label: "Pharmacies",    icon: "medkit-outline" as const,       bg: "#E8F5E9", color: Colors.primary },
-  { key: "juice",       label: "Jus & Boissons",icon: "water-outline" as const,        bg: "#E0F7FA", color: "#00BCD4" },
-  { key: "african",     label: "Cuisine locale",icon: "globe-outline" as const,        bg: "#F3E5F5", color: "#9C27B0" },
-  { key: "fastfood",    label: "Fast-food",     icon: "fast-food-outline" as const,   bg: "#FFEBEE", color: "#F44336" },
+  { key: "restaurant",  label: "Restaurants",    icon: "restaurant-outline" as const,  bg: "#FFF3E0", color: "#FF9800" },
+  { key: "supermarket", label: "Supermarché",    icon: "storefront-outline" as const,  bg: "#E3F2FD", color: "#2196F3" },
+  { key: "bakery",      label: "Boulangerie",    icon: "cafe-outline" as const,        bg: "#FFF8E1", color: "#FFC107" },
+  { key: "cafe",        label: "Cafés & Bars",   icon: "wine-outline" as const,        bg: "#EFEBE9", color: "#795548" },
+  { key: "pharmacy",    label: "Pharmacies",     icon: "medkit-outline" as const,      bg: "#E8F5E9", color: Colors.primary },
+  { key: "juice",       label: "Jus & Boissons", icon: "water-outline" as const,       bg: "#E0F7FA", color: "#00BCD4" },
+  { key: "african",     label: "Cuisine locale", icon: "globe-outline" as const,       bg: "#F3E5F5", color: "#9C27B0" },
+  { key: "fastfood",    label: "Fast-food",      icon: "fast-food-outline" as const,   bg: "#FFEBEE", color: "#F44336" },
 ];
 
 const BANNERS = [
-  { id: "1", bg: Colors.primaryLight, title: "Légumes frais", sub: "Jusqu'à 40% de réduction !", icon: "leaf-outline" as const, iconColor: Colors.primary },
-  { id: "2", bg: "#FFF3E0", title: "Flash Sales",  sub: "Offres limitées du jour",   icon: "flash-outline" as const,  iconColor: "#FF9800" },
-  { id: "3", bg: "#E3F2FD", title: "Livraison offerte", sub: "Sur votre 1re commande", icon: "bicycle-outline" as const, iconColor: "#2196F3" },
+  { id: "1", bg: Colors.primaryLight, title: "Légumes frais",    sub: "Jusqu'à 40% de réduction !", icon: "leaf-outline" as const,    iconColor: Colors.primary },
+  { id: "2", bg: "#FFF3E0",           title: "Flash Sales",      sub: "Offres limitées du jour",    icon: "flash-outline" as const,   iconColor: "#FF9800" },
+  { id: "3", bg: "#E3F2FD",           title: "Livraison offerte",sub: "Sur votre 1re commande",     icon: "bicycle-outline" as const, iconColor: "#2196F3" },
 ];
 
-const MOCK: Product[] = [
-  { id: "m1", name: "Bananes Organiques", price: 1500, original_price: 2000, unit: "7 unités, Prix", branch: { name: "Marché Central" } },
-  { id: "m2", name: "Pomme Rouge",    price: 4500, unit: "1kg, Prix",   branch: { name: "Fresh Market" } },
-  { id: "m3", name: "Ndolé crevettes",price: 2500, branch: { name: "Saveurs du Pays" } },
-  { id: "m4", name: "Poulet braisé",  price: 3500, original_price: 5000, branch: { name: "Chez Paul" } },
-  { id: "m5", name: "Jus de fruit",   price: 1000, unit: "500ml", branch: { name: "Fresh Bar" } },
-  { id: "m6", name: "Pastels",        price: 800,  branch: { name: "Street Food" } },
-];
+function getProductImage(p: Product): string | undefined {
+  if (p.image_url) return p.image_url;
+  const primary = p.product_images?.find((i) => i.is_primary);
+  return primary?.url ?? p.product_images?.[0]?.url;
+}
 
-function ProductCard({ item, onPress, onAdd }: { item: Product; onPress: () => void; onAdd: () => void }) {
+function getProductName(p: Product, lang: string) {
+  if (lang === "en" && p.name_en) return p.name_en;
+  if (p.name_fr) return p.name_fr;
+  return p.name ?? "";
+}
+
+function ProductCard({ item, onPress, onAdd, lang }: { item: Product; onPress: () => void; onAdd: () => void; lang: string }) {
   const hasDiscount = item.original_price && item.original_price > item.price;
   const pct = hasDiscount ? Math.round((1 - item.price / item.original_price!) * 100) : item.discount_pct;
+  const imageUrl = getProductImage(item);
+  const name = getProductName(item, lang);
+
   return (
     <TouchableOpacity style={pc.wrap} onPress={onPress} activeOpacity={0.88}>
       <View style={pc.imgWrap}>
-        {item.image_url
-          ? <Image source={{ uri: item.image_url }} style={pc.img} contentFit="cover" />
+        {imageUrl
+          ? <Image source={{ uri: imageUrl }} style={pc.img} contentFit="cover" />
           : <View style={[pc.img, pc.imgFallback]}><Ionicons name="fast-food-outline" size={40} color={Colors.primary} /></View>
         }
         {pct ? <View style={pc.badge}><Text style={pc.badgeText}>-{pct}%</Text></View> : null}
       </View>
       <View style={pc.body}>
-        <Text style={pc.name} numberOfLines={2}>{item.name}</Text>
+        <Text style={pc.name} numberOfLines={2}>{name}</Text>
         {item.unit && <Text style={pc.unit}>{item.unit}</Text>}
         {item.branch && <Text style={pc.branch} numberOfLines={1}>{item.branch.name}</Text>}
         <Text style={pc.price}>{formatCurrency(item.price)}</Text>
@@ -116,9 +122,26 @@ function BannerCarousel() {
   );
 }
 
+function ProductListSkeleton() {
+  return (
+    <View style={{ flexDirection: "row", paddingHorizontal: 16, gap: 14 }}>
+      {[1, 2, 3].map((k) => (
+        <View key={k} style={[pc.wrap, { width: 160, opacity: 0.4 }]}>
+          <View style={[pc.imgWrap, { backgroundColor: Colors.pageBg }]} />
+          <View style={pc.body}>
+            <View style={{ height: 12, backgroundColor: Colors.border, borderRadius: 6, marginBottom: 6 }} />
+            <View style={{ height: 10, backgroundColor: Colors.border, borderRadius: 6, width: "60%" }} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language;
   const addItem = useCartStore((s) => s.addItem);
 
   const { data: promoRes, isLoading: l1, refetch, isRefetching } = useQuery<{ data: Product[] }>({
@@ -132,10 +155,16 @@ export default function HomeScreen() {
     staleTime: 120_000,
   });
 
-  const promo   = promoRes?.data?.length  ? promoRes.data   : MOCK.slice(0, 4);
-  const featured = featRes?.data?.length  ? featRes.data    : MOCK;
+  const promo    = promoRes?.data ?? [];
+  const featured = featRes?.data ?? [];
 
-  const handleAdd = (p: Product) => addItem({ product_id: p.id, product_name: p.name, product_image: p.image_url, unit_price: p.price, quantity: 1 });
+  const handleAdd = (p: Product) => addItem({
+    product_id: p.id,
+    product_name: getProductName(p, lang),
+    product_image: getProductImage(p),
+    unit_price: p.price,
+    quantity: 1,
+  });
 
   return (
     <View style={s.container}>
@@ -169,14 +198,18 @@ export default function HomeScreen() {
 
         {/* Exclusive Offer */}
         <Section title="Exclusive Offer" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
-          {l1 ? <ActivityIndicator color={Colors.primary} style={{ marginVertical: 20 }} /> : (
+          {l1 ? <ProductListSkeleton /> : promo.length === 0 ? null : (
             <FlatList
               horizontal data={promo} keyExtractor={(i) => i.id}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
               renderItem={({ item }) => (
                 <View style={{ width: 160 }}>
-                  <ProductCard item={item} onPress={() => router.push({ pathname: "/product/[id]", params: { id: item.id } })} onAdd={() => handleAdd(item)} />
+                  <ProductCard
+                    item={item} lang={lang}
+                    onPress={() => router.push({ pathname: "/product/[id]", params: { id: item.id } })}
+                    onAdd={() => handleAdd(item)}
+                  />
                 </View>
               )}
             />
@@ -185,14 +218,22 @@ export default function HomeScreen() {
 
         {/* Best Selling */}
         <Section title="Best Selling" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
-          {l2 ? <ActivityIndicator color={Colors.primary} style={{ marginVertical: 20 }} /> : (
+          {l2 ? <ProductListSkeleton /> : featured.length === 0 ? (
+            <View style={s.emptySection}>
+              <Text style={s.emptySectionText}>Aucun produit disponible</Text>
+            </View>
+          ) : (
             <FlatList
               horizontal data={featured} keyExtractor={(i) => i.id}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
               renderItem={({ item }) => (
                 <View style={{ width: 160 }}>
-                  <ProductCard item={item} onPress={() => router.push({ pathname: "/product/[id]", params: { id: item.id } })} onAdd={() => handleAdd(item)} />
+                  <ProductCard
+                    item={item} lang={lang}
+                    onPress={() => router.push({ pathname: "/product/[id]", params: { id: item.id } })}
+                    onAdd={() => handleAdd(item)}
+                  />
                 </View>
               )}
             />
@@ -245,6 +286,8 @@ const s = StyleSheet.create({
   sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginBottom: 14 },
   sectionTitle: { fontSize: 18, fontWeight: "800", color: Colors.text },
   seeAll: { fontSize: 14, fontWeight: "600", color: Colors.primary },
+  emptySection: { paddingHorizontal: 16, paddingVertical: 20, alignItems: "center" },
+  emptySectionText: { fontSize: 14, color: Colors.text3 },
 });
 
 const pc = StyleSheet.create({
