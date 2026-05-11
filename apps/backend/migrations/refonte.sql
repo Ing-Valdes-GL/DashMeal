@@ -127,6 +127,18 @@ CREATE TABLE IF NOT EXISTS branches (
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE branches
+  ADD COLUMN IF NOT EXISTS city            TEXT,
+  ADD COLUMN IF NOT EXISTS lat             DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS lng             DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS email           TEXT,
+  ADD COLUMN IF NOT EXISTS is_sponsored    BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS sponsored_until TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS updated_at      TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE admins
+  ADD COLUMN IF NOT EXISTS username TEXT;
+
 -- ─── 9. CATEGORIES ───────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS categories (
   id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -137,6 +149,13 @@ CREATE TABLE IF NOT EXISTS categories (
   icon_url TEXT,
   is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
+
+ALTER TABLE categories
+  ADD COLUMN IF NOT EXISTS brand_id  UUID REFERENCES brands(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS name_en   TEXT,
+  ADD COLUMN IF NOT EXISTS slug      TEXT,
+  ADD COLUMN IF NOT EXISTS icon_url  TEXT,
+  ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
 
 -- ─── 10. PRODUCTS ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS products (
@@ -163,11 +182,20 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS branch_id      UUID REFERENCES branches(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS category_id    UUID REFERENCES categories(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS name_en        TEXT,
+  ADD COLUMN IF NOT EXISTS description_fr TEXT,
+  ADD COLUMN IF NOT EXISTS description_en TEXT,
   ADD COLUMN IF NOT EXISTS original_price INTEGER,
+  ADD COLUMN IF NOT EXISTS unit           TEXT,
+  ADD COLUMN IF NOT EXISTS category       TEXT,
   ADD COLUMN IF NOT EXISTS is_flash_sale  BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS flash_ends_at  TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS is_sponsored   BOOLEAN NOT NULL DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS category       TEXT;
+  ADD COLUMN IF NOT EXISTS avg_rating     NUMERIC(3,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS image_url      TEXT,
+  ADD COLUMN IF NOT EXISTS updated_at     TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_products_brand_id    ON products(brand_id);
 CREATE INDEX IF NOT EXISTS idx_products_branch_id   ON products(branch_id);
@@ -206,6 +234,21 @@ CREATE TABLE IF NOT EXISTS orders (
   updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS brand_id           UUID REFERENCES brands(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS branch_id          UUID REFERENCES branches(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS type               TEXT DEFAULT 'delivery',
+  ADD COLUMN IF NOT EXISTS delivery_fee       INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS commission_amount  INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS delivery_address   TEXT,
+  ADD COLUMN IF NOT EXISTS delivery_lat       DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS delivery_lng       DOUBLE PRECISION,
+  ADD COLUMN IF NOT EXISTS payment_method     TEXT,
+  ADD COLUMN IF NOT EXISTS payment_status     TEXT DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS payment_reference  TEXT,
+  ADD COLUMN IF NOT EXISTS notes              TEXT,
+  ADD COLUMN IF NOT EXISTS updated_at         TIMESTAMPTZ DEFAULT NOW();
+
 -- ─── 13. ORDER ITEMS ─────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS order_items (
   id         UUID    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -238,6 +281,8 @@ CREATE TABLE IF NOT EXISTS drivers (
 );
 
 ALTER TABLE drivers
+  ADD COLUMN IF NOT EXISTS brand_id            UUID REFERENCES brands(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS branch_id           UUID REFERENCES branches(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS pin_hash            TEXT,
   ADD COLUMN IF NOT EXISTS is_online           BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS current_lat         DOUBLE PRECISION,
@@ -339,6 +384,13 @@ CREATE TABLE IF NOT EXISTS payments (
   updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE payments
+  ADD COLUMN IF NOT EXISTS brand_id         UUID REFERENCES brands(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS campay_reference TEXT,
+  ADD COLUMN IF NOT EXISTS operator         TEXT,
+  ADD COLUMN IF NOT EXISTS phone            TEXT,
+  ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ DEFAULT NOW();
+
 -- ─── 21. NOTIFICATIONS ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS notifications (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -351,6 +403,9 @@ CREATE TABLE IF NOT EXISTS notifications (
   data       JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add driver_id to pre-existing notifications table (CREATE TABLE IF NOT EXISTS skips if table exists)
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE;
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id   ON notifications(user_id)   WHERE user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_notifications_driver_id ON notifications(driver_id) WHERE driver_id IS NOT NULL;
@@ -385,6 +440,12 @@ CREATE TABLE IF NOT EXISTS ads (
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE ads
+  ADD COLUMN IF NOT EXISTS impressions_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS rejection_reason  TEXT,
+  ADD COLUMN IF NOT EXISTS activated_at      TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS campay_reference  TEXT;
+
 -- ─── 24. PROMOTIONS ──────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS promotions (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -400,6 +461,13 @@ CREATE TABLE IF NOT EXISTS promotions (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE promotions
+  ADD COLUMN IF NOT EXISTS min_amount  INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS max_uses    INTEGER,
+  ADD COLUMN IF NOT EXISTS used_count  INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS expires_at  TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS is_active   BOOLEAN NOT NULL DEFAULT TRUE;
+
 -- ─── 25. LOYALTY ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS loyalty_points (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -409,6 +477,17 @@ CREATE TABLE IF NOT EXISTS loyalty_points (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, brand_id)
 );
+
+-- Add columns to pre-existing deliveries table (CREATE TABLE IF NOT EXISTS skips if table exists)
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS brand_id         UUID REFERENCES brands(id) ON DELETE CASCADE;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS branch_id        UUID REFERENCES branches(id) ON DELETE SET NULL;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS earnings_amount  INTEGER DEFAULT 0;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS distance_km      NUMERIC(6,2);
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS pickup_address   TEXT;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS delivery_address TEXT;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS delivered_at     TIMESTAMPTZ;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS notes            TEXT;
+ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS updated_at       TIMESTAMPTZ DEFAULT NOW();
 
 -- ─── 26. DRIVER EARNINGS VIEW ────────────────────────────────────────────────
 CREATE OR REPLACE VIEW driver_earnings_daily AS
