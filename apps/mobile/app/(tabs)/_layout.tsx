@@ -1,15 +1,38 @@
 import { Tabs, Redirect } from "expo-router";
 import { useAuthStore } from "@/stores/auth";
+import { useCartStore } from "@/stores/cart";
 import { Ionicons } from "@expo/vector-icons";
 import { View, Text, StyleSheet, Platform } from "react-native";
 import { Colors, Shadow } from "@/lib/theme";
 
-function TabIcon({ name, color, size }: { name: React.ComponentProps<typeof Ionicons>["name"]; color: string; size: number }) {
-  return <Ionicons name={name} size={size} color={color} />;
+function CartBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <View style={styles.badge}>
+      <Text style={styles.badgeText}>{count > 9 ? "9+" : count}</Text>
+    </View>
+  );
+}
+
+function TabIcon({
+  name, color, size, badge,
+}: {
+  name: React.ComponentProps<typeof Ionicons>["name"];
+  color: string;
+  size: number;
+  badge?: number;
+}) {
+  return (
+    <View style={{ position: "relative" }}>
+      <Ionicons name={name} size={size} color={color} />
+      {badge !== undefined && <CartBadge count={badge} />}
+    </View>
+  );
 }
 
 export default function TabsLayout() {
   const { isAuthenticated, isGuest } = useAuthStore();
+  const cartCount = useCartStore((s) => s.getCount());
 
   if (!isAuthenticated && !isGuest) {
     return <Redirect href="/(auth)/welcome" />;
@@ -29,60 +52,71 @@ export default function TabsLayout() {
           ...Shadow.sm,
         },
         tabBarActiveTintColor:   Colors.primary,
-        tabBarInactiveTintColor: "#BDBDBD",
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginTop: -2 },
+        tabBarInactiveTintColor: Colors.tabInactive,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginTop: 2 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          tabBarLabel: "Accueil",
+          tabBarLabel: "Shop",
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name={focused ? "home" : "home-outline"} color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
-        name="reels"
+        name="explore"
         options={{
-          tabBarLabel: "Réels",
+          tabBarLabel: "Explore",
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name={focused ? "play-circle" : "play-circle-outline"} color={color} size={size} />
+            <TabIcon name={focused ? "search" : "search-outline"} color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
-        name="marketplace"
+        name="cart"
         options={{
-          tabBarLabel: "Marketplace",
+          tabBarLabel: "Cart",
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name={focused ? "storefront" : "storefront-outline"} color={color} size={size} />
+            <TabIcon name={focused ? "cart" : "cart-outline"} color={color} size={size} badge={cartCount} />
           ),
         }}
       />
       <Tabs.Screen
-        name="orders"
+        name="favorites"
         options={{
-          tabBarLabel: "Commandes",
+          tabBarLabel: "Favourite",
           tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name={focused ? "receipt" : "receipt-outline"} color={color} size={size} />
+            <TabIcon name={focused ? "heart" : "heart-outline"} color={color} size={size} />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          tabBarLabel: "Profil",
+          tabBarLabel: "Account",
           tabBarIcon: ({ color, size, focused }) => (
             <TabIcon name={focused ? "person" : "person-outline"} color={color} size={size} />
           ),
         }}
       />
 
-      {/* Hidden screens — no tab icon */}
-      <Tabs.Screen name="catalog"    options={{ href: null }} />
-      <Tabs.Screen name="cart"       options={{ href: null }} />
-      <Tabs.Screen name="favorites"  options={{ href: null }} />
+      {/* Hidden — no tab icon */}
+      <Tabs.Screen name="reels"       options={{ href: null }} />
+      <Tabs.Screen name="marketplace" options={{ href: null }} />
+      <Tabs.Screen name="orders"      options={{ href: null }} />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  badge: {
+    position: "absolute", top: -4, right: -8,
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: Colors.primary,
+    alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: { fontSize: 9, color: "#fff", fontWeight: "800" },
+});
