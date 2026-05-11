@@ -219,12 +219,10 @@ export async function sendEmailOtp(email: string): Promise<{ code: string; email
   const code = generateCode();
   const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
 
-  await supabase.from("otp_codes").upsert({
-    phone: email,
-    code,
-    expires_at: expiresAt.toISOString(),
-    is_used: false,
-  });
+  await supabase.from("otps").upsert(
+    { email, otp: code, expires_at: expiresAt.toISOString() },
+    { onConflict: "email" }
+  );
 
   console.log(`\n🔑 Email OTP ──────────────────────────────`);
   console.log(`   Email  : ${email}`);
