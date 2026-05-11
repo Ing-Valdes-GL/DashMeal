@@ -1,331 +1,244 @@
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Linking,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useAuthStore } from "@/stores/auth";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiGet, apiPostForm } from "@/lib/api";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
-import i18n from "@/lib/i18n";
+import { useTranslation } from "react-i18next";
+import { useAuthStore } from "@/stores/auth";
 import { Colors, Radius, Shadow } from "@/lib/theme";
+import { useState } from "react";
 
 interface MenuItem {
+  key: string;
   icon: React.ComponentProps<typeof Ionicons>["name"];
-  iconColor: string;
-  iconBg: string;
   label: string;
-  subtitle?: string;
-  onPress: () => void;
+  route?: string;
+  toggle?: boolean;
   danger?: boolean;
   badge?: string;
 }
 
+const MENU: MenuItem[][] = [
+  [
+    { key: "orders",   icon: "bag-check-outline",    label: "Mes commandes",         route: "/orders" },
+    { key: "details",  icon: "person-outline",        label: "Mes informations",       route: "/profile/details" },
+    { key: "address",  icon: "location-outline",      label: "Adresses de livraison",  route: "/profile/addresses" },
+    { key: "payment",  icon: "card-outline",          label: "Moyens de paiement",     route: "/profile/payment" },
+    { key: "promo",    icon: "pricetag-outline",      label: "Carte promo",            route: "/profile/promo" },
+  ],
+  [
+    { key: "notif",    icon: "notifications-outline", label: "Notifications",         toggle: true },
+    { key: "help",     icon: "help-circle-outline",   label: "Aide & Support",        route: "/help" },
+    { key: "about",    icon: "information-circle-outline", label: "À propos",         route: "/about" },
+  ],
+  [
+    { key: "logout",   icon: "log-out-outline",       label: "Se déconnecter",        danger: true },
+  ],
+];
+
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, setUser, logout, isAuthenticated, isGuest } = useAuthStore();
-
-  const { data: ordersResp } = useQuery<{ success: boolean; data: any[] }>({
-    queryKey: ["my-orders"],
-    queryFn:  () => apiGet("/orders/my-orders"),
-    staleTime: 1000 * 60,
-    enabled:   isAuthenticated,
-  });
-  const orderCount = ordersResp?.data?.length ?? 0;
-
-  const { data: favResp } = useQuery<{ success: boolean; data: any[] }>({
-    queryKey: ["my-favorites"],
-    queryFn:  () => apiGet("/users/me/favorites"),
-    staleTime: 1000 * 60 * 5,
-    enabled:   isAuthenticated,
-  });
-  const favCount = favResp?.data?.length ?? 0;
-
-  const avatarMutation = useMutation({
-    mutationFn: async (uri: string) => {
-      const formData = new FormData();
-      const filename = uri.split("/").pop() ?? "avatar.jpg";
-      const ext  = filename.split(".").pop()?.toLowerCase() ?? "jpg";
-      const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
-      formData.append("avatar", { uri, name: filename, type: mime } as any);
-      return apiPostForm("/users/me/avatar", formData);
-    },
-    onSuccess: (resp: any) => {
-      const avatar_url = resp?.data?.avatar_url ?? resp?.avatar_url;
-      if (avatar_url && user) setUser({ ...user, avatar_url } as any);
-    },
-    onError: () => Alert.alert("Erreur", "Impossible de mettre à jour la photo."),
-  });
-
-  const handlePickAvatar = async () => {
-    if (!isAuthenticated) { router.push("/(auth)/welcome"); return; }
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") { Alert.alert("Permission refusée", "Autorisez l'accès à votre galerie."); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true, aspect: [1, 1], quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) avatarMutation.mutate(result.assets[0].uri);
-  };
+  const { t } = useTranslation();
+  const { user, isAuthenticated, isGuest, logout } = useAuthStore();
+  const [notifications, setNotifications] = useState(true);
 
   const handleLogout = () => {
-    Alert.alert("Déconnexion", "Êtes-vous sûr de vouloir vous déconnecter ?", [
-      { text: "Annuler", style: "cancel" },
-      { text: "Déconnexion", style: "destructive", onPress: async () => {
-        await logout();
-        router.replace("/(auth)/welcome");
-      }},
-    ]);
+    Alert.alert(
+      "Déconnexion",
+      "Voulez-vous vraiment vous déconnecter ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Déconnecter",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+            router.replace("/(auth)/welcome");
+          },
+        },
+      ]
+    );
   };
 
-  // ─── Menu sections ────────────────────────────────────────────────────────
-  const accountItems: MenuItem[] = isAuthenticated ? [
-    { icon: "person-outline",       iconColor: "#FF7A2F", iconBg: "#FFF0E8", label: "Informations personnelles", onPress: () => router.push("/profile/personal") },
-    { icon: "location-outline",     iconColor: "#2196F3", iconBg: "#E3F2FD", label: "Mes adresses",              onPress: () => router.push("/profile/addresses") },
-    { icon: "card-outline",         iconColor: "#4CAF50", iconBg: "#E8F5E9", label: "Paiement par défaut",        onPress: () => router.push("/profile/payment") },
-    { icon: "notifications-outline",iconColor: "#FF9800", iconBg: "#FFF3E0", label: "Notifications",              onPress: () => {} },
-  ] : [
-    { icon: "log-in-outline", iconColor: Colors.primary, iconBg: Colors.primaryLight, label: "Se connecter / S'inscrire", subtitle: "Accédez à votre compte", onPress: () => router.push("/(auth)/welcome") },
-  ];
+  const handlePress = (item: MenuItem) => {
+    if (item.key === "logout") { handleLogout(); return; }
+    if (item.route) router.push(item.route as any);
+  };
 
-  const activityItems: MenuItem[] = isAuthenticated ? [
-    { icon: "receipt-outline",  iconColor: "#9C27B0", iconBg: "#F3E5F5", label: "Mes commandes",      badge: orderCount > 0 ? `${orderCount}` : undefined, onPress: () => {} },
-    { icon: "heart-outline",    iconColor: "#E91E63", iconBg: "#FCE4EC", label: "Mes favoris",         badge: favCount > 0 ? `${favCount}` : undefined,   onPress: () => router.push("/profile/favorites") },
-    { icon: "star-outline",     iconColor: "#FFC107", iconBg: "#FFF9C4", label: "Points de fidélité",  onPress: () => router.push("/profile/loyalty") },
-  ] : [];
-
-  const helpItems: MenuItem[] = [
-    { icon: "help-buoy-outline",     iconColor: "#00BCD4", iconBg: "#E0F7FA", label: "Centre d'aide",         subtitle: "FAQ & tutoriels",         onPress: () => {} },
-    { icon: "chatbubbles-outline",   iconColor: "#4CAF50", iconBg: "#E8F5E9", label: "Chat avec le support",  subtitle: "Réponse en moins de 5 min", onPress: () => {} },
-    { icon: "mail-outline",          iconColor: "#2196F3", iconBg: "#E3F2FD", label: "Envoyer un email",       subtitle: "support@dashmeal.cm",      onPress: () => Linking.openURL("mailto:support@dashmeal.cm") },
-    { icon: "call-outline",          iconColor: "#FF9800", iconBg: "#FFF3E0", label: "Appeler le support",     subtitle: "+237 6XX XXX XXX",         onPress: () => Linking.openURL("tel:+237600000000") },
-  ];
-
-  const aboutItems: MenuItem[] = [
-    { icon: "information-circle-outline", iconColor: "#607D8B", iconBg: "#ECEFF1", label: "À propos de Dash Meal", onPress: () => {} },
-    { icon: "shield-checkmark-outline",   iconColor: "#3F51B5", iconBg: "#E8EAF6", label: "Politique de confidentialité", onPress: () => {} },
-    { icon: "document-text-outline",      iconColor: "#795548", iconBg: "#EFEBE9", label: "Conditions d'utilisation",     onPress: () => {} },
-    { icon: "star-half-outline",          iconColor: "#FFC107", iconBg: "#FFF9C4", label: "Évaluer l'application",        onPress: () => {} },
-  ];
-
-  const sections = [
-    ...(accountItems.length > 0 ? [{ title: isAuthenticated ? "Mon compte" : "", items: accountItems }] : []),
-    ...(activityItems.length > 0 ? [{ title: "Activité", items: activityItems }] : []),
-    { title: "Aide & Support", items: helpItems },
-    { title: "À propos", items: aboutItems },
-    ...(isAuthenticated ? [{ title: "", items: [{ icon: "log-out-outline" as const, iconColor: Colors.error, iconBg: "#FFEBEE", label: "Se déconnecter", onPress: handleLogout, danger: true }] }] : []),
-  ];
-
-  const avatarUrl = (user as any)?.avatar_url as string | undefined;
-  const initials  = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) ?? "?";
+  if (isGuest || !isAuthenticated) {
+    return (
+      <View style={s.container}>
+        <StatusBar style="dark" />
+        <SafeAreaView edges={["top"]} style={s.safe}>
+          <View style={s.header}><Text style={s.headerTitle}>Account</Text></View>
+        </SafeAreaView>
+        <View style={s.authWall}>
+          <View style={s.authIcon}><Ionicons name="person-outline" size={56} color={Colors.text3} /></View>
+          <Text style={s.authTitle}>Connectez-vous</Text>
+          <Text style={s.authSub}>Gérez vos commandes, adresses et plus encore</Text>
+          <TouchableOpacity style={s.loginBtn} onPress={() => router.push("/(auth)/login")}>
+            <Text style={s.loginBtnText}>Se connecter</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.registerBtn} onPress={() => router.push("/(auth)/register")}>
+            <Text style={s.registerBtnText}>Créer un compte</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container}>
+    <View style={s.container}>
       <StatusBar style="dark" />
-      <SafeAreaView style={styles.safe} edges={["top"]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profil</Text>
-          {isAuthenticated && (
-            <TouchableOpacity onPress={() => router.push("/profile/settings")}>
-              <Ionicons name="settings-outline" size={22} color={Colors.text} />
-            </TouchableOpacity>
-          )}
-        </View>
+      <SafeAreaView edges={["top"]} style={s.safe}>
+        <View style={s.header}><Text style={s.headerTitle}>Account</Text></View>
       </SafeAreaView>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Avatar section */}
-        <View style={styles.avatarSection}>
-          <TouchableOpacity style={styles.avatarWrap} onPress={handlePickAvatar} activeOpacity={0.85}>
-            {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={styles.avatar} contentFit="cover" />
-            ) : isGuest ? (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Ionicons name="person-outline" size={40} color={Colors.primary} />
-              </View>
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Text style={styles.avatarText}>{initials}</Text>
-              </View>
-            )}
-            {isAuthenticated && (
-              <View style={styles.editAvatarBtn}>
-                {avatarMutation.isPending
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Ionicons name="camera-outline" size={14} color="#fff" />
-                }
-              </View>
-            )}
-          </TouchableOpacity>
-
-          {isGuest ? (
-            <>
-              <Text style={styles.name}>Mode invité</Text>
-              <Text style={styles.email}>Connectez-vous pour accéder à toutes les fonctionnalités</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.name}>{user?.name ?? "Utilisateur"}</Text>
-              <Text style={styles.email}>{user?.email ?? user?.phone ?? ""}</Text>
-              {user?.is_verified && (
-                <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={13} color={Colors.success} />
-                  <Text style={styles.verifiedText}>Compte vérifié</Text>
-                </View>
-              )}
-            </>
-          )}
-        </View>
-
-        {/* Stats (authenticated only) */}
-        {isAuthenticated && (
-          <View style={styles.statsCard}>
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{orderCount}</Text>
-              <Text style={styles.statLabel}>Commandes</Text>
-            </View>
-            <View style={styles.statDiv} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>{favCount}</Text>
-              <Text style={styles.statLabel}>Favoris</Text>
-            </View>
-            <View style={styles.statDiv} />
-            <View style={styles.stat}>
-              <Text style={styles.statValue}>0 pts</Text>
-              <Text style={styles.statLabel}>Fidélité</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Language toggle */}
-        <View style={[styles.section, { marginTop: 16 }]}>
-          <View style={styles.langCard}>
-            <View style={styles.langIcon}>
-              <Ionicons name="language-outline" size={18} color="#2196F3" />
-            </View>
-            <Text style={styles.langLabel}>Langue</Text>
-            <View style={styles.langToggle}>
-              {(["fr", "en"] as const).map((lang) => (
-                <TouchableOpacity
-                  key={lang}
-                  style={[styles.langBtn, i18n.language === lang && styles.langBtnActive]}
-                  onPress={() => i18n.changeLanguage(lang)}
-                >
-                  <Text style={[styles.langBtnText, i18n.language === lang && styles.langBtnTextActive]}>
-                    {lang.toUpperCase()}
+        {/* Avatar card */}
+        <View style={s.avatarCard}>
+          <View style={s.avatarWrap}>
+            {user?.avatar_url
+              ? <Image source={{ uri: user.avatar_url }} style={s.avatar} contentFit="cover" />
+              : (
+                <View style={s.avatarFallback}>
+                  <Text style={s.avatarInitial}>
+                    {(user?.name ?? "U").charAt(0).toUpperCase()}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                </View>
+              )
+            }
+            <TouchableOpacity style={s.avatarEdit}>
+              <Ionicons name="camera-outline" size={14} color="#fff" />
+            </TouchableOpacity>
           </View>
+          <View style={s.avatarInfo}>
+            <Text style={s.avatarName}>{user?.name ?? "Utilisateur"}</Text>
+            <Text style={s.avatarMeta}>{user?.email ?? user?.phone ?? ""}</Text>
+          </View>
+          <TouchableOpacity style={s.editBtn} onPress={() => router.push("/profile/details" as any)}>
+            <Ionicons name="create-outline" size={18} color={Colors.primary} />
+          </TouchableOpacity>
         </View>
 
-        {/* Menu sections */}
-        {sections.map((section, si) => (
-          <View key={si} style={styles.section}>
-            {section.title ? <Text style={styles.sectionTitle}>{section.title}</Text> : null}
-            <View style={styles.menuCard}>
-              {section.items.map((item, i) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[styles.menuRow, i < section.items.length - 1 && styles.menuRowBorder]}
-                  onPress={item.onPress}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.menuIcon, { backgroundColor: item.iconBg }]}>
-                    <Ionicons name={item.icon} size={18} color={item.iconColor} />
-                  </View>
-                  <View style={styles.menuTextGroup}>
-                    <Text style={[styles.menuLabel, item.danger && { color: Colors.error }]}>
-                      {item.label}
-                    </Text>
-                    {item.subtitle && (
-                      <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-                    )}
-                  </View>
-                  {item.badge ? (
-                    <View style={styles.menuBadge}>
-                      <Text style={styles.menuBadgeText}>{item.badge}</Text>
-                    </View>
-                  ) : null}
-                  <Ionicons name="chevron-forward" size={15} color={Colors.border} />
-                </TouchableOpacity>
-              ))}
-            </View>
+        {/* Menu groups */}
+        {MENU.map((group, gi) => (
+          <View key={gi} style={s.group}>
+            {group.map((item, idx) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[
+                  s.menuItem,
+                  idx === group.length - 1 && s.menuItemLast,
+                ]}
+                onPress={() => handlePress(item)}
+                activeOpacity={0.7}
+                disabled={item.toggle}
+              >
+                <View style={[s.menuIcon, item.danger && s.menuIconDanger]}>
+                  <Ionicons
+                    name={item.icon}
+                    size={20}
+                    color={item.danger ? Colors.error : Colors.primary}
+                  />
+                </View>
+                <Text style={[s.menuLabel, item.danger && s.menuLabelDanger]}>
+                  {item.label}
+                </Text>
+                {item.badge && (
+                  <View style={s.badge}><Text style={s.badgeText}>{item.badge}</Text></View>
+                )}
+                {item.toggle ? (
+                  <Switch
+                    value={notifications}
+                    onValueChange={setNotifications}
+                    trackColor={{ true: Colors.primary, false: Colors.border }}
+                    thumbColor="#fff"
+                  />
+                ) : (
+                  <Ionicons name="chevron-forward" size={16} color={Colors.text3} />
+                )}
+              </TouchableOpacity>
+            ))}
           </View>
         ))}
 
-        <Text style={styles.version}>Dash Meal v1.0.0 — CEMAC Zone</Text>
+        <Text style={s.version}>Dash Meal v1.0.0</Text>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.pageBg },
-  safe:      { backgroundColor: Colors.bg },
-  header: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingVertical: 14, backgroundColor: Colors.bg,
-  },
-  headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.text },
+  safe: { backgroundColor: Colors.bg },
+  header: { paddingHorizontal: 16, paddingVertical: 14, backgroundColor: Colors.bg },
+  headerTitle: { fontSize: 20, fontWeight: "800", color: Colors.text },
 
-  avatarSection: { alignItems: "center", paddingVertical: 24, backgroundColor: Colors.bg },
-  avatarWrap: { position: "relative", marginBottom: 12 },
-  avatar: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: Colors.primary },
-  avatarFallback: { backgroundColor: "#FFE8D9", alignItems: "center", justifyContent: "center" },
-  avatarText: { fontSize: 30, fontWeight: "700", color: Colors.primary },
-  editAvatarBtn: {
-    position: "absolute", bottom: 0, right: 0,
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: Colors.primary,
+  // Auth wall
+  authWall: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 32 },
+  authIcon: { width: 120, height: 120, borderRadius: 60, backgroundColor: Colors.bg, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  authTitle: { fontSize: 18, fontWeight: "700", color: Colors.text, textAlign: "center" },
+  authSub: { fontSize: 14, color: Colors.text2, textAlign: "center", lineHeight: 22 },
+  loginBtn: { marginTop: 12, height: 52, width: "100%", borderRadius: Radius.full, backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center" },
+  loginBtnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  registerBtn: { height: 52, width: "100%", borderRadius: Radius.full, backgroundColor: Colors.bg, borderWidth: 1.5, borderColor: Colors.primary, alignItems: "center", justifyContent: "center" },
+  registerBtnText: { color: Colors.primary, fontWeight: "700", fontSize: 15 },
+
+  // Avatar card
+  avatarCard: {
+    flexDirection: "row", alignItems: "center", gap: 14,
+    margin: 16, padding: 16, backgroundColor: Colors.bg,
+    borderRadius: Radius.lg, ...Shadow.sm,
+  },
+  avatarWrap: { position: "relative" },
+  avatar: { width: 64, height: 64, borderRadius: 32 },
+  avatarFallback: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: Colors.primaryLight,
     alignItems: "center", justifyContent: "center",
+  },
+  avatarInitial: { fontSize: 24, fontWeight: "800", color: Colors.primary },
+  avatarEdit: {
+    position: "absolute", bottom: 0, right: 0,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center",
     borderWidth: 2, borderColor: Colors.bg,
   },
-  name:  { fontSize: 20, fontWeight: "700", color: Colors.text, marginBottom: 4 },
-  email: { fontSize: 13, color: Colors.text2, textAlign: "center", paddingHorizontal: 32 },
-  verifiedBadge: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
-  verifiedText:  { fontSize: 12, color: Colors.success, fontWeight: "500" },
-
-  statsCard: {
-    flexDirection: "row", marginHorizontal: 16, marginTop: 16,
-    backgroundColor: Colors.card, borderRadius: Radius.lg, paddingVertical: 16, ...Shadow.sm,
+  avatarInfo: { flex: 1 },
+  avatarName: { fontSize: 16, fontWeight: "700", color: Colors.text, marginBottom: 2 },
+  avatarMeta: { fontSize: 13, color: Colors.text2 },
+  editBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: Colors.primaryLight,
+    alignItems: "center", justifyContent: "center",
   },
-  stat:      { flex: 1, alignItems: "center" },
-  statValue: { fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 2 },
-  statLabel: { fontSize: 11, color: Colors.text3 },
-  statDiv:   { width: 1, backgroundColor: Colors.divider },
 
-  section:      { marginTop: 12, paddingHorizontal: 16 },
-  sectionTitle: { fontSize: 11, fontWeight: "700", color: Colors.text3, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8, paddingLeft: 4 },
-
-  langCard: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    backgroundColor: Colors.card, borderRadius: Radius.lg, padding: 14, ...Shadow.sm,
+  // Menu
+  group: {
+    marginHorizontal: 16, marginBottom: 14,
+    backgroundColor: Colors.bg, borderRadius: Radius.lg, ...Shadow.sm,
+    overflow: "hidden",
   },
-  langIcon: { width: 36, height: 36, borderRadius: Radius.sm, backgroundColor: "#E3F2FD", alignItems: "center", justifyContent: "center" },
-  langLabel: { flex: 1, fontSize: 14, fontWeight: "500", color: Colors.text },
-  langToggle: { flexDirection: "row", gap: 4 },
-  langBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.full, backgroundColor: Colors.inputBg },
-  langBtnActive: { backgroundColor: Colors.primary },
-  langBtnText:       { fontSize: 12, fontWeight: "700", color: Colors.text2 },
-  langBtnTextActive: { color: "#fff" },
-
-  menuCard: { backgroundColor: Colors.card, borderRadius: Radius.lg, overflow: "hidden", ...Shadow.sm },
-  menuRow:  { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 12 },
-  menuRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  menuIcon: { width: 38, height: 38, borderRadius: Radius.sm, alignItems: "center", justifyContent: "center" },
-  menuTextGroup: { flex: 1 },
-  menuLabel:    { fontSize: 14, fontWeight: "500", color: Colors.text },
-  menuSubtitle: { fontSize: 11, color: Colors.text3, marginTop: 1 },
-  menuBadge: {
-    backgroundColor: Colors.primary, borderRadius: Radius.full,
-    minWidth: 20, height: 20, alignItems: "center", justifyContent: "center", paddingHorizontal: 6,
+  menuItem: {
+    flexDirection: "row", alignItems: "center", gap: 14,
+    paddingHorizontal: 16, paddingVertical: 16,
+    borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  menuBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  menuItemLast: { borderBottomWidth: 0 },
+  menuIcon: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: Colors.primaryLight,
+    alignItems: "center", justifyContent: "center",
+  },
+  menuIconDanger: { backgroundColor: "#FFEBEE" },
+  menuLabel: { flex: 1, fontSize: 14, fontWeight: "600", color: Colors.text },
+  menuLabelDanger: { color: Colors.error },
+  badge: { backgroundColor: Colors.primary, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 },
+  badgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
 
-  version: { textAlign: "center", color: Colors.border, fontSize: 12, marginTop: 24, marginBottom: 8 },
+  version: { textAlign: "center", fontSize: 12, color: Colors.text3, marginTop: 4, marginBottom: 16 },
 });

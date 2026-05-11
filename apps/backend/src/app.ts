@@ -44,6 +44,7 @@ import reportsRoutes from "./modules/reports/reports.routes.js";
 import favoritesRoutes from "./modules/favorites/favorites.routes.js";
 import trackingRoutes from "./modules/tracking/tracking.routes.js";
 import groupOrdersRoutes from "./modules/group-orders/group-orders.routes.js";
+import driverRoutes from "./modules/driver/driver.routes.js";
 
 const app: Application = express();
 
@@ -128,6 +129,7 @@ app.get(`${API_PREFIX}/health`, (_req, res) => {
 // Rate limiters spécifiques appliqués avant les routes d'auth globales
 app.use(`${API_PREFIX}/auth/user/register`,      registerLimiter);
 app.use(`${API_PREFIX}/auth/user/request-reset`, resetLimiter);
+app.use(`${API_PREFIX}/auth/driver/send-otp`,    resetLimiter);
 app.use(`${API_PREFIX}/auth/apply`,              applyLimiter);
 app.use(`${API_PREFIX}/auth`,                    authLimiter, authRoutes);
 app.use(`${API_PREFIX}/branch-auth`,             authLimiter, branchAuthRoutes);
@@ -163,6 +165,7 @@ app.use(`${API_PREFIX}/reports`,       reportsRoutes);
 app.use(`${API_PREFIX}/favorites`,     favoritesRoutes);
 app.use(`${API_PREFIX}/tracking`,      trackingRoutes);
 app.use(`${API_PREFIX}/group-orders`,  groupOrdersRoutes);
+app.use(`${API_PREFIX}/driver`,        driverRoutes);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {

@@ -1,272 +1,195 @@
 import { useState } from "react";
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
+  View, Text, StyleSheet, TouchableOpacity, TextInput,
+  ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
-import { Image } from "expo-image";
-import { apiPost } from "@/lib/api";
-import { useAuthStore } from "@/stores/auth";
-import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-import { LinearGradient } from "expo-linear-gradient";
-import { Colors, Radius, Shadow } from "@/lib/theme";
+import { Ionicons } from "@expo/vector-icons";
+import * as SecureStore from "expo-secure-store";
+import { useTranslation } from "react-i18next";
+import { useAuthStore } from "@/stores/auth";
+import { apiPost } from "@/lib/api";
+import { Colors, Radius } from "@/lib/theme";
 
-function AuthDecoration() {
-  return (
-    <View style={deco.wrap} pointerEvents="none">
-      <View style={[deco.circle, deco.c1]} />
-      <View style={[deco.circle, deco.c2]} />
-      <View style={[deco.circle, deco.c3]} />
-    </View>
-  );
-}
-const deco = StyleSheet.create({
-  wrap:   { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-  circle: { position: "absolute", borderRadius: 999, borderWidth: 1 },
-  c1:     { width: 320, height: 320, top: -130, right: -90, backgroundColor: "rgba(255,122,47,0.06)", borderColor: "rgba(255,122,47,0.12)" },
-  c2:     { width: 200, height: 200, top: 60,   right: -60, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.05)" },
-  c3:     { width: 140, height: 140, top: -30,  right: 70,  backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.04)" },
-});
+type Mode = "email" | "phone";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { login } = useAuthStore();
+
+  const [mode, setMode] = useState<Mode>("email");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
-  const [usePhone, setUsePhone] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const isEmail = !usePhone;
-
-  const loginMutation = useMutation({
-    mutationFn: () => {
-      const body = isEmail
-        ? { email: identifier.trim().toLowerCase(), password }
+  const handleLogin = async () => {
+    setError("");
+    if (!identifier.trim() || !password.trim()) {
+      setError("Veuillez remplir tous les champs");
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = mode === "email"
+        ? { email: identifier.trim(), password }
         : { phone: identifier.trim(), password };
-      return apiPost<{ data: { user: any; tokens: { access_token: string; refresh_token: string } } }>("/auth/user/login", body);
-    },
-    onSuccess: async (res) => {
-      await login(res.data.user, res.data.tokens.access_token, res.data.tokens.refresh_token);
+      const res = await apiPost("/auth/user/login", payload);
+      const { user, access_token, refresh_token } = res.data;
+      await SecureStore.setItemAsync("dm_access_token", access_token);
+      await SecureStore.setItemAsync("dm_refresh_token", refresh_token);
+      login(user, access_token, refresh_token);
       router.replace("/(tabs)");
-    },
-    onError: (err: any) => {
-      const code = err?.response?.data?.error?.code;
-      const msg  = err?.response?.data?.error?.message;
-      if (code === "PHONE_NOT_VERIFIED" || code === "EMAIL_NOT_VERIFIED") {
-        router.push({ pathname: "/(auth)/otp", params: { identifier: identifier.trim(), via: isEmail ? "email" : "phone" } });
-      } else if (code === "ACCOUNT_SUSPENDED") setError("Ce compte a été suspendu.");
-      else if (msg) setError(msg);
-      else if (!err?.response) setError("Impossible de joindre le serveur.");
-      else setError("Identifiants incorrects. Vérifiez et réessayez.");
-    },
-  });
-
-  const handleSocialAuth = (provider: "google" | "apple") => {
-    Alert.alert("Bientôt disponible", `La connexion via ${provider === "google" ? "Google" : "Apple"} sera disponible prochainement.`);
+    } catch (e: any) {
+      const code = e?.response?.data?.error?.code;
+      if (code === "EMAIL_NOT_VERIFIED") {
+        router.push({ pathname: "/(auth)/otp", params: { identifier, via: "email" } });
+        return;
+      }
+      if (code === "PHONE_NOT_VERIFIED") {
+        router.push({ pathname: "/(auth)/otp", params: { identifier, via: "phone" } });
+        return;
+      }
+      setError(e?.response?.data?.error?.message ?? t("auth.invalidCredentials"));
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const canSubmit = identifier.trim().length > 0 && password.length >= 6;
-
   return (
-    <View style={styles.container}>
-      <StatusBar style="light" />
-      <AuthDecoration />
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView style={s.container} keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1 }}>
+        <StatusBar style="dark" />
+        <TouchableOpacity style={s.back} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+        </TouchableOpacity>
+        <View style={s.content}>
+          <Text style={s.title}>Loging</Text>
+          <Text style={s.sub}>Entrez votre email et mot de passe</Text>
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          {/* Mode toggle */}
+          <View style={s.toggle}>
+            {(["email", "phone"] as Mode[]).map((m) => (
+              <TouchableOpacity
+                key={m}
+                style={[s.toggleBtn, mode === m && s.toggleBtnActive]}
+                onPress={() => { setMode(m); setIdentifier(""); setError(""); }}
+              >
+                <Text style={[s.toggleText, mode === m && s.toggleTextActive]}>
+                  {m === "email" ? "Email" : "Téléphone"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-          {/* Back */}
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={20} color="#fff" />
+          <Text style={s.label}>{mode === "email" ? "Email" : "Téléphone"}</Text>
+          <View style={s.inputWrap}>
+            <Ionicons name={mode === "email" ? "mail-outline" : "call-outline"} size={18} color={Colors.text3} style={s.inputIcon} />
+            <TextInput
+              style={s.input}
+              placeholder={mode === "email" ? "imshuvo97@gmail.com" : "+237 6XX XXX XXX"}
+              placeholderTextColor={Colors.text3}
+              value={identifier}
+              onChangeText={setIdentifier}
+              keyboardType={mode === "email" ? "email-address" : "phone-pad"}
+              autoCapitalize="none"
+            />
+          </View>
+
+          <Text style={s.label}>Mot de passe</Text>
+          <View style={s.inputWrap}>
+            <Ionicons name="lock-closed-outline" size={18} color={Colors.text3} style={s.inputIcon} />
+            <TextInput
+              style={s.input}
+              placeholder="••••••••"
+              placeholderTextColor={Colors.text3}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPwd}
+            />
+            <TouchableOpacity onPress={() => setShowPwd(!showPwd)} style={s.eyeBtn}>
+              <Ionicons name={showPwd ? "eye" : "eye-off-outline"} size={18} color={Colors.text3} />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={s.forgotRow}>
+            <Text style={s.forgotText}>Forgot Password?</Text>
           </TouchableOpacity>
 
-          {/* Logo */}
-          <View style={styles.logoWrap}>
-            <Image source={require("../../assets/logo.png")} style={styles.logo} contentFit="contain" />
+          {error ? <Text style={s.errorText}>{error}</Text> : null}
+
+          <TouchableOpacity style={s.btn} onPress={handleLogin} disabled={loading} activeOpacity={0.85}>
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Log In</Text>}
+          </TouchableOpacity>
+
+          <View style={s.divider}>
+            <View style={s.divLine} />
+            <Text style={s.divText}>Or connect with social media</Text>
+            <View style={s.divLine} />
           </View>
 
-          <Text style={styles.title}>Bon retour !</Text>
-          <Text style={styles.subtitle}>Connectez-vous pour continuer</Text>
+          <TouchableOpacity style={s.socialBtn} onPress={() => Alert.alert("Google", "Bientôt disponible")}>
+            <Ionicons name="logo-google" size={20} color="#EA4335" />
+            <Text style={s.socialText}>Continue with Google</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.socialBtn, { borderColor: "#1877F2" }]} onPress={() => Alert.alert("Facebook", "Bientôt disponible")}>
+            <Ionicons name="logo-facebook" size={20} color="#1877F2" />
+            <Text style={[s.socialText, { color: "#1877F2" }]}>Continue with Facebook</Text>
+          </TouchableOpacity>
 
-          {/* Social auth */}
-          <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialAuth("google")} activeOpacity={0.8}>
-              <Text style={styles.socialIcon}>G</Text>
-              <Text style={styles.socialText}>Google</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialAuth("apple")} activeOpacity={0.8}>
-              <Ionicons name="logo-apple" size={18} color="#fff" />
-              <Text style={styles.socialText}>Apple</Text>
+          <View style={s.regRow}>
+            <Text style={s.regText}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
+              <Text style={s.regLink}>Signup</Text>
             </TouchableOpacity>
           </View>
-
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>ou</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Form */}
-          <View style={styles.form}>
-            {/* Identifier toggle */}
-            <View style={styles.toggleRow}>
-              <TouchableOpacity
-                style={[styles.toggleTab, !usePhone && styles.toggleTabActive]}
-                onPress={() => { setUsePhone(false); setIdentifier(""); setError(""); }}
-              >
-                <Ionicons name="mail-outline" size={14} color={!usePhone ? Colors.primary : Colors.textDark2} />
-                <Text style={[styles.toggleTabText, !usePhone && styles.toggleTabTextActive]}>Email</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggleTab, usePhone && styles.toggleTabActive]}
-                onPress={() => { setUsePhone(true); setIdentifier(""); setError(""); }}
-              >
-                <Ionicons name="call-outline" size={14} color={usePhone ? Colors.primary : Colors.textDark2} />
-                <Text style={[styles.toggleTabText, usePhone && styles.toggleTabTextActive]}>Téléphone</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.label}>{isEmail ? "ADRESSE EMAIL" : "NUMÉRO DE TÉLÉPHONE"}</Text>
-            <View style={styles.inputWrap}>
-              <Ionicons
-                name={isEmail ? "mail-outline" : "call-outline"}
-                size={18} color={Colors.text3} style={styles.icon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder={isEmail ? "exemple@email.com" : "6 90 00 00 00"}
-                placeholderTextColor={Colors.text3}
-                keyboardType={isEmail ? "email-address" : "phone-pad"}
-                autoCapitalize="none"
-                autoComplete={isEmail ? "email" : "tel"}
-                value={identifier}
-                onChangeText={(v) => { setIdentifier(v); setError(""); }}
-              />
-            </View>
-
-            <Text style={[styles.label, { marginTop: 16 }]}>MOT DE PASSE</Text>
-            <View style={styles.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={18} color={Colors.text3} style={styles.icon} />
-              <TextInput
-                style={[styles.input, { flex: 1 }]}
-                placeholder="••••••••"
-                placeholderTextColor={Colors.text3}
-                secureTextEntry={!showPwd}
-                value={password}
-                onChangeText={(v) => { setPassword(v); setError(""); }}
-              />
-              <TouchableOpacity onPress={() => setShowPwd(!showPwd)} style={{ padding: 4 }}>
-                <Ionicons name={showPwd ? "eye-off-outline" : "eye-outline"} size={18} color={Colors.text3} />
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity style={styles.forgotBtn}>
-              <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
-            </TouchableOpacity>
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-
-            <TouchableOpacity
-              style={[styles.btn, (!canSubmit || loginMutation.isPending) && styles.btnOff]}
-              onPress={() => { setError(""); loginMutation.mutate(); }}
-              disabled={!canSubmit || loginMutation.isPending}
-              activeOpacity={0.85}
-            >
-              {loginMutation.isPending
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.btnText}>SE CONNECTER</Text>
-              }
-            </TouchableOpacity>
-
-            <View style={styles.registerRow}>
-              <Text style={styles.registerText}>Pas encore de compte ? </Text>
-              <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-                <Text style={styles.registerLink}>S'inscrire</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.darkBg },
-  scroll:    { flexGrow: 1, padding: 24, paddingTop: 52 },
-
-  backBtn: {
-    width: 40, height: 40, borderRadius: Radius.full,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    alignItems: "center", justifyContent: "center", marginBottom: 24,
-  },
-
-  logoWrap: { alignItems: "center", marginBottom: 20 },
-  logo:     { width: 64, height: 64, borderRadius: 16 },
-
-  title:    { fontSize: 26, fontWeight: "800", color: "#fff", textAlign: "center", marginBottom: 6 },
-  subtitle: { fontSize: 14, color: Colors.textDark2, textAlign: "center", marginBottom: 28 },
-
-  // Social
-  socialRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
-  socialBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    height: 48, borderRadius: Radius.md,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
-  },
-  socialIcon: { fontSize: 18, fontWeight: "800", color: "#fff" },
-  socialText: { color: "#fff", fontSize: 14, fontWeight: "600" },
-
-  // Divider
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 20 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.1)" },
-  dividerText: { color: Colors.textDark2, fontSize: 13 },
-
-  // Toggle email/phone
-  toggleRow: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderRadius: Radius.sm, padding: 4,
-    marginBottom: 20,
-  },
-  toggleTab: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, paddingVertical: 8, borderRadius: Radius.xs,
-  },
-  toggleTabActive: { backgroundColor: "rgba(255,122,47,0.18)" },
-  toggleTabText:   { fontSize: 13, fontWeight: "600", color: Colors.textDark2 },
-  toggleTabTextActive: { color: Colors.primary },
-
-  // Form
-  form:     { gap: 2 },
-  label:    { fontSize: 11, fontWeight: "600", color: Colors.textDark2, letterSpacing: 0.8, marginBottom: 8 },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.bg },
+  back: { paddingTop: 56, paddingHorizontal: 20, paddingBottom: 8 },
+  content: { paddingHorizontal: 24, paddingBottom: 40 },
+  title: { fontSize: 26, fontWeight: "800", color: Colors.text, marginBottom: 4 },
+  sub: { fontSize: 14, color: Colors.text2, marginBottom: 24, lineHeight: 22 },
+  toggle: { flexDirection: "row", backgroundColor: Colors.pageBg, borderRadius: Radius.md, padding: 4, marginBottom: 24, gap: 4 },
+  toggleBtn: { flex: 1, paddingVertical: 10, borderRadius: Radius.sm, alignItems: "center" },
+  toggleBtnActive: { backgroundColor: "#fff", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
+  toggleText: { fontSize: 13, fontWeight: "600", color: Colors.text3 },
+  toggleTextActive: { color: Colors.primary },
+  label: { fontSize: 14, fontWeight: "600", color: Colors.text, marginBottom: 8 },
   inputWrap: {
     flexDirection: "row", alignItems: "center",
-    backgroundColor: Colors.darkInput, borderRadius: Radius.md,
-    paddingHorizontal: 14, height: 52,
+    backgroundColor: Colors.pageBg, borderRadius: Radius.lg,
+    marginBottom: 18, paddingHorizontal: 16, height: 52,
   },
-  icon:  { marginRight: 10 },
-  input: { flex: 1, color: "#fff", fontSize: 15 },
-
-  forgotBtn: { alignSelf: "flex-end", marginTop: 8, marginBottom: 4 },
-  forgotText: { color: Colors.primary, fontSize: 13, fontWeight: "600" },
-
-  error: { color: "#FF6B6B", fontSize: 13, textAlign: "center", marginTop: 6 },
-
+  inputIcon: { marginRight: 10 },
+  input: { flex: 1, fontSize: 14, color: Colors.text },
+  eyeBtn: { padding: 4 },
+  forgotRow: { alignItems: "flex-end", marginBottom: 24, marginTop: -8 },
+  forgotText: { fontSize: 13, color: Colors.primary, fontWeight: "600" },
+  errorText: { fontSize: 13, color: Colors.error, marginBottom: 12, textAlign: "center" },
   btn: {
-    height: 52, borderRadius: Radius.full,
-    backgroundColor: Colors.primary,
-    alignItems: "center", justifyContent: "center",
-    marginTop: 20, ...Shadow.primary,
+    height: 67, borderRadius: Radius.full, backgroundColor: Colors.primary,
+    alignItems: "center", justifyContent: "center", marginBottom: 24,
+    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 14, elevation: 6,
   },
-  btnOff:  { opacity: 0.5 },
-  btnText: { color: "#fff", fontWeight: "700", fontSize: 15, letterSpacing: 1 },
-
-  registerRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 20 },
-  registerText: { color: Colors.textDark2, fontSize: 14 },
-  registerLink: { color: Colors.primary, fontWeight: "700", fontSize: 14 },
+  btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  divider: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 20 },
+  divLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  divText: { fontSize: 12, color: Colors.text3 },
+  socialBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    height: 52, borderRadius: Radius.lg, borderWidth: 1.5, borderColor: "#EA4335", marginBottom: 14,
+  },
+  socialText: { fontSize: 14, fontWeight: "600", color: "#EA4335" },
+  regRow: { flexDirection: "row", justifyContent: "center", marginTop: 8 },
+  regText: { fontSize: 14, color: Colors.text2 },
+  regLink: { fontSize: 14, color: Colors.primary, fontWeight: "700" },
 });
