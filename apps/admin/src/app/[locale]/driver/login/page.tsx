@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useDriverAuthStore } from "@/stores/driver-auth";
+import logo from "@/assets/logo.png";
 
 type Step = "phone" | "otp";
 
@@ -26,6 +28,8 @@ export default function DriverLoginPage() {
     }, 1000);
   };
 
+  const fullPhone = phone.trim().startsWith("+") ? phone.trim() : `+237${phone.trim()}`;
+
   const handleSendOtp = async () => {
     setError("");
     if (!phone.trim()) { setError("Entrez votre numéro de téléphone"); return; }
@@ -34,7 +38,7 @@ export default function DriverLoginPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/driver/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone: fullPhone }),
       });
       if (!res.ok) {
         const body = await res.json();
@@ -57,7 +61,7 @@ export default function DriverLoginPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/driver/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, otp }),
+        body: JSON.stringify({ phone: fullPhone, code: otp }),
       });
       if (!res.ok) {
         const body = await res.json();
@@ -77,11 +81,7 @@ export default function DriverLoginPage() {
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center px-6">
       {/* Logo */}
       <div className="mb-10 flex flex-col items-center gap-3">
-        <div className="w-16 h-16 rounded-2xl bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/30">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
-            <path d="M18.5 17.5a3.5 3.5 0 1 0-7 0 3.5 3.5 0 0 0 7 0ZM5.5 17.5a3.5 3.5 0 1 0-7 0 3.5 3.5 0 0 0 7 0ZM15 6a1 1 0 0 0-1-1h-1M12 6l-3 6H5.5M12 6l2.5 5.5M15 12h3.5L17 6"/>
-          </svg>
-        </div>
+        <Image src={logo} alt="Dash Meal" width={72} height={72} className="rounded-2xl shadow-lg" unoptimized />
         <div className="text-center">
           <p className="text-white font-bold text-xl">Dash Meal</p>
           <p className="text-orange-400 font-semibold text-sm">Espace Livreur</p>
