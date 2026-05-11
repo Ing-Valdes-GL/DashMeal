@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import axios from "axios";
 import { supabase } from "../../config/supabase.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../utils/jwt.js";
 import { sendOtp, verifyOtp } from "../../utils/otp.js";
@@ -527,6 +528,73 @@ export async function applyBrand(input: {
   }
 
   return { message: "Demande soumise avec succès", application: data };
+}
+
+// ─── Google OAuth ─────────────────────────────────────────────────────────────
+
+export async function googleAuth(input: { id_token: string }): Promise<{ user: object; tokens: AuthTokens }> {
+  // 1. Vérifier le token Google via tokeninfo
+  let googlePayload: { email: string; name: string; sub: string };
+  try {
+    const { data } = await axios.get<{ email: string; name: string; sub: string; email_verified: string }>(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${input.id_token}`
+    );
+    if (!data.email || !data.sub) {
+      throw new AppError(401, "INVALID_GOOGLE_TOKEN", "Token Google invalide");
+    }
+    googlePayload = { email: data.email, name: data.name ?? data.email, sub: data.sub };
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(401, "INVALID_GOOGLE_TOKEN", "Impossible de vérifier le token Google");
+  }
+
+  const { email, name, sub: google_id } = googlePayload;
+
+  // 2. Chercher l'utilisateur par email ou par google_id
+  const { data: byEmail } = await supabase
+    .from("users")
+    .select("id, name, phone, email, google_id, is_verified")
+    .eq("email", email)
+    .maybeSingle();
+
+  let user = byEmail;
+
+  if (!user) {
+    const { data: byGoogleId } = await supabase
+      .from("users")
+      .select("id, name, phone, email, google_id, is_verified")
+      .eq("google_id", google_id)
+      .maybeSingle();
+    user = byGoogleId;
+  }
+
+  // 3. Si pas trouvé, créer le compte
+  if (!user) {
+    const { data: newUser, error: createErr } = await supabase
+      .from("users")
+      .insert({
+        name,
+        email,
+        google_id,
+        email_verified: true,
+        is_verified: true,
+        phone: null,
+        password_hash: null,
+      })
+      .select("id, name, phone, email, google_id, is_verified")
+      .single();
+
+    if (createErr || !newUser) {
+      throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte Google");
+    }
+    user = newUser;
+  } else if (!user.google_id) {
+    // Lier le google_id au compte existant
+    await supabase.from("users").update({ google_id, email_verified: true }).eq("id", user.id);
+  }
+
+  const tokens = buildUserTokens(user as { id: string; name?: string; phone: string });
+  return { user, tokens };
 }
 
 // ─── Helpers privés ───────────────────────────────────────────────────────────

@@ -14,6 +14,11 @@ import { z } from "zod";
 const router: import("express").Router = Router();
 
 // ─── Utilisateur (mobile) ─────────────────────────────────────────────────────
+router.post(
+  "/user/google",
+  validate(z.object({ id_token: z.string().min(1, "Le token Google est requis") })),
+  controller.googleAuth
+);
 router.post("/user/register", validate(RegisterUserSchema), controller.registerUser);
 router.post("/user/verify-phone", validate(VerifyOtpSchema), controller.verifyPhone);
 router.post("/user/login", validate(LoginUserSchema), controller.loginUser);

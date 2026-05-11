@@ -45,6 +45,7 @@ import favoritesRoutes from "./modules/favorites/favorites.routes.js";
 import trackingRoutes from "./modules/tracking/tracking.routes.js";
 import groupOrdersRoutes from "./modules/group-orders/group-orders.routes.js";
 import driverRoutes from "./modules/driver/driver.routes.js";
+import reelsRoutes from "./modules/reels/reels.routes.js";
 
 const app: Application = express();
 
@@ -166,6 +167,7 @@ app.use(`${API_PREFIX}/favorites`,     favoritesRoutes);
 app.use(`${API_PREFIX}/tracking`,      trackingRoutes);
 app.use(`${API_PREFIX}/group-orders`,  groupOrdersRoutes);
 app.use(`${API_PREFIX}/driver`,        driverRoutes);
+app.use(`${API_PREFIX}/reels`,         reelsRoutes);
 
 // ─── 404 ─────────────────────────────────────────────────────────────────────
 app.use((_req, res) => {
