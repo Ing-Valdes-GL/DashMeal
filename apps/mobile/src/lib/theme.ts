@@ -1,52 +1,44 @@
-// ─── Dash Meal — Design System ────────────────────────────────────────────────
-// Basé sur le Figma "Food Delivery App Community"
+// ─── Dash Meal — Nectar-inspired Design System ────────────────────────────────
 
 export const Colors = {
   // Backgrounds
   bg:        "#FFFFFF",
-  pageBg:    "#F8F9FA",
+  pageBg:    "#F2F3F2",
   card:      "#FFFFFF",
-  inputBg:   "#F5F5F8",
+  inputBg:   "#F2F3F2",
 
-  // Auth (dark)
-  darkBg:    "#1B2138",
-  darkSurf:  "#252B47",
-  darkInput: "#2C3454",
-
-  // Brand
-  primary:      "#FF7A2F",
-  primaryLight: "rgba(255, 122, 47, 0.12)",
-  primaryDark:  "#E86520",
+  // Brand — Nectar green
+  primary:      "#53B175",
+  primaryLight: "#F2F9F0",
+  primaryDark:  "#3E8C58",
 
   // Text
-  text:       "#1C1C1E",
-  text2:      "#747474",
-  text3:      "#ABABAB",
-  textDark:   "#FFFFFF",   // text on dark bg
-  textDark2:  "#A0A8C0",
+  text:    "#181725",
+  text2:   "#7C7C7C",
+  text3:   "#B3B3B3",
 
   // Status
-  success:   "#4CAF50",
-  error:     "#F44336",
-  warning:   "#FFC107",
-  info:      "#2196F3",
+  success: "#53B175",
+  error:   "#F44336",
+  warning: "#FFC107",
+  info:    "#2196F3",
 
   // Borders
-  border:    "#EBEBEB",
-  divider:   "#F0F0F0",
+  border:  "#E2E2E2",
+  divider: "#F2F3F2",
 
-  // Tab bar
-  tabActive:   "#FF7A2F",
-  tabInactive: "#BDBDBD",
+  // Tabs
+  tabActive:   "#53B175",
+  tabInactive: "#B3B3B3",
 } as const;
 
 export const Radius = {
-  xs:   6,
-  sm:   10,
+  xs:   4,
+  sm:   8,
   md:   14,
-  lg:   16,
-  xl:   20,
-  xxl:  28,
+  lg:   18,
+  xl:   24,
+  xxl:  32,
   full: 999,
 } as const;
 
@@ -54,34 +46,24 @@ export const Shadow = {
   sm: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
   },
   md: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowRadius: 16,
     elevation: 4,
   },
   primary: {
-    shadowColor: "#FF7A2F",
+    shadowColor: "#53B175",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
     elevation: 6,
   },
-} as const;
-
-export const Typography = {
-  h1:    { fontSize: 28, fontWeight: "800" as const, color: Colors.text },
-  h2:    { fontSize: 22, fontWeight: "700" as const, color: Colors.text },
-  h3:    { fontSize: 18, fontWeight: "600" as const, color: Colors.text },
-  h4:    { fontSize: 16, fontWeight: "600" as const, color: Colors.text },
-  body:  { fontSize: 14, fontWeight: "400" as const, color: Colors.text2 },
-  small: { fontSize: 12, fontWeight: "400" as const, color: Colors.text3 },
-  label: { fontSize: 13, fontWeight: "500" as const, color: Colors.text2 },
 } as const;
 
 export const Spacing = {

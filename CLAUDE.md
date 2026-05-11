@@ -1,6 +1,12 @@
-# CLAUDE.md
+# CLAUDE.md — Dash Meal Project Memory
+> Last updated: 2026-05-11. Read this BEFORE touching any file — it prevents re-reading the whole codebase.
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+---
+
+## TL;DR
+SaaS food-delivery app for CEMAC zone (Central Africa, XAF). Monorepo: Next.js admin + Express backend + Expo mobile. Primary color: **`#53B175`** (Nectar green). Backend on Railway. DB on Supabase.
+
+---
 
 ## Project Overview
 
@@ -101,3 +107,92 @@ res.json({ success: true, data: T[], pagination: { page, limit, total, total_pag
 - `apps/mobile/.env.local` — `EXPO_PUBLIC_API_URL`
 
 See `apps/backend/.env.local.example` for required variables.
+
+---
+
+## Mobile Design System (Nectar-inspired)
+```
+Colors.primary      = "#53B175"   // Nectar green — buttons, active tabs, badges
+Colors.primaryLight = "#F2F9F0"   // light green tint
+Colors.primaryDark  = "#3E8C58"
+Colors.bg           = "#FFFFFF"
+Colors.pageBg       = "#F2F3F2"
+Colors.card         = "#FFFFFF"
+Colors.inputBg      = "#F2F3F2"
+Colors.text         = "#181725"
+Colors.text2        = "#7C7C7C"
+Colors.text3        = "#B3B3B3"
+Colors.border       = "#E2E2E2"
+Colors.divider      = "#F2F3F2"
+```
+- Auth screens: **light/white** background (NOT dark — changed from previous dark theme)
+- Buttons: full-width rounded green pill (height 56-67)
+- All icons: Ionicons from `@expo/vector-icons` — NEVER emoji as structural icons
+- i18n: `useTranslation()` from `react-i18next` in EVERY screen
+- Currency: `formatCurrency(amount)` from `@/lib/utils`
+
+## Mobile Tab Structure (5 tabs — Nectar style)
+1. `index`     → Home (Shop): banner carousel + categories + products from API
+2. `explore`   → Explore: category grid + product search (API)
+3. `cart`      → Cart: items from Zustand + checkout navigation
+4. `favorites` → Favourites: user favorites from API (auth wall for guests)
+5. `profile`   → Account: orders link, settings, language, logout
+
+Hidden (href:null): `reels` (accessible via home), `marketplace` (merged into explore), `orders` (in profile)
+
+## Mobile API (Backend at Railway)
+```
+API_URL = process.env.EXPO_PUBLIC_API_URL (https://hopeful-gentleness-production.up.railway.app/api/v1)
+Auth tokens: dm_access_token (SecureStore, 15min) + dm_refresh_token (30d)
+
+POST /auth/user/register        { name, email, phone?, password }
+POST /auth/user/login           { email, password } | { phone, password }
+POST /auth/user/send-otp        { phone }
+POST /auth/user/verify-phone    { phone, otp }
+POST /auth/user/send-email-otp  { email }
+POST /auth/user/verify-email    { email, otp }
+POST /auth/refresh              { refresh_token }
+
+GET  /branches/public           ?lat&lng&limit&category&search
+GET  /products/public           ?flash&promo&limit&category&branch_id&search
+GET  /products/public/:id
+GET  /categories/public
+
+GET  /orders                    (auth)
+POST /orders                    (auth) { branch_id, items, type, address? }
+GET  /orders/:id
+GET  /reels                     ?limit&offset
+POST /reels/:id/like            (auth)
+DELETE /reels/:id/like          (auth)
+GET  /user/favorites            (auth)
+POST /user/favorites            (auth) { product_id }
+DELETE /user/favorites/:id      (auth)
+GET  /user/profile              (auth)
+PATCH /user/profile             (auth)
+```
+
+## Key Files (mobile)
+```
+apps/mobile/src/lib/theme.ts      Design tokens (GREEN palette)
+apps/mobile/src/lib/api.ts        Axios, interceptors, apiGet/Post/Patch/Delete
+apps/mobile/src/lib/i18n.ts       i18next FR+EN, AsyncStorage, setLanguage()
+apps/mobile/src/lib/utils.ts      formatCurrency, formatDate
+apps/mobile/src/stores/auth.ts    Zustand: user, isAuthenticated, isGuest, continueAsGuest()
+apps/mobile/src/stores/cart.ts    Zustand: items, addItem, updateQuantity, getTotal(), getCount()
+```
+
+## Done ✅ / Pending ⏳
+### Done
+- Mobile: 5-tab Nectar redesign (green palette, all screens)
+- Mobile: react-native-maps@1.20.1 installed
+- Mobile: Email+phone auth (login/register/OTP)
+- Mobile: Guest mode (isGuest in auth store)
+- Admin: PWA (@ducanh2912/next-pwa) + manifest + driver web app
+- DB: Migration 010 (email auth, reels, drivers, deliveries, sponsored branches, flash/promo)
+
+### Pending
+- Backend: driver endpoints (GET/PATCH /driver/deliveries, GET /driver/earnings)
+- Backend: reels + favorites endpoints
+- Admin: Generate PWA icons → public/icons/*.png from realfavicongenerator.net
+- Google OAuth + Apple Sign-In (currently stub Alert)
+- Push notification token registration
