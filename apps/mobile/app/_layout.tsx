@@ -24,11 +24,7 @@ const queryClient = new QueryClient({
 });
 
 // ─── Rating Modal ─────────────────────────────────────────────────────────────
-
-interface RatingModalProps {
-  orderId: string | null;
-  onClose: () => void;
-}
+interface RatingModalProps { orderId: string | null; onClose: () => void; }
 
 function RatingModal({ orderId, onClose }: RatingModalProps) {
   const [stars, setStars] = useState(0);
@@ -61,7 +57,6 @@ function RatingModal({ orderId, onClose }: RatingModalProps) {
             </View>
           ) : (
             <>
-              {/* Header */}
               <View style={ratingStyles.header}>
                 <View style={ratingStyles.iconWrap}>
                   <Ionicons name="star" size={28} color={Colors.primary} />
@@ -70,42 +65,28 @@ function RatingModal({ orderId, onClose }: RatingModalProps) {
                   <Ionicons name="close" size={20} color={Colors.text3} />
                 </TouchableOpacity>
               </View>
-
               <Text style={ratingStyles.title}>Comment était votre expérience ?</Text>
               <Text style={ratingStyles.subtitle}>Notez votre commande pour nous aider à nous améliorer</Text>
-
-              {/* Stars */}
               <View style={ratingStyles.stars}>
-                {[1, 2, 3, 4, 5].map((s) => (
+                {[1,2,3,4,5].map((s) => (
                   <TouchableOpacity key={s} onPress={() => setStars(s)} style={ratingStyles.starBtn}>
-                    <Ionicons
-                      name={s <= stars ? "star" : "star-outline"}
-                      size={36}
-                      color={s <= stars ? "#FFC107" : Colors.border}
-                    />
+                    <Ionicons name={s <= stars ? "star" : "star-outline"} size={36} color={s <= stars ? "#FFC107" : Colors.border} />
                   </TouchableOpacity>
                 ))}
               </View>
-
               {stars > 0 && (
                 <Text style={ratingStyles.ratingLabel}>
-                  {["", "Très mauvais", "Mauvais", "Correct", "Bon", "Excellent !"][stars]}
+                  {["","Très mauvais","Mauvais","Correct","Bon","Excellent !"][stars]}
                 </Text>
               )}
-
-              {/* Comment */}
               <TextInput
                 style={ratingStyles.commentInput}
                 placeholder="Laissez un commentaire (optionnel)"
                 placeholderTextColor={Colors.text3}
                 value={comment}
                 onChangeText={setComment}
-                multiline
-                maxLength={500}
-                numberOfLines={3}
+                multiline maxLength={500} numberOfLines={3}
               />
-
-              {/* Submit */}
               <TouchableOpacity
                 style={[ratingStyles.submitBtn, (stars === 0 || loading) && ratingStyles.submitBtnDisabled]}
                 onPress={handleSubmit}
@@ -125,40 +106,18 @@ function RatingModal({ orderId, onClose }: RatingModalProps) {
 }
 
 const ratingStyles = StyleSheet.create({
-  overlay: {
-    flex: 1, backgroundColor: "rgba(0,0,0,0.55)",
-    alignItems: "center", justifyContent: "center", padding: 24,
-  },
-  card: {
-    backgroundColor: Colors.bg, borderRadius: 24,
-    padding: 24, width: "100%", maxWidth: 380, ...Shadow.sm,
-  },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
-  iconWrap: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: Colors.primaryLight,
-    alignItems: "center", justifyContent: "center",
-  },
-  closeBtn: {
-    marginLeft: "auto", width: 32, height: 32,
-    borderRadius: 16, backgroundColor: Colors.inputBg,
-    alignItems: "center", justifyContent: "center",
-  },
-  title: { fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 6 },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center", padding: 24 },
+  card:    { backgroundColor: Colors.bg, borderRadius: 24, padding: 24, width: "100%", maxWidth: 380, ...Shadow.sm },
+  header:  { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+  iconWrap: { width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center" },
+  closeBtn: { marginLeft: "auto", width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.inputBg, alignItems: "center", justifyContent: "center" },
+  title:    { fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 6 },
   subtitle: { fontSize: 13, color: Colors.text3, lineHeight: 19, marginBottom: 20 },
-  stars: { flexDirection: "row", gap: 4, justifyContent: "center", marginBottom: 8 },
-  starBtn: { padding: 4 },
+  stars:    { flexDirection: "row", gap: 4, justifyContent: "center", marginBottom: 8 },
+  starBtn:  { padding: 4 },
   ratingLabel: { textAlign: "center", fontSize: 13, fontWeight: "700", color: "#FFC107", marginBottom: 16 },
-  commentInput: {
-    backgroundColor: Colors.inputBg, borderRadius: Radius.lg,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: Colors.text, lineHeight: 20,
-    minHeight: 80, textAlignVertical: "top", marginBottom: 16,
-  },
-  submitBtn: {
-    backgroundColor: Colors.primary, borderRadius: Radius.full,
-    paddingVertical: 15, alignItems: "center",
-  },
+  commentInput: { backgroundColor: Colors.inputBg, borderRadius: Radius.lg, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: Colors.text, minHeight: 80, textAlignVertical: "top", marginBottom: 16 },
+  submitBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: 15, alignItems: "center" },
   submitBtnDisabled: { backgroundColor: Colors.border },
   submitText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   doneWrap: { alignItems: "center", paddingVertical: 24, gap: 12 },
@@ -166,7 +125,6 @@ const ratingStyles = StyleSheet.create({
 });
 
 // ─── Root navigation ──────────────────────────────────────────────────────────
-
 function RootLayoutNav() {
   const { setUser } = useAuthStore();
   const router = useRouter();
@@ -179,16 +137,10 @@ function RootLayoutNav() {
       try {
         const token = await SecureStore.getItemAsync("dm_access_token");
         if (!token) { setUser(null); return; }
-        const savedRole = await SecureStore.getItemAsync("dm_user_role");
-        if (savedRole === "driver") {
-          const res = await apiGet("/delivery/me");
-          const d = res.data;
-          setUser({ id: d.id, name: d.name, phone: d.phone, is_verified: true, role: "driver" });
-        } else {
-          const res = await apiGet("/users/me");
-          setUser(res.data);
-          registerForPushNotifications().catch(() => {});
-        }
+
+        const res = await apiGet("/users/me");
+        setUser(res.data);
+        registerForPushNotifications().catch(() => {});
       } catch {
         setUser(null);
       }
@@ -200,29 +152,21 @@ function RootLayoutNav() {
     responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, unknown> | undefined;
 
-      // Order ready → show rating popup
       if (data?.type === "order_ready" && typeof data.orderId === "string") {
         setRatingOrderId(data.orderId);
         return;
       }
-      // Order delivered → also show rating popup
       if (data?.rateOrder === true && typeof data.orderId === "string") {
         setRatingOrderId(data.orderId);
         return;
       }
-      // Navigate to order detail (stale_order or generic order notification)
       if (data?.screen === "order" && typeof data.orderId === "string") {
         router.push({ pathname: "/order/[id]", params: { id: data.orderId } });
         return;
       }
-      // Navigate to chat (legacy: conversationId param)
       if (data?.screen === "chat" && typeof data.conversationId === "string") {
         router.push({ pathname: "/chat/[id]", params: { id: data.conversationId } });
         return;
-      }
-      // Driver: new delivery available
-      if (data?.type === "new_delivery" && typeof data.deliveryId === "string") {
-        router.push({ pathname: "/(driver)/delivery/[id]", params: { id: data.deliveryId, mode: "available" } });
       }
     });
 
@@ -235,20 +179,21 @@ function RootLayoutNav() {
   return (
     <>
       <Stack screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
-        <Stack.Screen name="index" options={{ animation: "none" }} />
-        <Stack.Screen name="onboarding" options={{ animation: "fade", gestureEnabled: false }} />
-        <Stack.Screen name="(auth)" options={{ animation: "fade" }} />
-        <Stack.Screen name="(tabs)" options={{ animation: "fade", gestureEnabled: false }} />
-        <Stack.Screen name="product/[id]" options={{ presentation: "card" }} />
-        <Stack.Screen name="order/[id]" options={{ presentation: "card" }} />
-        <Stack.Screen name="checkout" options={{ presentation: "modal" }} />
-        <Stack.Screen name="chat/[id]" options={{ presentation: "card" }} />
-        <Stack.Screen name="tracking/[id]" options={{ presentation: "card" }} />
-        <Stack.Screen name="(driver)" options={{ animation: "fade", gestureEnabled: false }} />
-      <Stack.Screen name="profile/personal"  options={{ presentation: "card" }} />
-      <Stack.Screen name="profile/addresses" options={{ presentation: "card" }} />
-      <Stack.Screen name="profile/payment"   options={{ presentation: "card" }} />
-      <Stack.Screen name="profile/favorites" options={{ presentation: "card" }} />
+        <Stack.Screen name="index"          options={{ animation: "none" }} />
+        <Stack.Screen name="onboarding"     options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="(auth)"         options={{ animation: "fade" }} />
+        <Stack.Screen name="(tabs)"         options={{ animation: "fade", gestureEnabled: false }} />
+        <Stack.Screen name="product/[id]"   options={{ presentation: "card" }} />
+        <Stack.Screen name="order/[id]"     options={{ presentation: "card" }} />
+        <Stack.Screen name="checkout"       options={{ presentation: "modal" }} />
+        <Stack.Screen name="chat/[id]"      options={{ presentation: "card" }} />
+        <Stack.Screen name="tracking/[id]"  options={{ presentation: "card" }} />
+        <Stack.Screen name="profile/personal"  options={{ presentation: "card" }} />
+        <Stack.Screen name="profile/addresses" options={{ presentation: "card" }} />
+        <Stack.Screen name="profile/payment"   options={{ presentation: "card" }} />
+        <Stack.Screen name="profile/favorites" options={{ presentation: "card" }} />
+        <Stack.Screen name="profile/loyalty"   options={{ presentation: "card" }} />
+        <Stack.Screen name="profile/settings"  options={{ presentation: "card" }} />
       </Stack>
 
       <RatingModal orderId={ratingOrderId} onClose={() => setRatingOrderId(null)} />

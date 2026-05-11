@@ -1,12 +1,13 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
+import * as Location from "expo-location";
 import { Colors, Radius, Shadow } from "@/lib/theme";
 
 const { width, height } = Dimensions.get("window");
@@ -73,10 +74,86 @@ const fan = StyleSheet.create({
   } as any,
 });
 
+// ─── Location permission popup ────────────────────────────────────────────────
+function LocationPermissionModal({ visible, onAllow, onSkip }: { visible: boolean; onAllow: () => void; onSkip: () => void }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={locStyles.overlay}>
+        <View style={locStyles.card}>
+          <View style={locStyles.iconWrap}>
+            <Ionicons name="location" size={40} color={Colors.primary} />
+          </View>
+          <Text style={locStyles.title}>Activez votre localisation</Text>
+          <Text style={locStyles.subtitle}>
+            Pour vous montrer les boutiques à proximité et estimer les temps de livraison, nous avons besoin de votre position.
+          </Text>
+          <View style={locStyles.bullets}>
+            {["Boutiques les plus proches", "Estimation précise de la livraison", "Suggestions personnalisées"].map((b) => (
+              <View key={b} style={locStyles.bulletRow}>
+                <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+                <Text style={locStyles.bulletText}>{b}</Text>
+              </View>
+            ))}
+          </View>
+          <TouchableOpacity style={locStyles.allowBtn} onPress={onAllow}>
+            <Ionicons name="location-outline" size={18} color="#fff" />
+            <Text style={locStyles.allowText}>Activer la localisation</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={locStyles.skipBtn} onPress={onSkip}>
+            <Text style={locStyles.skipText}>Pas maintenant</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const locStyles = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center", padding: 24 },
+  card:    { backgroundColor: "#fff", borderRadius: 28, padding: 28, width: "100%", maxWidth: 360, alignItems: "center" },
+  iconWrap: {
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: Colors.primaryLight,
+    alignItems: "center", justifyContent: "center", marginBottom: 20,
+  },
+  title:    { fontSize: 20, fontWeight: "800", color: Colors.text, textAlign: "center", marginBottom: 10 },
+  subtitle: { fontSize: 14, color: Colors.text2, textAlign: "center", lineHeight: 21, marginBottom: 20 },
+  bullets:  { width: "100%", gap: 10, marginBottom: 24 },
+  bulletRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  bulletText: { fontSize: 13, color: Colors.text2, flex: 1 },
+  allowBtn: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    width: "100%", height: 50, borderRadius: Radius.full,
+    backgroundColor: Colors.primary, justifyContent: "center", marginBottom: 10,
+    ...Shadow.primary,
+  },
+  allowText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+  skipBtn:   { paddingVertical: 8 },
+  skipText:  { color: Colors.text3, fontSize: 14 },
+});
+
 export default function OnboardingScreen() {
   const router = useRouter();
   const [current, setCurrent] = useState(0);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const flatRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    // Show location popup after brief delay on first load
+    const t = setTimeout(() => setShowLocationModal(true), 800);
+    return () => clearTimeout(t);
+  }, []);
+
+  const handleAllowLocation = async () => {
+    setShowLocationModal(false);
+    try {
+      await Location.requestForegroundPermissionsAsync();
+    } catch {}
+  };
+
+  const handleSkipLocation = () => {
+    setShowLocationModal(false);
+  };
 
   const goNext = () => {
     if (current < SLIDES.length - 1) {
@@ -89,7 +166,7 @@ export default function OnboardingScreen() {
 
   const finish = async () => {
     await SecureStore.setItemAsync("dm_onboarded", "true");
-    router.replace("/(auth)/login");
+    router.replace("/(auth)/welcome");
   };
 
   const isLast = current === SLIDES.length - 1;
@@ -98,6 +175,12 @@ export default function OnboardingScreen() {
     <View style={styles.container}>
       <StatusBar style="dark" />
       <FanDecoration />
+
+      <LocationPermissionModal
+        visible={showLocationModal}
+        onAllow={handleAllowLocation}
+        onSkip={handleSkipLocation}
+      />
 
       {/* Logo */}
       <View style={styles.logoRow}>

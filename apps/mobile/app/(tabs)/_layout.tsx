@@ -1,38 +1,18 @@
 import { Tabs, Redirect } from "expo-router";
-import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth";
-import { useCartStore } from "@/stores/cart";
 import { Ionicons } from "@expo/vector-icons";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { Colors, Shadow } from "@/lib/theme";
 
-function CartBadge({ count }: { count: number }) {
-  if (!count) return null;
-  return (
-    <View style={badge.wrap}>
-      <Text style={badge.text}>{count > 99 ? "99+" : count}</Text>
-    </View>
-  );
+function TabIcon({ name, color, size }: { name: React.ComponentProps<typeof Ionicons>["name"]; color: string; size: number }) {
+  return <Ionicons name={name} size={size} color={color} />;
 }
 
-const badge = StyleSheet.create({
-  wrap: {
-    position: "absolute", top: -4, right: -8,
-    minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: Colors.primary,
-    alignItems: "center", justifyContent: "center",
-    paddingHorizontal: 3,
-  },
-  text: { color: "#fff", fontSize: 9, fontWeight: "700" },
-});
-
 export default function TabsLayout() {
-  const { t } = useTranslation();
-  const { isAuthenticated } = useAuthStore();
-  const cartCount = useCartStore((s) => s.getCount());
+  const { isAuthenticated, isGuest } = useAuthStore();
 
-  if (!isAuthenticated) {
-    return <Redirect href="/(auth)/login" />;
+  if (!isAuthenticated && !isGuest) {
+    return <Redirect href="/(auth)/welcome" />;
   }
 
   return (
@@ -43,39 +23,40 @@ export default function TabsLayout() {
           backgroundColor: Colors.bg,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 10,
-          paddingTop: 6,
+          height: Platform.OS === "ios" ? 84 : 64,
+          paddingBottom: Platform.OS === "ios" ? 24 : 10,
+          paddingTop: 8,
           ...Shadow.sm,
         },
-        tabBarActiveTintColor:   Colors.tabActive,
-        tabBarInactiveTintColor: Colors.tabInactive,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+        tabBarActiveTintColor:   Colors.primary,
+        tabBarInactiveTintColor: "#BDBDBD",
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginTop: -2 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           tabBarLabel: "Accueil",
-          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name={focused ? "home" : "home-outline"} color={color} size={size} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="catalog"
+        name="reels"
         options={{
-          tabBarLabel: "Catalogue",
-          tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} />,
+          tabBarLabel: "Réels",
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name={focused ? "play-circle" : "play-circle-outline"} color={color} size={size} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="cart"
+        name="marketplace"
         options={{
-          tabBarLabel: t("cart.title"),
-          tabBarIcon: ({ color, size }) => (
-            <View>
-              <Ionicons name="cart-outline" size={size} color={color} />
-              <CartBadge count={cartCount} />
-            </View>
+          tabBarLabel: "Marketplace",
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name={focused ? "storefront" : "storefront-outline"} color={color} size={size} />
           ),
         }}
       />
@@ -83,23 +64,25 @@ export default function TabsLayout() {
         name="orders"
         options={{
           tabBarLabel: "Commandes",
-          tabBarIcon: ({ color, size }) => <Ionicons name="receipt-outline" size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="favorites"
-        options={{
-          tabBarLabel: "Favoris",
-          tabBarIcon: ({ color, size }) => <Ionicons name="heart-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name={focused ? "receipt" : "receipt-outline"} color={color} size={size} />
+          ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           tabBarLabel: "Profil",
-          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon name={focused ? "person" : "person-outline"} color={color} size={size} />
+          ),
         }}
       />
+
+      {/* Hidden screens — no tab icon */}
+      <Tabs.Screen name="catalog"    options={{ href: null }} />
+      <Tabs.Screen name="cart"       options={{ href: null }} />
+      <Tabs.Screen name="favorites"  options={{ href: null }} />
     </Tabs>
   );
 }

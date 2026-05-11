@@ -1,5 +1,5 @@
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "@/stores/auth";
@@ -18,34 +18,37 @@ interface MenuItem {
   iconColor: string;
   iconBg: string;
   label: string;
+  subtitle?: string;
   onPress: () => void;
   danger?: boolean;
+  badge?: string;
 }
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, setUser, logout } = useAuthStore();
+  const { user, setUser, logout, isAuthenticated, isGuest } = useAuthStore();
 
   const { data: ordersResp } = useQuery<{ success: boolean; data: any[] }>({
     queryKey: ["my-orders"],
-    queryFn: () => apiGet("/orders/my-orders"),
+    queryFn:  () => apiGet("/orders/my-orders"),
     staleTime: 1000 * 60,
+    enabled:   isAuthenticated,
   });
   const orderCount = ordersResp?.data?.length ?? 0;
 
   const { data: favResp } = useQuery<{ success: boolean; data: any[] }>({
     queryKey: ["my-favorites"],
-    queryFn: () => apiGet("/users/me/favorites"),
+    queryFn:  () => apiGet("/users/me/favorites"),
     staleTime: 1000 * 60 * 5,
+    enabled:   isAuthenticated,
   });
   const favCount = favResp?.data?.length ?? 0;
 
-  // ── Upload avatar ──────────────────────────────────────────────────────────
   const avatarMutation = useMutation({
     mutationFn: async (uri: string) => {
       const formData = new FormData();
       const filename = uri.split("/").pop() ?? "avatar.jpg";
-      const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
+      const ext  = filename.split(".").pop()?.toLowerCase() ?? "jpg";
       const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
       formData.append("avatar", { uri, name: filename, type: mime } as any);
       return apiPostForm("/users/me/avatar", formData);
@@ -58,125 +61,146 @@ export default function ProfileScreen() {
   });
 
   const handlePickAvatar = async () => {
+    if (!isAuthenticated) { router.push("/(auth)/welcome"); return; }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert("Permission refusée", "Autorisez l'accès à votre galerie dans les paramètres.");
-      return;
-    }
+    if (status !== "granted") { Alert.alert("Permission refusée", "Autorisez l'accès à votre galerie."); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      allowsEditing: true, aspect: [1, 1], quality: 0.8,
     });
-    if (!result.canceled && result.assets[0]) {
-      avatarMutation.mutate(result.assets[0].uri);
-    }
+    if (!result.canceled && result.assets[0]) avatarMutation.mutate(result.assets[0].uri);
   };
 
   const handleLogout = () => {
     Alert.alert("Déconnexion", "Êtes-vous sûr de vouloir vous déconnecter ?", [
       { text: "Annuler", style: "cancel" },
-      { text: "Déconnexion", style: "destructive", onPress: async () => { await logout(); router.replace("/(auth)/login"); } },
+      { text: "Déconnexion", style: "destructive", onPress: async () => {
+        await logout();
+        router.replace("/(auth)/welcome");
+      }},
     ]);
   };
 
-  const menuSections: { title: string; items: MenuItem[] }[] = [
-    {
-      title: "Mon compte",
-      items: [
-        { icon: "person-outline",   iconColor: "#FF7A2F", iconBg: "#FFF0E8", label: "Informations personnelles", onPress: () => router.push("/profile/personal") },
-        { icon: "location-outline", iconColor: "#2196F3", iconBg: "#E3F2FD", label: "Mes adresses",              onPress: () => router.push("/profile/addresses") },
-        { icon: "card-outline",     iconColor: "#4CAF50", iconBg: "#E8F5E9", label: "Paiement par défaut",        onPress: () => router.push("/profile/payment") },
-      ],
-    },
-    {
-      title: "Activité",
-      items: [
-        { icon: "receipt-outline",       iconColor: "#9C27B0", iconBg: "#F3E5F5", label: "Mes commandes",   onPress: () => router.push("/(tabs)/orders") },
-        { icon: "heart-outline",         iconColor: "#E91E63", iconBg: "#FCE4EC", label: "Mes favoris",     onPress: () => router.push("/(tabs)/favorites") },
-        { icon: "star-outline",          iconColor: "#FFC107", iconBg: "#FFF9C4", label: "Points de fidélité", onPress: () => router.push("/profile/loyalty") },
-        { icon: "notifications-outline", iconColor: "#FF9800", iconBg: "#FFF3E0", label: "Notifications",   onPress: () => {} },
-      ],
-    },
-    {
-      title: "Aide & Support",
-      items: [
-        { icon: "help-circle-outline", iconColor: "#00BCD4", iconBg: "#E0F7FA", label: "FAQ",        onPress: () => {} },
-        { icon: "settings-outline",    iconColor: "#795548", iconBg: "#EFEBE9", label: "Paramètres", onPress: () => router.push("/profile/settings") },
-      ],
-    },
-    {
-      title: "",
-      items: [
-        { icon: "log-out-outline", iconColor: Colors.error, iconBg: "#FFEBEE", label: "Se déconnecter", onPress: handleLogout, danger: true },
-      ],
-    },
+  // ─── Menu sections ────────────────────────────────────────────────────────
+  const accountItems: MenuItem[] = isAuthenticated ? [
+    { icon: "person-outline",       iconColor: "#FF7A2F", iconBg: "#FFF0E8", label: "Informations personnelles", onPress: () => router.push("/profile/personal") },
+    { icon: "location-outline",     iconColor: "#2196F3", iconBg: "#E3F2FD", label: "Mes adresses",              onPress: () => router.push("/profile/addresses") },
+    { icon: "card-outline",         iconColor: "#4CAF50", iconBg: "#E8F5E9", label: "Paiement par défaut",        onPress: () => router.push("/profile/payment") },
+    { icon: "notifications-outline",iconColor: "#FF9800", iconBg: "#FFF3E0", label: "Notifications",              onPress: () => {} },
+  ] : [
+    { icon: "log-in-outline", iconColor: Colors.primary, iconBg: Colors.primaryLight, label: "Se connecter / S'inscrire", subtitle: "Accédez à votre compte", onPress: () => router.push("/(auth)/welcome") },
+  ];
+
+  const activityItems: MenuItem[] = isAuthenticated ? [
+    { icon: "receipt-outline",  iconColor: "#9C27B0", iconBg: "#F3E5F5", label: "Mes commandes",      badge: orderCount > 0 ? `${orderCount}` : undefined, onPress: () => {} },
+    { icon: "heart-outline",    iconColor: "#E91E63", iconBg: "#FCE4EC", label: "Mes favoris",         badge: favCount > 0 ? `${favCount}` : undefined,   onPress: () => router.push("/profile/favorites") },
+    { icon: "star-outline",     iconColor: "#FFC107", iconBg: "#FFF9C4", label: "Points de fidélité",  onPress: () => router.push("/profile/loyalty") },
+  ] : [];
+
+  const helpItems: MenuItem[] = [
+    { icon: "help-buoy-outline",     iconColor: "#00BCD4", iconBg: "#E0F7FA", label: "Centre d'aide",         subtitle: "FAQ & tutoriels",         onPress: () => {} },
+    { icon: "chatbubbles-outline",   iconColor: "#4CAF50", iconBg: "#E8F5E9", label: "Chat avec le support",  subtitle: "Réponse en moins de 5 min", onPress: () => {} },
+    { icon: "mail-outline",          iconColor: "#2196F3", iconBg: "#E3F2FD", label: "Envoyer un email",       subtitle: "support@dashmeal.cm",      onPress: () => Linking.openURL("mailto:support@dashmeal.cm") },
+    { icon: "call-outline",          iconColor: "#FF9800", iconBg: "#FFF3E0", label: "Appeler le support",     subtitle: "+237 6XX XXX XXX",         onPress: () => Linking.openURL("tel:+237600000000") },
+  ];
+
+  const aboutItems: MenuItem[] = [
+    { icon: "information-circle-outline", iconColor: "#607D8B", iconBg: "#ECEFF1", label: "À propos de Dash Meal", onPress: () => {} },
+    { icon: "shield-checkmark-outline",   iconColor: "#3F51B5", iconBg: "#E8EAF6", label: "Politique de confidentialité", onPress: () => {} },
+    { icon: "document-text-outline",      iconColor: "#795548", iconBg: "#EFEBE9", label: "Conditions d'utilisation",     onPress: () => {} },
+    { icon: "star-half-outline",          iconColor: "#FFC107", iconBg: "#FFF9C4", label: "Évaluer l'application",        onPress: () => {} },
+  ];
+
+  const sections = [
+    ...(accountItems.length > 0 ? [{ title: isAuthenticated ? "Mon compte" : "", items: accountItems }] : []),
+    ...(activityItems.length > 0 ? [{ title: "Activité", items: activityItems }] : []),
+    { title: "Aide & Support", items: helpItems },
+    { title: "À propos", items: aboutItems },
+    ...(isAuthenticated ? [{ title: "", items: [{ icon: "log-out-outline" as const, iconColor: Colors.error, iconBg: "#FFEBEE", label: "Se déconnecter", onPress: handleLogout, danger: true }] }] : []),
   ];
 
   const avatarUrl = (user as any)?.avatar_url as string | undefined;
-  const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) ?? "?";
+  const initials  = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) ?? "?";
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={20} color={Colors.text} />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Profil</Text>
-          <View style={{ width: 38 }} />
+          {isAuthenticated && (
+            <TouchableOpacity onPress={() => router.push("/profile/settings")}>
+              <Ionicons name="settings-outline" size={22} color={Colors.text} />
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 90 }}>
-        {/* Avatar & infos */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* Avatar section */}
         <View style={styles.avatarSection}>
           <TouchableOpacity style={styles.avatarWrap} onPress={handlePickAvatar} activeOpacity={0.85}>
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={styles.avatar} contentFit="cover" />
+            ) : isGuest ? (
+              <View style={[styles.avatar, styles.avatarFallback]}>
+                <Ionicons name="person-outline" size={40} color={Colors.primary} />
+              </View>
             ) : (
               <View style={[styles.avatar, styles.avatarFallback]}>
                 <Text style={styles.avatarText}>{initials}</Text>
               </View>
             )}
-            <View style={styles.editAvatarBtn}>
-              {avatarMutation.isPending
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Ionicons name="camera-outline" size={14} color="#fff" />
-              }
-            </View>
+            {isAuthenticated && (
+              <View style={styles.editAvatarBtn}>
+                {avatarMutation.isPending
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="camera-outline" size={14} color="#fff" />
+                }
+              </View>
+            )}
           </TouchableOpacity>
-          <Text style={styles.name}>{user?.name ?? "Utilisateur"}</Text>
-          <Text style={styles.phone}>{user?.phone ?? ""}</Text>
-          {user?.is_verified && (
-            <View style={styles.verifiedBadge}>
-              <Ionicons name="checkmark-circle" size={13} color={Colors.success} />
-              <Text style={styles.verifiedText}>Compte vérifié</Text>
-            </View>
+
+          {isGuest ? (
+            <>
+              <Text style={styles.name}>Mode invité</Text>
+              <Text style={styles.email}>Connectez-vous pour accéder à toutes les fonctionnalités</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.name}>{user?.name ?? "Utilisateur"}</Text>
+              <Text style={styles.email}>{user?.email ?? user?.phone ?? ""}</Text>
+              {user?.is_verified && (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={13} color={Colors.success} />
+                  <Text style={styles.verifiedText}>Compte vérifié</Text>
+                </View>
+              )}
+            </>
           )}
         </View>
 
-        {/* Stats */}
-        <View style={styles.statsCard}>
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{orderCount}</Text>
-            <Text style={styles.statLabel}>Commandes</Text>
+        {/* Stats (authenticated only) */}
+        {isAuthenticated && (
+          <View style={styles.statsCard}>
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{orderCount}</Text>
+              <Text style={styles.statLabel}>Commandes</Text>
+            </View>
+            <View style={styles.statDiv} />
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>{favCount}</Text>
+              <Text style={styles.statLabel}>Favoris</Text>
+            </View>
+            <View style={styles.statDiv} />
+            <View style={styles.stat}>
+              <Text style={styles.statValue}>0 pts</Text>
+              <Text style={styles.statLabel}>Fidélité</Text>
+            </View>
           </View>
-          <View style={styles.statDiv} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>{favCount}</Text>
-            <Text style={styles.statLabel}>Favoris</Text>
-          </View>
-          <View style={styles.statDiv} />
-          <View style={styles.stat}>
-            <Text style={styles.statValue}>0 pts</Text>
-            <Text style={styles.statLabel}>Fidélité</Text>
-          </View>
-        </View>
+        )}
 
-        {/* Langue */}
+        {/* Language toggle */}
         <View style={[styles.section, { marginTop: 16 }]}>
           <View style={styles.langCard}>
             <View style={styles.langIcon}>
@@ -200,7 +224,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Menu sections */}
-        {menuSections.map((section, si) => (
+        {sections.map((section, si) => (
           <View key={si} style={styles.section}>
             {section.title ? <Text style={styles.sectionTitle}>{section.title}</Text> : null}
             <View style={styles.menuCard}>
@@ -214,17 +238,27 @@ export default function ProfileScreen() {
                   <View style={[styles.menuIcon, { backgroundColor: item.iconBg }]}>
                     <Ionicons name={item.icon} size={18} color={item.iconColor} />
                   </View>
-                  <Text style={[styles.menuLabel, item.danger && { color: Colors.error }]}>
-                    {item.label}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={16} color={Colors.border} />
+                  <View style={styles.menuTextGroup}>
+                    <Text style={[styles.menuLabel, item.danger && { color: Colors.error }]}>
+                      {item.label}
+                    </Text>
+                    {item.subtitle && (
+                      <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                    )}
+                  </View>
+                  {item.badge ? (
+                    <View style={styles.menuBadge}>
+                      <Text style={styles.menuBadgeText}>{item.badge}</Text>
+                    </View>
+                  ) : null}
+                  <Ionicons name="chevron-forward" size={15} color={Colors.border} />
                 </TouchableOpacity>
               ))}
             </View>
           </View>
         ))}
 
-        <Text style={styles.version}>Dash Meal v1.0.0</Text>
+        <Text style={styles.version}>Dash Meal v1.0.0 — CEMAC Zone</Text>
       </ScrollView>
     </View>
   );
@@ -232,31 +266,30 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.pageBg },
-  safe: { backgroundColor: Colors.bg },
+  safe:      { backgroundColor: Colors.bg },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 20, paddingVertical: 14, backgroundColor: Colors.bg,
   },
-  backBtn: {
-    width: 38, height: 38, borderRadius: Radius.full,
-    backgroundColor: Colors.inputBg, alignItems: "center", justifyContent: "center",
-  },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: Colors.text },
+  headerTitle: { fontSize: 22, fontWeight: "800", color: Colors.text },
+
   avatarSection: { alignItems: "center", paddingVertical: 24, backgroundColor: Colors.bg },
   avatarWrap: { position: "relative", marginBottom: 12 },
-  avatar: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: Colors.primary },
+  avatar: { width: 90, height: 90, borderRadius: 45, borderWidth: 3, borderColor: Colors.primary },
   avatarFallback: { backgroundColor: "#FFE8D9", alignItems: "center", justifyContent: "center" },
   avatarText: { fontSize: 30, fontWeight: "700", color: Colors.primary },
   editAvatarBtn: {
     position: "absolute", bottom: 0, right: 0,
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: Colors.primary, alignItems: "center", justifyContent: "center",
+    backgroundColor: Colors.primary,
+    alignItems: "center", justifyContent: "center",
     borderWidth: 2, borderColor: Colors.bg,
   },
   name:  { fontSize: 20, fontWeight: "700", color: Colors.text, marginBottom: 4 },
-  phone: { fontSize: 14, color: Colors.text2 },
+  email: { fontSize: 13, color: Colors.text2, textAlign: "center", paddingHorizontal: 32 },
   verifiedBadge: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6 },
   verifiedText:  { fontSize: 12, color: Colors.success, fontWeight: "500" },
+
   statsCard: {
     flexDirection: "row", marginHorizontal: 16, marginTop: 16,
     backgroundColor: Colors.card, borderRadius: Radius.lg, paddingVertical: 16, ...Shadow.sm,
@@ -265,8 +298,10 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 18, fontWeight: "800", color: Colors.text, marginBottom: 2 },
   statLabel: { fontSize: 11, color: Colors.text3 },
   statDiv:   { width: 1, backgroundColor: Colors.divider },
-  section: { marginTop: 12, paddingHorizontal: 16 },
+
+  section:      { marginTop: 12, paddingHorizontal: 16 },
   sectionTitle: { fontSize: 11, fontWeight: "700", color: Colors.text3, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8, paddingLeft: 4 },
+
   langCard: {
     flexDirection: "row", alignItems: "center", gap: 12,
     backgroundColor: Colors.card, borderRadius: Radius.lg, padding: 14, ...Shadow.sm,
@@ -278,10 +313,19 @@ const styles = StyleSheet.create({
   langBtnActive: { backgroundColor: Colors.primary },
   langBtnText:       { fontSize: 12, fontWeight: "700", color: Colors.text2 },
   langBtnTextActive: { color: "#fff" },
+
   menuCard: { backgroundColor: Colors.card, borderRadius: Radius.lg, overflow: "hidden", ...Shadow.sm },
-  menuRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 14, gap: 14 },
+  menuRow:  { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 12, gap: 12 },
   menuRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.divider },
-  menuIcon: { width: 36, height: 36, borderRadius: Radius.sm, alignItems: "center", justifyContent: "center" },
-  menuLabel: { flex: 1, fontSize: 14, fontWeight: "500", color: Colors.text },
+  menuIcon: { width: 38, height: 38, borderRadius: Radius.sm, alignItems: "center", justifyContent: "center" },
+  menuTextGroup: { flex: 1 },
+  menuLabel:    { fontSize: 14, fontWeight: "500", color: Colors.text },
+  menuSubtitle: { fontSize: 11, color: Colors.text3, marginTop: 1 },
+  menuBadge: {
+    backgroundColor: Colors.primary, borderRadius: Radius.full,
+    minWidth: 20, height: 20, alignItems: "center", justifyContent: "center", paddingHorizontal: 6,
+  },
+  menuBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+
   version: { textAlign: "center", color: Colors.border, fontSize: 12, marginTop: 24, marginBottom: 8 },
 });
