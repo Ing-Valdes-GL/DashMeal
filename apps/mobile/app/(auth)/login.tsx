@@ -1,19 +1,18 @@
 import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator,
+  KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { apiPost } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
 import { Colors, Radius, Shadow } from "@/lib/theme";
 
-// ─── Décoration cercles (style auth Figma) ────────────────────────────────────
 function AuthDecoration() {
   return (
     <View style={deco.wrap} pointerEvents="none">
@@ -25,23 +24,30 @@ function AuthDecoration() {
 }
 const deco = StyleSheet.create({
   wrap:   { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
-  circle: { position: "absolute", borderRadius: 999, borderWidth: 1, borderColor: "rgba(255,255,255,0.06)" },
-  c1:     { width: 300, height: 300, top: -120, right: -80, backgroundColor: "rgba(255,255,255,0.03)" },
-  c2:     { width: 200, height: 200, top: 60,   right: -60,  backgroundColor: "transparent" },
-  c3:     { width: 160, height: 160, top: -40,  right: 60,   backgroundColor: "transparent" },
+  circle: { position: "absolute", borderRadius: 999, borderWidth: 1 },
+  c1:     { width: 320, height: 320, top: -130, right: -90, backgroundColor: "rgba(255,122,47,0.06)", borderColor: "rgba(255,122,47,0.12)" },
+  c2:     { width: 200, height: 200, top: 60,   right: -60, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.05)" },
+  c3:     { width: 140, height: 140, top: -30,  right: 70,  backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.04)" },
 });
 
 export default function LoginScreen() {
-  const { t } = useTranslation();
   const router = useRouter();
   const { login } = useAuthStore();
-  const [phone, setPhone] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
+  const [usePhone, setUsePhone] = useState(false);
   const [error, setError] = useState("");
 
+  const isEmail = !usePhone;
+
   const loginMutation = useMutation({
-    mutationFn: () => apiPost<{ data: { user: any; tokens: { access_token: string; refresh_token: string } } }>("/auth/user/login", { phone, password }),
+    mutationFn: () => {
+      const body = isEmail
+        ? { email: identifier.trim().toLowerCase(), password }
+        : { phone: identifier.trim(), password };
+      return apiPost<{ data: { user: any; tokens: { access_token: string; refresh_token: string } } }>("/auth/user/login", body);
+    },
     onSuccess: async (res) => {
       await login(res.data.user, res.data.tokens.access_token, res.data.tokens.refresh_token);
       router.replace("/(tabs)");
@@ -49,14 +55,20 @@ export default function LoginScreen() {
     onError: (err: any) => {
       const code = err?.response?.data?.error?.code;
       const msg  = err?.response?.data?.error?.message;
-      if (code === "PHONE_NOT_VERIFIED") {
-        router.push({ pathname: "/(auth)/otp", params: { phone } });
-      } else if (code === "ACCOUNT_SUSPENDED") setError("Ce compte a été suspendu");
+      if (code === "PHONE_NOT_VERIFIED" || code === "EMAIL_NOT_VERIFIED") {
+        router.push({ pathname: "/(auth)/otp", params: { identifier: identifier.trim(), via: isEmail ? "email" : "phone" } });
+      } else if (code === "ACCOUNT_SUSPENDED") setError("Ce compte a été suspendu.");
       else if (msg) setError(msg);
-      else if (!err?.response) setError("Impossible de joindre le serveur");
-      else setError(t("auth.invalidCredentials"));
+      else if (!err?.response) setError("Impossible de joindre le serveur.");
+      else setError("Identifiants incorrects. Vérifiez et réessayez.");
     },
   });
+
+  const handleSocialAuth = (provider: "google" | "apple") => {
+    Alert.alert("Bientôt disponible", `La connexion via ${provider === "google" ? "Google" : "Apple"} sera disponible prochainement.`);
+  };
+
+  const canSubmit = identifier.trim().length > 0 && password.length >= 6;
 
   return (
     <View style={styles.container}>
@@ -65,27 +77,73 @@ export default function LoginScreen() {
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+
+          {/* Back */}
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color="#fff" />
+          </TouchableOpacity>
+
           {/* Logo */}
           <View style={styles.logoWrap}>
             <Image source={require("../../assets/logo.png")} style={styles.logo} contentFit="contain" />
           </View>
 
-          <Text style={styles.title}>Se connecter</Text>
-          <Text style={styles.subtitle}>Connectez-vous à votre compte</Text>
+          <Text style={styles.title}>Bon retour !</Text>
+          <Text style={styles.subtitle}>Connectez-vous pour continuer</Text>
 
-          {/* Card form */}
+          {/* Social auth */}
+          <View style={styles.socialRow}>
+            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialAuth("google")} activeOpacity={0.8}>
+              <Text style={styles.socialIcon}>G</Text>
+              <Text style={styles.socialText}>Google</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocialAuth("apple")} activeOpacity={0.8}>
+              <Ionicons name="logo-apple" size={18} color="#fff" />
+              <Text style={styles.socialText}>Apple</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Form */}
           <View style={styles.form}>
-            <Text style={styles.label}>NUMÉRO DE TÉLÉPHONE</Text>
+            {/* Identifier toggle */}
+            <View style={styles.toggleRow}>
+              <TouchableOpacity
+                style={[styles.toggleTab, !usePhone && styles.toggleTabActive]}
+                onPress={() => { setUsePhone(false); setIdentifier(""); setError(""); }}
+              >
+                <Ionicons name="mail-outline" size={14} color={!usePhone ? Colors.primary : Colors.textDark2} />
+                <Text style={[styles.toggleTabText, !usePhone && styles.toggleTabTextActive]}>Email</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleTab, usePhone && styles.toggleTabActive]}
+                onPress={() => { setUsePhone(true); setIdentifier(""); setError(""); }}
+              >
+                <Ionicons name="call-outline" size={14} color={usePhone ? Colors.primary : Colors.textDark2} />
+                <Text style={[styles.toggleTabText, usePhone && styles.toggleTabTextActive]}>Téléphone</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.label}>{isEmail ? "ADRESSE EMAIL" : "NUMÉRO DE TÉLÉPHONE"}</Text>
             <View style={styles.inputWrap}>
-              <Ionicons name="call-outline" size={18} color={Colors.text3} style={styles.icon} />
+              <Ionicons
+                name={isEmail ? "mail-outline" : "call-outline"}
+                size={18} color={Colors.text3} style={styles.icon}
+              />
               <TextInput
                 style={styles.input}
-                placeholder="ex : 6 90 00 00 00"
+                placeholder={isEmail ? "exemple@email.com" : "6 90 00 00 00"}
                 placeholderTextColor={Colors.text3}
-                keyboardType="phone-pad"
-                autoComplete="tel"
-                value={phone}
-                onChangeText={setPhone}
+                keyboardType={isEmail ? "email-address" : "phone-pad"}
+                autoCapitalize="none"
+                autoComplete={isEmail ? "email" : "tel"}
+                value={identifier}
+                onChangeText={(v) => { setIdentifier(v); setError(""); }}
               />
             </View>
 
@@ -98,19 +156,23 @@ export default function LoginScreen() {
                 placeholderTextColor={Colors.text3}
                 secureTextEntry={!showPwd}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(v) => { setPassword(v); setError(""); }}
               />
               <TouchableOpacity onPress={() => setShowPwd(!showPwd)} style={{ padding: 4 }}>
                 <Ionicons name={showPwd ? "eye-off-outline" : "eye-outline"} size={18} color={Colors.text3} />
               </TouchableOpacity>
             </View>
 
+            <TouchableOpacity style={styles.forgotBtn}>
+              <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+            </TouchableOpacity>
+
             {error ? <Text style={styles.error}>{error}</Text> : null}
 
             <TouchableOpacity
-              style={[styles.btn, (loginMutation.isPending || !phone || !password) && styles.btnOff]}
+              style={[styles.btn, (!canSubmit || loginMutation.isPending) && styles.btnOff]}
               onPress={() => { setError(""); loginMutation.mutate(); }}
-              disabled={loginMutation.isPending || !phone || !password}
+              disabled={!canSubmit || loginMutation.isPending}
               activeOpacity={0.85}
             >
               {loginMutation.isPending
@@ -120,19 +182,11 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <View style={styles.registerRow}>
-              <Text style={styles.registerText}>Pas de compte ? </Text>
+              <Text style={styles.registerText}>Pas encore de compte ? </Text>
               <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
                 <Text style={styles.registerLink}>S'inscrire</Text>
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={styles.driverRow}
-              onPress={() => router.push("/(driver)/login")}
-            >
-              <Ionicons name="bicycle-outline" size={16} color={Colors.textDark2} />
-              <Text style={styles.driverText}>Accès livreur</Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -142,13 +196,54 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.darkBg },
-  scroll:    { flexGrow: 1, padding: 28, paddingTop: 48 },
-  logoWrap:  { alignItems: "center", marginBottom: 24 },
-  logo:      { width: 160, height: 100 },
-  title:     { fontSize: 28, fontWeight: "800", color: "#fff", textAlign: "center", marginBottom: 6 },
-  subtitle:  { fontSize: 14, color: Colors.textDark2, textAlign: "center", marginBottom: 36 },
-  form:      { gap: 2 },
-  label:     { fontSize: 11, fontWeight: "600", color: Colors.textDark2, letterSpacing: 0.8, marginBottom: 8 },
+  scroll:    { flexGrow: 1, padding: 24, paddingTop: 52 },
+
+  backBtn: {
+    width: 40, height: 40, borderRadius: Radius.full,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center", justifyContent: "center", marginBottom: 24,
+  },
+
+  logoWrap: { alignItems: "center", marginBottom: 20 },
+  logo:     { width: 64, height: 64, borderRadius: 16 },
+
+  title:    { fontSize: 26, fontWeight: "800", color: "#fff", textAlign: "center", marginBottom: 6 },
+  subtitle: { fontSize: 14, color: Colors.textDark2, textAlign: "center", marginBottom: 28 },
+
+  // Social
+  socialRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
+  socialBtn: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    height: 48, borderRadius: Radius.md,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
+  },
+  socialIcon: { fontSize: 18, fontWeight: "800", color: "#fff" },
+  socialText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+
+  // Divider
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 20 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.1)" },
+  dividerText: { color: Colors.textDark2, fontSize: 13 },
+
+  // Toggle email/phone
+  toggleRow: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: Radius.sm, padding: 4,
+    marginBottom: 20,
+  },
+  toggleTab: {
+    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 6, paddingVertical: 8, borderRadius: Radius.xs,
+  },
+  toggleTabActive: { backgroundColor: "rgba(255,122,47,0.18)" },
+  toggleTabText:   { fontSize: 13, fontWeight: "600", color: Colors.textDark2 },
+  toggleTabTextActive: { color: Colors.primary },
+
+  // Form
+  form:     { gap: 2 },
+  label:    { fontSize: 11, fontWeight: "600", color: Colors.textDark2, letterSpacing: 0.8, marginBottom: 8 },
   inputWrap: {
     flexDirection: "row", alignItems: "center",
     backgroundColor: Colors.darkInput, borderRadius: Radius.md,
@@ -156,24 +251,22 @@ const styles = StyleSheet.create({
   },
   icon:  { marginRight: 10 },
   input: { flex: 1, color: "#fff", fontSize: 15 },
-  error: { color: "#FF6B6B", fontSize: 13, textAlign: "center", marginTop: 8 },
+
+  forgotBtn: { alignSelf: "flex-end", marginTop: 8, marginBottom: 4 },
+  forgotText: { color: Colors.primary, fontSize: 13, fontWeight: "600" },
+
+  error: { color: "#FF6B6B", fontSize: 13, textAlign: "center", marginTop: 6 },
+
   btn: {
     height: 52, borderRadius: Radius.full,
     backgroundColor: Colors.primary,
     alignItems: "center", justifyContent: "center",
-    marginTop: 28,
-    ...Shadow.primary,
+    marginTop: 20, ...Shadow.primary,
   },
-  btnOff:    { opacity: 0.55 },
-  btnText:   { color: "#fff", fontWeight: "700", fontSize: 15, letterSpacing: 1 },
+  btnOff:  { opacity: 0.5 },
+  btnText: { color: "#fff", fontWeight: "700", fontSize: 15, letterSpacing: 1 },
+
   registerRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 20 },
   registerText: { color: Colors.textDark2, fontSize: 14 },
   registerLink: { color: Colors.primary, fontWeight: "700", fontSize: 14 },
-  driverRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, marginTop: 16, padding: 10,
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.08)",
-    borderRadius: 12,
-  },
-  driverText: { color: Colors.textDark2, fontSize: 13, fontWeight: "600" },
 });
