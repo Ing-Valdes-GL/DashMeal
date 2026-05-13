@@ -21,7 +21,17 @@ router.post(
 );
 router.post("/user/register", validate(RegisterUserSchema), controller.registerUser);
 router.post("/user/verify-phone", validate(VerifyOtpSchema), controller.verifyPhone);
+router.post(
+  "/user/verify-email",
+  validate(z.object({ email: z.string().email(), code: z.string().length(6) })),
+  controller.verifyEmail
+);
 router.post("/user/login", validate(LoginUserSchema), controller.loginUser);
+router.post(
+  "/user/resend-email-otp",
+  validate(z.object({ email: z.string().email() })),
+  controller.resendEmailOtp
+);
 router.post("/user/request-reset", validate(z.object({ phone: z.string().min(8) })), controller.requestReset);
 router.post("/user/reset-password", validate(ResetPasswordSchema), controller.resetPassword);
 

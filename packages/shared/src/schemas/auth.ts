@@ -12,8 +12,13 @@ export const RegisterUserSchema = z.object({
 });
 
 export const LoginUserSchema = z.object({
-  phone: z.string().min(8),
+  identifier: z.string().min(1).optional(), // email ou téléphone
+  email: z.string().email().optional(),
+  phone: z.string().min(8).optional(),
   password: z.string().min(1),
+}).refine((v) => Boolean(v.identifier || v.email || v.phone), {
+  message: "Email ou téléphone requis",
+  path: ["identifier"],
 });
 
 export const VerifyOtpSchema = z.object({

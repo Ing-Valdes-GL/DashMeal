@@ -19,6 +19,15 @@ export async function verifyPhone(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function verifyEmail(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.verifyUserEmail(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function loginUser(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await authService.loginUser(req.body);
@@ -104,6 +113,15 @@ export async function applyBrand(req: Request, res: Response, next: NextFunction
 export async function requestReset(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await authService.requestPasswordReset(req.body.phone);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function resendEmailOtp(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.resendUserEmailOtp(req.body.email);
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     next(err);

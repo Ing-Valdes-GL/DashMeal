@@ -55,15 +55,16 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-function shouldLogOtpCode(): boolean {
-  return env.OTP_LOG_CODES || env.OTP_EXPOSE_CODE;
-}
-
 export async function sendCodeByEmail(email: string, code: string): Promise<{ emailSent: boolean }> {
   const normalizedEmail = normalizeEmail(email);
-  if (shouldLogOtpCode()) {
-    console.log(`[OTP][EMAIL] ${normalizedEmail}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
-  }
+  console.log(`[OTP][EMAIL] ${normalizedEmail}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
+
+  const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
+  await supabase.from("otps").delete().eq("email", normalizedEmail);
+  await supabase
+    .from("otps")
+    .insert({ email: normalizedEmail, otp: code, expires_at: expiresAt.toISOString() });
+
   const result = await sendEmail({
     to: normalizedEmail,
     subject: "Code OTP Dash Meal",
@@ -77,14 +78,6 @@ export async function sendCodeByEmail(email: string, code: string): Promise<{ em
 export async function sendEmailOtp(email: string): Promise<{ emailSent: boolean; code: string }> {
   const normalizedEmail = normalizeEmail(email);
   const code = generateOtpCode();
-  const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
-
-  // Avoid depending on a DB unique constraint on email for OTP updates.
-  await supabase.from("otps").delete().eq("email", normalizedEmail);
-  await supabase
-    .from("otps")
-    .insert({ email: normalizedEmail, otp: code, expires_at: expiresAt.toISOString() });
-
   const { emailSent } = await sendCodeByEmail(normalizedEmail, code);
   return { emailSent, code };
 }
