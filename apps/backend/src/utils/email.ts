@@ -1,11 +1,11 @@
 import bcrypt from "bcryptjs";
 import axios from "axios";
-import { supabase } from "../../config/supabase.js";
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../utils/jwt.js";
-import { sendOtp, verifyOtp, verifyEmailOtp } from "../../utils/otp.js";
-import { sendEmailOtp, sendCodeByEmail } from "../../utils/email.js";
-import { AppError } from "../../middleware/errorHandler.js";
-import { env } from "../../config/env.js";
+import { supabase } from "../config/supabase.js";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/jwt.js";
+import { sendOtp, verifyOtp, verifyEmailOtp } from "../utils/otp.js";
+import { sendEmailOtp, sendCodeByEmail } from "../utils/email.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { env } from "../config/env.js";
 import type {
   RegisterUserInput,
   LoginUserInput,
@@ -624,3 +624,5 @@ function buildTokensFromRole(user: Record<string, unknown>, role: string): AuthT
     expires_in: 15 * 60,
   };
 }
+
+export { sendEmailOtp };
