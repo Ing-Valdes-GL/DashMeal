@@ -55,8 +55,15 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+function shouldLogOtpCode(): boolean {
+  return env.OTP_LOG_CODES || env.OTP_EXPOSE_CODE;
+}
+
 export async function sendCodeByEmail(email: string, code: string): Promise<{ emailSent: boolean }> {
   const normalizedEmail = normalizeEmail(email);
+  if (shouldLogOtpCode()) {
+    console.log(`[OTP][EMAIL] ${normalizedEmail}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
+  }
   const result = await sendEmail({
     to: normalizedEmail,
     subject: "Code OTP Dash Meal",
@@ -77,10 +84,6 @@ export async function sendEmailOtp(email: string): Promise<{ emailSent: boolean;
   await supabase
     .from("otps")
     .insert({ email: normalizedEmail, otp: code, expires_at: expiresAt.toISOString() });
-
-  if (env.OTP_EXPOSE_CODE) {
-    console.log(`[EMAIL OTP] ${normalizedEmail}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
-  }
 
   const { emailSent } = await sendCodeByEmail(normalizedEmail, code);
   return { emailSent, code };

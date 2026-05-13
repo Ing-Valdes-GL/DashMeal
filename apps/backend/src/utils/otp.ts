@@ -22,6 +22,10 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+function shouldLogOtpCode(): boolean {
+  return env.OTP_LOG_CODES || env.OTP_EXPOSE_CODE;
+}
+
 export async function sendOtp(phone: string): Promise<{ code: string; smsSent: boolean }> {
   const normalized = normalizePhone(phone);
   const code = generateCode();
@@ -31,6 +35,10 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
     { phone, otp: code, expires_at: expiresAt.toISOString() },
     { onConflict: "phone" }
   );
+
+  if (shouldLogOtpCode()) {
+    console.log(`[OTP][SMS] ${normalized}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
+  }
 
   if (!env.AT_API_KEY || !env.AT_USERNAME) {
     console.warn("⚠️  AT_API_KEY / AT_USERNAME manquants — SMS non envoyé");
