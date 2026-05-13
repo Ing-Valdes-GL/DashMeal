@@ -51,6 +51,7 @@ const EnvSchema = z.object({
   AT_USERNAME:   z.string().min(1),
   AT_SENDER_ID:  z.string().default(""),
   OTP_EXPOSE_CODE: z.coerce.boolean().default(false),
+  OTP_LOG_CODES: z.coerce.boolean().default(false),
 
   CAMPAY_APP_USERNAME: z.string().min(1),
   CAMPAY_APP_PASSWORD: z.string().min(1),
