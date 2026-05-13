@@ -81,9 +81,10 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const payload = mode === "email"
-        ? { email: identifier.trim().toLowerCase(), password }
-        : { phone: identifier.trim(), password };
+      const normalizedIdentifier = mode === "email"
+        ? identifier.trim().toLowerCase()
+        : identifier.trim();
+      const payload = { identifier: normalizedIdentifier, password };
       const res = await apiPost("/auth/user/login", payload);
       const { user, tokens } = res.data;
       await SecureStore.setItemAsync("dm_access_token", tokens.access_token);

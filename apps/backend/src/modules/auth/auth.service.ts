@@ -117,21 +117,95 @@ export async function verifyUserPhone(input: VerifyOtpInput) {
   return { user, tokens };
 }
 
-export async function loginUser(input: LoginUserInput): Promise<{ user: object; tokens: AuthTokens }> {
-  const { phone, password } = input;
+export async function verifyUserEmail(input: { email: string; code: string }) {
+  const email = input.email.trim().toLowerCase();
+  const { code } = input;
 
-  const { data: user } = await supabase
-    .from("users")
-    .select("id, name, phone, password_hash, is_verified")
-    .eq("phone", phone)
+  const isValid = await verifyEmailOtp(email, code);
+  if (!isValid) {
+    throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
+  }
+
+  const { data: pending } = await supabase
+    .from("pending_registrations")
+    .select("name, phone, email, password_hash")
+    .eq("email", email)
+    .gt("expires_at", new Date().toISOString())
     .single();
+
+  if (!pending) {
+    throw new AppError(400, "REGISTRATION_EXPIRED", "Session d'inscription expirée. Recommencez l'inscription.");
+  }
+
+  const { data: user, error } = await supabase
+    .from("users")
+    .insert({
+      name: pending.name,
+      phone: pending.phone,
+      email: pending.email ?? email,
+      password_hash: pending.password_hash,
+      is_verified: true,
+    })
+    .select("id, name, phone, email, is_verified")
+    .single();
+
+  if (error || !user) {
+    throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte");
+  }
+
+  await supabase.from("pending_registrations").delete().eq("phone", pending.phone);
+
+  const tokens = buildUserTokens(user);
+  return { user, tokens };
+}
+
+export async function resendUserEmailOtp(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data: pending } = await supabase
+    .from("pending_registrations")
+    .select("phone")
+    .eq("email", normalizedEmail)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+
+  if (!pending) {
+    throw new AppError(404, "REGISTRATION_NOT_FOUND", "Aucune inscription en attente pour cet email");
+  }
+
+  const { code } = await sendOtp(pending.phone);
+  await sendCodeByEmail(normalizedEmail, code);
+
+  return {
+    message: "Code OTP renvoyé",
+    ...(env.OTP_EXPOSE_CODE ? { otp_code: code } : {}),
+  };
+}
+
+export async function loginUser(input: { identifier?: string; email?: string; phone?: string; password: string }): Promise<{ user: object; tokens: AuthTokens }> {
+  const { password } = input;
+  const rawIdentifier = input.identifier ?? input.email ?? input.phone;
+  if (!rawIdentifier) {
+    throw new AppError(400, "MISSING_IDENTIFIER", "Email ou numÃ©ro requis");
+  }
+
+  const identifier = rawIdentifier.trim();
+  const isEmail = identifier.includes("@");
+
+  let query = supabase
+    .from("users")
+    .select("id, name, phone, email, password_hash, is_verified");
+  query = isEmail
+    ? query.eq("email", identifier.toLowerCase())
+    : query.eq("phone", identifier);
+
+  const { data: user } = await query.single();
 
   if (!user) {
     throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
   }
 
   if (!user.is_verified) {
-    throw new AppError(403, "PHONE_NOT_VERIFIED", "Numéro de téléphone non vérifié");
+    throw new AppError(403, isEmail ? "EMAIL_NOT_VERIFIED" : "PHONE_NOT_VERIFIED", isEmail ? "Email non verifie" : "Numero de telephone non verifie");
   }
 
   const valid = await bcrypt.compare(password, user.password_hash);
@@ -171,6 +245,7 @@ export async function loginAdmin(input: LoginAdminInput): Promise<{ requires_otp
   }
 
   const { emailSent } = await sendEmailOtp(admin.email);
+  console.log(`[OTP][ADMIN_LOGIN] ${admin.email}: emailSent=${emailSent}`);
   if (!emailSent) {
     console.warn(`⚠️  Email OTP non envoyé pour l'admin — vérifier la config RESEND`);
   }
@@ -228,6 +303,7 @@ export async function loginSuperAdmin(input: LoginAdminInput): Promise<{ require
   }
 
   const { emailSent } = await sendEmailOtp(superAdmin.email);
+  console.log(`[OTP][SUPERADMIN_LOGIN] ${superAdmin.email}: emailSent=${emailSent}`);
   if (!emailSent) {
     console.warn(`⚠️  Email OTP non envoyé pour le superadmin — vérifier la config RESEND`);
   }
