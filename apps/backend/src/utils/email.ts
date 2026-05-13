@@ -1,267 +1,626 @@
-import { Resend } from "resend";
-import { supabase } from "../config/supabase.js";
-import { OTP_EXPIRES_IN_MINUTES, OTP_LENGTH } from "@dash-meal/shared";
-import { env } from "../config/env.js";
+import bcrypt from "bcryptjs";
+import axios from "axios";
+import { supabase } from "../../config/supabase.js";
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../utils/jwt.js";
+import { sendOtp, verifyOtp, verifyEmailOtp } from "../../utils/otp.js";
+import { sendEmailOtp, sendCodeByEmail } from "../../utils/email.js";
+import { AppError } from "../../middleware/errorHandler.js";
+import { env } from "../../config/env.js";
+import type {
+  RegisterUserInput,
+  LoginUserInput,
+  LoginAdminInput,
+  VerifyOtpInput,
+  ResetPasswordInput,
+  AuthTokens,
+} from "@dash-meal/shared";
 
-function resendClient() {
-  return new Resend(env.RESEND_API_KEY);
-}
+export async function registerUser(input: RegisterUserInput) {
+  const { name, phone, password, email } = input;
 
-function canSendEmail(): boolean {
-  return !!env.RESEND_API_KEY;
-}
+  const { data: existing } = await supabase
+    .from("users")
+    .select("id")
+    .eq("phone", phone)
+    .single();
 
-/** Send Click & Collect confirmation email with QR code */
-export async function sendCollectQrEmail(opts: {
-  to: string;
-  customerName: string;
-  orderId: string;
-  qrToken: string;
-  qrImageDataUrl: string;
-  numericCode: string;
-  branchName: string;
-  slotDate: string;
-  slotTime: string;
-  total: number;
-}): Promise<void> {
-  if (!canSendEmail()) { console.warn("⚠️  RESEND_API_KEY manquant — QR email non envoyé"); return; }
-  try {
-    const { error } = await resendClient().emails.send({
-      from: env.RESEND_FROM_EMAIL,
-      to: opts.to,
-      subject: `Votre QR Code Click & Collect — Dash Meal #${opts.orderId.slice(0, 8).toUpperCase()}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
-          <div style="background:#0f172a;padding:28px 32px;">
-            <h1 style="color:#f97316;margin:0;font-size:22px;">Dash Meal</h1>
-            <p style="color:#94a3b8;margin:6px 0 0;font-size:14px;">Confirmation Click & Collect</p>
-          </div>
-          <div style="padding:32px;">
-            <p style="color:#1e293b;font-size:15px;margin:0 0 8px;">Bonjour <strong>${opts.customerName}</strong>,</p>
-            <p style="color:#475569;font-size:14px;margin:0 0 24px;">Votre commande est confirmée. Présentez ce QR code lors de votre retrait.</p>
-
-            <div style="background:#f8fafc;border-radius:12px;padding:24px;text-align:center;border:1px solid #e2e8f0;margin-bottom:24px;">
-              <img src="${opts.qrImageDataUrl}" alt="QR Code" style="width:200px;height:200px;display:block;margin:0 auto 16px;" />
-              <p style="margin:0;color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Code de secours</p>
-              <p style="margin:8px 0 0;font-size:28px;font-weight:700;color:#0f172a;letter-spacing:8px;">${opts.numericCode}</p>
-            </div>
-
-            <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin-bottom:24px;">
-              <table style="width:100%;border-collapse:collapse;">
-                <tr><td style="color:#64748b;font-size:13px;padding:4px 0;">Commande</td><td style="color:#0f172a;font-weight:600;font-size:13px;text-align:right;">#${opts.orderId.slice(0, 8).toUpperCase()}</td></tr>
-                <tr><td style="color:#64748b;font-size:13px;padding:4px 0;">Agence</td><td style="color:#0f172a;font-weight:600;font-size:13px;text-align:right;">${opts.branchName}</td></tr>
-                <tr><td style="color:#64748b;font-size:13px;padding:4px 0;">Date</td><td style="color:#0f172a;font-weight:600;font-size:13px;text-align:right;">${opts.slotDate}</td></tr>
-                <tr><td style="color:#64748b;font-size:13px;padding:4px 0;">Créneau</td><td style="color:#0f172a;font-weight:600;font-size:13px;text-align:right;">${opts.slotTime}</td></tr>
-                <tr><td style="color:#64748b;font-size:13px;padding:4px 0;border-top:1px solid #cbd5e1;padding-top:12px;margin-top:8px;">Total</td><td style="color:#f97316;font-weight:700;font-size:16px;text-align:right;border-top:1px solid #cbd5e1;padding-top:12px;">${opts.total.toLocaleString("fr-FR")} FCFA</td></tr>
-              </table>
-            </div>
-
-            <p style="color:#94a3b8;font-size:12px;margin:0;">Conservez cet email — il est votre ticket de retrait. L'agence scannera le QR ou saisira le code à 6 chiffres.</p>
-          </div>
-        </div>
-      `,
-    });
-    if (error) console.error("❌ Échec QR email:", error.message);
-    else console.log(`✅ QR email envoyé à ${opts.to}`);
-  } catch (err) {
-    console.error("❌ QR email error:", err);
+  if (existing) {
+    throw new AppError(409, "PHONE_ALREADY_EXISTS", "Ce numéro est déjà utilisé");
   }
-}
 
-/** Notify admin that a branch requested live approval */
-export async function sendBranchLiveRequestEmail(opts: {
-  adminEmail: string;
-  adminName: string;
-  branchName: string;
-  branchEmail: string;
-}): Promise<void> {
-  if (!canSendEmail()) return;
-  try {
-    await resendClient().emails.send({
-      from: env.RESEND_FROM_EMAIL,
-      to: opts.adminEmail,
-      subject: `Demande de mise en ligne — ${opts.branchName}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#fff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;">
-          <div style="background:#0f172a;padding:24px 28px;"><h1 style="color:#f97316;margin:0;font-size:20px;">Dash Meal</h1></div>
-          <div style="padding:28px;">
-            <p style="color:#1e293b;font-size:15px;margin:0 0 12px;">Bonjour <strong>${opts.adminName}</strong>,</p>
-            <p style="color:#475569;font-size:14px;">L'agence <strong>${opts.branchName}</strong> (${opts.branchEmail}) demande à passer en mode <strong>Live</strong>.</p>
-            <p style="color:#475569;font-size:14px;">Connectez-vous au panneau d'administration pour vérifier la configuration et approuver ou rejeter la demande.</p>
-            <a href="${process.env.ADMIN_URL ?? "#"}" style="display:inline-block;margin-top:16px;background:#f97316;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px;">Voir la demande</a>
-          </div>
-        </div>
-      `,
-    });
-  } catch {}
-}
-
-/** Notify branch that admin approved/rejected their live request */
-export async function sendBranchLiveDecisionEmail(opts: {
-  to: string;
-  branchName: string;
-  approved: boolean;
-  reason?: string;
-}): Promise<void> {
-  if (!canSendEmail()) return;
-  try {
-    await resendClient().emails.send({
-      from: env.RESEND_FROM_EMAIL,
-      to: opts.to,
-      subject: opts.approved
-        ? `✅ Votre agence ${opts.branchName} est maintenant en ligne !`
-        : `❌ Demande de mise en ligne refusée — ${opts.branchName}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;background:#fff;border-radius:16px;border:1px solid #e2e8f0;overflow:hidden;">
-          <div style="background:${opts.approved ? "#16a34a" : "#dc2626"};padding:24px 28px;">
-            <h1 style="color:#fff;margin:0;font-size:20px;">${opts.approved ? "🎉 Félicitations !" : "Demande refusée"}</h1>
-          </div>
-          <div style="padding:28px;">
-            ${opts.approved
-              ? `<p style="color:#1e293b;font-size:15px;">L'agence <strong>${opts.branchName}</strong> est maintenant <strong>Live</strong> sur Dash Meal. Vos clients peuvent désormais passer des commandes.</p>`
-              : `<p style="color:#1e293b;font-size:15px;">La demande de mise en ligne de l'agence <strong>${opts.branchName}</strong> a été refusée.</p>${opts.reason ? `<div style="background:#fef2f2;border-radius:8px;padding:12px;margin-top:12px;"><p style="color:#dc2626;font-size:14px;margin:0;"><strong>Raison :</strong> ${opts.reason}</p></div>` : ""}<p style="color:#475569;font-size:14px;margin-top:16px;">Corrigez les points soulevés et soumettez une nouvelle demande.</p>`
-            }
-          </div>
-        </div>
-      `,
-    });
-  } catch {}
-}
-
-/** Notify superadmin that a brand submitted legal documents */
-export async function sendLegalDocsSubmittedEmail(opts: {
-  brandName: string;
-  adminEmail: string;
-}): Promise<void> {
-  if (!canSendEmail()) return;
-  try {
-    await resendClient().emails.send({
-      from: env.RESEND_FROM_EMAIL,
-      to: process.env.SUPERADMIN_EMAIL ?? env.RESEND_FROM_EMAIL,
-      subject: `Documents légaux soumis — ${opts.brandName}`,
-      html: `<div style="font-family:sans-serif;padding:24px;"><h2>Documents légaux</h2><p>La marque <strong>${opts.brandName}</strong> (${opts.adminEmail}) vient de soumettre ses documents légaux pour vérification.</p></div>`,
-    });
-  } catch {}
-}
-
-/** Notify brand admin that legal docs were approved/rejected */
-export async function sendLegalDocsDecisionEmail(opts: {
-  to: string;
-  brandName: string;
-  approved: boolean;
-  reason?: string;
-}): Promise<void> {
-  if (!canSendEmail()) return;
-  try {
-    await resendClient().emails.send({
-      from: env.RESEND_FROM_EMAIL,
-      to: opts.to,
-      subject: opts.approved
-        ? `✅ Documents légaux approuvés — ${opts.brandName}`
-        : `❌ Documents légaux refusés — ${opts.brandName}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:28px;">
-          <h2 style="color:${opts.approved ? "#16a34a" : "#dc2626"};">${opts.approved ? "Documents approuvés" : "Documents refusés"}</h2>
-          <p>${opts.approved
-            ? `Les documents légaux de <strong>${opts.brandName}</strong> ont été vérifiés et approuvés par Dash Meal.`
-            : `Les documents légaux de <strong>${opts.brandName}</strong> ont été refusés.${opts.reason ? ` Raison : ${opts.reason}` : ""} Veuillez les corriger et soumettre à nouveau.`
-          }</p>
-        </div>
-      `,
-    });
-  } catch {}
-}
-
-function generateCode(): string {
-  return Math.floor(
-    Math.pow(10, OTP_LENGTH - 1) +
-    Math.random() * 9 * Math.pow(10, OTP_LENGTH - 1)
-  )
-    .toString()
-    .padStart(OTP_LENGTH, "0");
-}
-
-export async function sendCodeByEmail(email: string, code: string): Promise<boolean> {
-  if (!env.RESEND_API_KEY) {
-    console.warn("⚠️  RESEND_API_KEY manquant — email de confirmation non envoyé");
-    return false;
-  }
-  try {
-    const resend = new Resend(env.RESEND_API_KEY);
-    const { error } = await resend.emails.send({
-      from: env.RESEND_FROM_EMAIL,
-      to: email,
-      subject: `Code de vérification Dash Meal : ${code}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0a0f1e;color:#fff;border-radius:12px;">
-          <h2 style="color:#f97316;margin-bottom:8px;">Dash Meal</h2>
-          <p style="color:#94a3b8;margin-bottom:24px;">Voici votre code de vérification. Utilisez-le dans l'application pour confirmer votre numéro.</p>
-          <div style="background:#1e293b;border-radius:8px;padding:20px;text-align:center;letter-spacing:8px;font-size:32px;font-weight:700;color:#f97316;">
-            ${code}
-          </div>
-          <p style="color:#64748b;font-size:13px;margin-top:20px;">Valable ${OTP_EXPIRES_IN_MINUTES} minutes. Ne partagez pas ce code.</p>
-        </div>
-      `,
-    });
-    if (error) {
-      console.error("❌ Échec envoi email Resend:", error.message);
-      return false;
+  if (email) {
+    const { data: existingEmail } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
+    if (existingEmail) {
+      throw new AppError(409, "EMAIL_ALREADY_EXISTS", "Cet email est déjà utilisé");
     }
-    console.log(`✅ Email OTP Resend envoyé à ${email}`);
-    return true;
-  } catch (err) {
-    console.error("❌ Erreur réseau envoi email Resend:", err);
-    return false;
   }
+
+  const password_hash = await bcrypt.hash(password, 12);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  const { error: pendingErr } = await supabase.from("pending_registrations").upsert({
+    phone,
+    name,
+    email: email ?? null,
+    password_hash,
+    expires_at: expiresAt.toISOString(),
+  });
+
+  if (pendingErr) {
+    throw new AppError(500, "REGISTRATION_ERROR", "Échec de l'inscription temporaire");
+  }
+
+  const { smsSent, code } = await sendOtp(phone);
+
+  if (email) {
+    await sendCodeByEmail(email, code);
+  }
+
+  const exposeCode = env.OTP_EXPOSE_CODE || !smsSent;
+
+  return {
+    message: smsSent && !env.OTP_EXPOSE_CODE
+      ? "Code OTP envoyé par SMS. Vérifiez votre téléphone."
+      : "SMS non livré — utilisez le code ci-dessous.",
+    ...(exposeCode ? { otp_code: code } : {}),
+  };
 }
 
-export async function sendEmailOtp(email: string): Promise<{ code: string; emailSent: boolean }> {
-  const code = generateCode();
-  const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
+export async function verifyUserPhone(input: VerifyOtpInput) {
+  const { phone, code } = input;
 
-  await supabase.from("otps").upsert(
-    { email, otp: code, expires_at: expiresAt.toISOString() },
-    { onConflict: "email" }
-  );
-
-  console.log(`\n🔑 Email OTP ──────────────────────────────`);
-  console.log(`   Email  : ${email}`);
-  console.log(`   Code   : ${code}`);
-  console.log(`   Expire : ${expiresAt.toLocaleTimeString()}`);
-  console.log(`───────────────────────────────────────────\n`);
-
-  if (!env.RESEND_API_KEY) {
-    console.warn("⚠️  RESEND_API_KEY manquant — email non envoyé");
-    return { code, emailSent: false };
+  const isValid = await verifyOtp(phone, code);
+  if (!isValid) {
+    throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
   }
 
+  const { data: pending } = await supabase
+    .from("pending_registrations")
+    .select("name, email, password_hash")
+    .eq("phone", phone)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+
+  if (!pending) {
+    throw new AppError(400, "REGISTRATION_EXPIRED", "Session d'inscription expirée. Recommencez l'inscription.");
+  }
+
+  const { data: user, error } = await supabase
+    .from("users")
+    .insert({
+      name: pending.name,
+      phone,
+      email: pending.email ?? null,
+      password_hash: pending.password_hash,
+      is_verified: true,
+    })
+    .select("id, name, phone, email, is_verified")
+    .single();
+
+  if (error || !user) {
+    throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte");
+  }
+
+  await supabase.from("pending_registrations").delete().eq("phone", phone);
+
+  const tokens = buildUserTokens(user);
+  return { user, tokens };
+}
+
+export async function loginUser(input: LoginUserInput): Promise<{ user: object; tokens: AuthTokens }> {
+  const { phone, password } = input;
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("id, name, phone, password_hash, is_verified")
+    .eq("phone", phone)
+    .single();
+
+  if (!user) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  if (!user.is_verified) {
+    throw new AppError(403, "PHONE_NOT_VERIFIED", "Numéro de téléphone non vérifié");
+  }
+
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  const { password_hash: _, ...safeUser } = user;
+  const tokens = buildUserTokens(user);
+  return { user: safeUser, tokens };
+}
+
+export async function loginAdmin(input: LoginAdminInput): Promise<{ requires_otp: true; email: string }> {
+  const { identifier, password } = input;
+
+  const isEmail = identifier.includes("@");
+  const query = supabase
+    .from("admins")
+    .select("id, username, email, phone, brand_id, role, is_active, password_hash");
+
+  const { data: admin } = await (isEmail
+    ? query.eq("email", identifier)
+    : query.eq("phone", identifier)
+  ).single();
+
+  if (!admin) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  if (!admin.is_active) {
+    throw new AppError(403, "ACCOUNT_SUSPENDED", "Ce compte a été suspendu");
+  }
+
+  const valid = await bcrypt.compare(password, admin.password_hash);
+  if (!valid) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  const { emailSent } = await sendEmailOtp(admin.email);
+  if (!emailSent) {
+    console.warn(`⚠️  Email OTP non envoyé pour l'admin — vérifier la config RESEND`);
+  }
+
+  return { requires_otp: true, email: admin.email };
+}
+
+export async function verifyAdminOtp(input: { identifier: string; code: string }): Promise<{ admin: object; tokens: AuthTokens }> {
+  const { identifier, code } = input;
+
+  const isEmail = identifier.includes("@");
+  const query = supabase
+    .from("admins")
+    .select("id, username, email, phone, brand_id, role, is_active, password_hash");
+
+  const { data: admin } = await (isEmail
+    ? query.eq("email", identifier)
+    : query.eq("phone", identifier)
+  ).single();
+
+  if (!admin) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  // ✅ Fix : utilise verifyEmailOtp (clé email) au lieu de verifyOtp (clé phone)
+  const isValid = await verifyEmailOtp(admin.email, code);
+  if (!isValid) {
+    throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
+  }
+
+  const { password_hash: _, ...safeAdmin } = admin;
+  const tokens = buildAdminTokens(admin);
+  return { admin: safeAdmin, tokens };
+}
+
+export async function loginSuperAdmin(input: LoginAdminInput): Promise<{ requires_otp: true; email: string }> {
+  const { identifier, password } = input;
+
+  const isEmail = identifier.includes("@");
+  const query = supabase
+    .from("super_admins")
+    .select("id, email, phone, password_hash");
+
+  const { data: superAdmin } = await (isEmail
+    ? query.eq("email", identifier)
+    : query.eq("phone", identifier)
+  ).single();
+
+  if (!superAdmin) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  const valid = await bcrypt.compare(password, superAdmin.password_hash);
+  if (!valid) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  const { emailSent } = await sendEmailOtp(superAdmin.email);
+  if (!emailSent) {
+    console.warn(`⚠️  Email OTP non envoyé pour le superadmin — vérifier la config RESEND`);
+  }
+
+  return { requires_otp: true, email: superAdmin.email };
+}
+
+export async function verifySuperAdminOtp(input: { identifier: string; code: string }): Promise<{ admin: object; tokens: AuthTokens }> {
+  const { identifier, code } = input;
+
+  const isEmail = identifier.includes("@");
+  const query = supabase
+    .from("super_admins")
+    .select("id, email, phone, password_hash");
+
+  const { data: superAdmin } = await (isEmail
+    ? query.eq("email", identifier)
+    : query.eq("phone", identifier)
+  ).single();
+
+  if (!superAdmin) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+
+  // ✅ Fix : utilise verifyEmailOtp (clé email) au lieu de verifyOtp (clé phone)
+  const isValid = await verifyEmailOtp(superAdmin.email, code);
+  if (!isValid) {
+    throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
+  }
+
+  const { password_hash: _, ...safeSuperAdmin } = superAdmin;
+  const tokens = buildSuperAdminTokens(superAdmin);
+  return { admin: safeSuperAdmin, tokens };
+}
+
+export async function registerSuperAdmin(input: {
+  email: string;
+  phone: string;
+  password: string;
+}): Promise<{ admin: object; tokens: AuthTokens }> {
+  const { email, phone, password } = input;
+
+  const { data: existing, error: existingError } = await supabase
+    .from("super_admins")
+    .select("id")
+    .or(`email.eq.${email},phone.eq.${phone}`)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new AppError(500, "SUPERADMIN_LOOKUP_ERROR", "Erreur de vérification superadmin");
+  }
+
+  if (existing) {
+    throw new AppError(409, "SUPERADMIN_ALREADY_EXISTS", "Email ou numéro déjà utilisé");
+  }
+
+  const password_hash = await bcrypt.hash(password, 12);
+
+  const { data: created, error } = await supabase
+    .from("super_admins")
+    .insert({ email, phone, password_hash })
+    .select("id, email, phone, password_hash")
+    .single();
+
+  if (error || !created) {
+    throw new AppError(500, "CREATE_SUPERADMIN_ERROR", "Echec de création du compte superadmin");
+  }
+
+  const { password_hash: _, ...safeSuperAdmin } = created;
+  const tokens = buildSuperAdminTokens(created);
+  return { admin: safeSuperAdmin, tokens };
+}
+
+export async function refreshTokens(refreshToken: string): Promise<AuthTokens> {
+  let payload: { id: string; role: string };
   try {
-    const resend = new Resend(env.RESEND_API_KEY);
-    const { error } = await resend.emails.send({
-      from: env.RESEND_FROM_EMAIL,
-      to: email,
-      subject: `Code de vérification Dash Meal : ${code}`,
-      html: `
-        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#0a0f1e;color:#fff;border-radius:12px;">
-          <h2 style="color:#f97316;margin-bottom:8px;">Dash Meal</h2>
-          <p style="color:#94a3b8;margin-bottom:24px;">Voici votre code de vérification pour accéder à votre espace administration.</p>
-          <div style="background:#1e293b;border-radius:8px;padding:20px;text-align:center;letter-spacing:8px;font-size:32px;font-weight:700;color:#f97316;">
-            ${code}
-          </div>
-          <p style="color:#64748b;font-size:13px;margin-top:20px;">Valable ${OTP_EXPIRES_IN_MINUTES} minutes. Ne partagez pas ce code.</p>
-        </div>
-      `,
-    });
-
-    if (error) {
-      console.error("❌ Échec envoi email Resend:", error.message);
-      return { code, emailSent: false };
-    }
-
-    console.log(`✅ Email OTP Resend envoyé à ${email}`);
-    return { code, emailSent: true };
-  } catch (err) {
-    console.error("❌ Erreur réseau envoi email Resend:", err);
-    return { code, emailSent: false };
+    payload = verifyRefreshToken(refreshToken);
+  } catch {
+    throw new AppError(401, "INVALID_REFRESH_TOKEN", "Refresh token invalide");
   }
+
+  let user;
+  if (payload.role === "user") {
+    const { data } = await supabase
+      .from("users")
+      .select("id, name, phone, is_verified")
+      .eq("id", payload.id)
+      .single();
+    user = data;
+  } else if (payload.role === "driver") {
+    const { data } = await supabase
+      .from("drivers")
+      .select("id, name, phone, branch_id, brand_id, is_active")
+      .eq("id", payload.id)
+      .single();
+    user = data ? { ...data, role: "driver" } : null;
+  } else if (payload.role === "superadmin") {
+    const { data } = await supabase
+      .from("super_admins")
+      .select("id, email, phone")
+      .eq("id", payload.id)
+      .single();
+    user = data ? { ...data, role: "superadmin" } : null;
+  } else {
+    const { data } = await supabase
+      .from("admins")
+      .select("id, email, phone, brand_id, role, is_active")
+      .eq("id", payload.id)
+      .single();
+    user = data;
+  }
+
+  if (!user) {
+    throw new AppError(401, "USER_NOT_FOUND", "Compte introuvable");
+  }
+
+  return buildTokensFromRole(user, payload.role);
+}
+
+export async function requestPasswordReset(phone: string) {
+  const { data: user } = await supabase
+    .from("users")
+    .select("id")
+    .eq("phone", phone)
+    .single();
+
+  if (!user) {
+    return { message: "Si ce numéro est enregistré, un code OTP a été envoyé" };
+  }
+
+  const { smsSent, code } = await sendOtp(phone);
+  const exposeCode = env.OTP_EXPOSE_CODE || !smsSent;
+
+  return {
+    message: smsSent && !env.OTP_EXPOSE_CODE
+      ? "Si ce numéro est enregistré, un code OTP a été envoyé"
+      : "SMS non livré — utilisez le code ci-dessous.",
+    ...(exposeCode ? { otp_code: code } : {}),
+  };
+}
+
+export async function resetPassword(input: ResetPasswordInput) {
+  const { phone, code, new_password } = input;
+
+  const isValid = await verifyOtp(phone, code);
+  if (!isValid) {
+    throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
+  }
+
+  const password_hash = await bcrypt.hash(new_password, 12);
+  const { error } = await supabase
+    .from("users")
+    .update({ password_hash })
+    .eq("phone", phone);
+
+  if (error) {
+    throw new AppError(500, "RESET_PASSWORD_ERROR", "Échec de la réinitialisation");
+  }
+
+  return { message: "Mot de passe mis à jour avec succès" };
+}
+
+// ─── Driver login ─────────────────────────────────────────────────────────────
+
+export async function loginDriver(input: { phone: string; pin: string }): Promise<{ driver: object; tokens: AuthTokens }> {
+  const { phone, pin } = input;
+
+  const { data: driver } = await supabase
+    .from("drivers")
+    .select("id, name, phone, branch_id, brand_id, is_active, pin_hash")
+    .eq("phone", phone)
+    .single();
+
+  if (!driver) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
+  }
+  if (!driver.pin_hash) {
+    throw new AppError(401, "NO_PIN", "PIN non configuré. Contactez votre administrateur.");
+  }
+
+  const valid = await bcrypt.compare(pin, driver.pin_hash);
+  if (!valid) {
+    throw new AppError(401, "INVALID_CREDENTIALS", "PIN incorrect");
+  }
+
+  const { pin_hash: _, ...safeDriver } = driver;
+  const payload = {
+    id: driver.id,
+    role: "driver",
+    name: driver.name,
+    phone: driver.phone,
+    brand_id: driver.brand_id,
+    branch_id: driver.branch_id,
+  };
+  const tokens: AuthTokens = {
+    access_token: signAccessToken(payload),
+    refresh_token: signRefreshToken({ id: driver.id, role: "driver" }),
+    expires_in: 15 * 60,
+  };
+  return { driver: safeDriver, tokens };
+}
+
+// ─── Driver OTP auth (web PWA) ────────────────────────────────────────────────
+
+export async function sendDriverOtp(phone: string): Promise<{ sent: boolean }> {
+  const { data: driver } = await supabase
+    .from("drivers")
+    .select("id, is_active")
+    .eq("phone", phone)
+    .single();
+
+  if (!driver) {
+    throw new AppError(404, "DRIVER_NOT_FOUND", "Aucun livreur trouvé avec ce numéro");
+  }
+  if (!driver.is_active) {
+    throw new AppError(403, "DRIVER_INACTIVE", "Compte livreur désactivé. Contactez votre administrateur.");
+  }
+
+  const { smsSent } = await sendOtp(phone);
+  return { sent: smsSent };
+}
+
+export async function verifyDriverOtp(phone: string, code: string): Promise<{ driver: object; tokens: AuthTokens }> {
+  const { data: driver } = await supabase
+    .from("drivers")
+    .select("id, name, phone, branch_id, brand_id, is_active, vehicle_type, photo_url")
+    .eq("phone", phone)
+    .single();
+
+  if (!driver) {
+    throw new AppError(404, "DRIVER_NOT_FOUND", "Livreur introuvable");
+  }
+
+  const isValid = await verifyOtp(phone, code);
+  if (!isValid) {
+    throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
+  }
+
+  const payload = {
+    id: driver.id,
+    role: "driver",
+    name: driver.name,
+    phone: driver.phone,
+    brand_id: driver.brand_id,
+    branch_id: driver.branch_id,
+  };
+  const tokens: AuthTokens = {
+    access_token: signAccessToken(payload),
+    refresh_token: signRefreshToken({ id: driver.id, role: "driver" }),
+    expires_in: 15 * 60,
+  };
+  return { driver, tokens };
+}
+
+// ─── Demande d'accès marque ───────────────────────────────────────────────────
+
+export async function applyBrand(input: {
+  brand_name: string;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  city: string;
+  description: string;
+  password: string;
+}) {
+  const { brand_name, contact_name, contact_email, contact_phone, city, description, password } = input;
+
+  const { data: existing } = await supabase
+    .from("brand_applications")
+    .select("id")
+    .or(`contact_email.eq.${contact_email},contact_phone.eq.${contact_phone}`)
+    .maybeSingle();
+
+  if (existing) {
+    throw new AppError(409, "APPLICATION_ALREADY_EXISTS", "Une demande existe déjà avec cet email ou ce numéro");
+  }
+
+  const password_hash = await bcrypt.hash(password, 12);
+
+  const { data, error } = await supabase
+    .from("brand_applications")
+    .insert({
+      brand_name,
+      contact_name,
+      contact_email,
+      contact_phone,
+      city,
+      description,
+      password_hash,
+      status: "pending",
+    })
+    .select("id, brand_name, contact_email, status, submitted_at")
+    .single();
+
+  if (error || !data) {
+    throw new AppError(500, "APPLICATION_ERROR", "Échec de l'envoi de la demande");
+  }
+
+  return { message: "Demande soumise avec succès", application: data };
+}
+
+// ─── Google OAuth ─────────────────────────────────────────────────────────────
+
+export async function googleAuth(input: { id_token: string }): Promise<{ user: object; tokens: AuthTokens }> {
+  let googlePayload: { email: string; name: string; sub: string };
+  try {
+    const { data } = await axios.get<{ email: string; name: string; sub: string; email_verified: string }>(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${input.id_token}`
+    );
+    if (!data.email || !data.sub) {
+      throw new AppError(401, "INVALID_GOOGLE_TOKEN", "Token Google invalide");
+    }
+    googlePayload = { email: data.email, name: data.name ?? data.email, sub: data.sub };
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(401, "INVALID_GOOGLE_TOKEN", "Impossible de vérifier le token Google");
+  }
+
+  const { email, name, sub: google_id } = googlePayload;
+
+  const { data: byEmail } = await supabase
+    .from("users")
+    .select("id, name, phone, email, google_id, is_verified")
+    .eq("email", email)
+    .maybeSingle();
+
+  let user = byEmail;
+
+  if (!user) {
+    const { data: byGoogleId } = await supabase
+      .from("users")
+      .select("id, name, phone, email, google_id, is_verified")
+      .eq("google_id", google_id)
+      .maybeSingle();
+    user = byGoogleId;
+  }
+
+  if (!user) {
+    const { data: newUser, error: createErr } = await supabase
+      .from("users")
+      .insert({
+        name,
+        email,
+        google_id,
+        email_verified: true,
+        is_verified: true,
+        phone: null,
+        password_hash: null,
+      })
+      .select("id, name, phone, email, google_id, is_verified")
+      .single();
+
+    if (createErr || !newUser) {
+      throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte Google");
+    }
+    user = newUser;
+  } else if (!user.google_id) {
+    await supabase.from("users").update({ google_id, email_verified: true }).eq("id", user.id);
+  }
+
+  const tokens = buildUserTokens(user as { id: string; name?: string; phone: string });
+  return { user, tokens };
+}
+
+// ─── Helpers privés ───────────────────────────────────────────────────────────
+
+function buildUserTokens(user: { id: string; name?: string; phone: string }): AuthTokens {
+  const payload = { id: user.id, role: "user", name: user.name, phone: user.phone };
+  return {
+    access_token: signAccessToken(payload),
+    refresh_token: signRefreshToken({ id: user.id, role: "user" }),
+    expires_in: 15 * 60,
+  };
+}
+
+function buildAdminTokens(admin: { id: string; username?: string; email: string; phone: string; brand_id: string; role: string }): AuthTokens {
+  const payload = { id: admin.id, role: admin.role, email: admin.email, phone: admin.phone, brand_id: admin.brand_id };
+  return {
+    access_token: signAccessToken(payload),
+    refresh_token: signRefreshToken({ id: admin.id, role: admin.role }),
+    expires_in: 15 * 60,
+  };
+}
+
+function buildSuperAdminTokens(admin: { id: string; email: string; phone: string }): AuthTokens {
+  const payload = { id: admin.id, role: "superadmin", email: admin.email, phone: admin.phone };
+  return {
+    access_token: signAccessToken(payload),
+    refresh_token: signRefreshToken({ id: admin.id, role: "superadmin" }),
+    expires_in: 15 * 60,
+  };
+}
+
+function buildTokensFromRole(user: Record<string, unknown>, role: string): AuthTokens {
+  const payload = { id: user.id as string, role, ...user };
+  return {
+    access_token: signAccessToken(payload as Parameters<typeof signAccessToken>[0]),
+    refresh_token: signRefreshToken({ id: user.id as string, role }),
+    expires_in: 15 * 60,
+  };
 }
