@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import axios from "axios";
 import { supabase } from "../../config/supabase.js";
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../../utils/jwt.js";
-import { sendOtp, verifyOtp } from "../../utils/otp.js";
+import { sendOtp, verifyOtp, verifyEmailOtp } from "../../utils/otp.js";
 import { sendEmailOtp, sendCodeByEmail } from "../../utils/email.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { env } from "../../config/env.js";
@@ -195,7 +195,7 @@ export async function verifyAdminOtp(input: { identifier: string; code: string }
     throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
   }
 
-  const isValid = await verifyOtp(admin.email, code);
+  const isValid = await verifyEmailOtp(admin.email, code);
   if (!isValid) {
     throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
   }
@@ -252,7 +252,7 @@ export async function verifySuperAdminOtp(input: { identifier: string; code: str
     throw new AppError(401, "INVALID_CREDENTIALS", "Identifiants incorrects");
   }
 
-  const isValid = await verifyOtp(superAdmin.email, code);
+  const isValid = await verifyEmailOtp(superAdmin.email, code);
   if (!isValid) {
     throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
   }
