@@ -1,7 +1,6 @@
 import { supabase } from "../config/supabase.js";
 import { OTP_EXPIRES_IN_MINUTES, OTP_LENGTH } from "@dash-meal/shared";
 import { env } from "../config/env.js";
-import { AppError } from "../middleware/errorHandler.js";
 
 function generateCode(): string {
   return Math.floor(
@@ -24,7 +23,6 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
   const code = generateCode();
   const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
 
-  // Upsert dans la table otps (identifié par phone)
   await supabase.from("otps").upsert(
     { phone, otp: code, expires_at: expiresAt.toISOString() },
     { onConflict: "phone" }
@@ -74,6 +72,7 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
   }
 }
 
+/** Vérifie un OTP envoyé par SMS (clé : phone) */
 export async function verifyOtp(phone: string, code: string): Promise<boolean> {
   const { data } = await supabase
     .from("otps")
@@ -85,9 +84,22 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean> {
 
   if (!data) return false;
 
-  // Supprimer l'OTP après vérification (usage unique)
   await supabase.from("otps").delete().eq("id", data.id);
-
   return true;
 }
 
+/** Vérifie un OTP envoyé par email (clé : email) */
+export async function verifyEmailOtp(email: string, code: string): Promise<boolean> {
+  const { data } = await supabase
+    .from("otps")
+    .select("id")
+    .eq("email", email)
+    .eq("otp", code)
+    .gt("expires_at", new Date().toISOString())
+    .single();
+
+  if (!data) return false;
+
+  await supabase.from("otps").delete().eq("id", data.id);
+  return true;
+}
