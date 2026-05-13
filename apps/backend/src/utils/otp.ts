@@ -18,6 +18,10 @@ function normalizePhone(phone: string): string {
   return `+237${digits}`;
 }
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export async function sendOtp(phone: string): Promise<{ code: string; smsSent: boolean }> {
   const normalized = normalizePhone(phone);
   const code = generateCode();
@@ -90,13 +94,19 @@ export async function verifyOtp(phone: string, code: string): Promise<boolean> {
 
 /** Vérifie un OTP envoyé par email (clé : email) */
 export async function verifyEmailOtp(email: string, code: string): Promise<boolean> {
-  const { data } = await supabase
+  const normalizedEmail = normalizeEmail(email);
+  const { data, error } = await supabase
     .from("otps")
     .select("id")
-    .eq("email", email)
+    .eq("email", normalizedEmail)
     .eq("otp", code)
     .gt("expires_at", new Date().toISOString())
-    .single();
+    .maybeSingle();
+
+  if (error) {
+    console.error("[verifyEmailOtp] lookup failed:", error.message);
+    return false;
+  }
 
   if (!data) return false;
 

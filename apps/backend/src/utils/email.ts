@@ -51,9 +51,14 @@ function generateOtpCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export async function sendCodeByEmail(email: string, code: string): Promise<{ emailSent: boolean }> {
+  const normalizedEmail = normalizeEmail(email);
   const result = await sendEmail({
-    to: email,
+    to: normalizedEmail,
     subject: "Code OTP Dash Meal",
     html: `<p>Votre code OTP Dash Meal est :</p><h2>${code}</h2><p>Valable ${OTP_EXPIRES_IN_MINUTES} minutes.</p>`,
     text: `Votre code OTP Dash Meal est: ${code}. Valable ${OTP_EXPIRES_IN_MINUTES} minutes.`,
@@ -63,15 +68,21 @@ export async function sendCodeByEmail(email: string, code: string): Promise<{ em
 }
 
 export async function sendEmailOtp(email: string): Promise<{ emailSent: boolean; code: string }> {
+  const normalizedEmail = normalizeEmail(email);
   const code = generateOtpCode();
   const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
 
-  await supabase.from("otps").upsert(
-    { email, otp: code, expires_at: expiresAt.toISOString() },
-    { onConflict: "email" }
-  );
+  // Avoid depending on a DB unique constraint on email for OTP updates.
+  await supabase.from("otps").delete().eq("email", normalizedEmail);
+  await supabase
+    .from("otps")
+    .insert({ email: normalizedEmail, otp: code, expires_at: expiresAt.toISOString() });
 
-  const { emailSent } = await sendCodeByEmail(email, code);
+  if (env.OTP_EXPOSE_CODE) {
+    console.log(`[EMAIL OTP] ${normalizedEmail}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
+  }
+
+  const { emailSent } = await sendCodeByEmail(normalizedEmail, code);
   return { emailSent, code };
 }
 
