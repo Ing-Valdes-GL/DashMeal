@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dash Meal — Inventaire complet des fonctionnalités</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      line-height: 1.6;
+    }
+
+    header {
+      background: linear-gradient(135deg, #53B175 0%, #3E8C58 100%);
+      padding: 2.5rem 2rem;
+      text-align: center;
+    }
+    header h1 { font-size: 2rem; color: #fff; font-weight: 700; letter-spacing: -0.5px; }
+    header p  { color: rgba(255,255,255,0.85); margin-top: 0.5rem; font-size: 0.95rem; }
+
+    .stats-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      padding: 1.5rem 2rem;
+      background: #1a1d2e;
+      border-bottom: 1px solid #2d3048;
+    }
+    .stat {
+      background: #22253a;
+      border: 1px solid #2d3048;
+      border-radius: 10px;
+      padding: 0.6rem 1.2rem;
+      text-align: center;
+      min-width: 120px;
+    }
+    .stat .num { font-size: 1.5rem; font-weight: 700; color: #53B175; }
+    .stat .label { font-size: 0.7rem; color: #8892a4; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    main { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 2.5rem 0 1.25rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 2px solid #53B175;
+    }
+    .section-header .badge {
+      background: #53B175;
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.25rem 0.7rem;
+      border-radius: 20px;
+    }
+    .section-header h2 { font-size: 1.25rem; font-weight: 600; color: #f1f5f9; }
+
+    /* Grille modules backend */
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .module-card {
+      background: #1a1d2e;
+      border: 1px solid #2d3048;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .module-card .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.8rem 1rem;
+      background: #22253a;
+      cursor: pointer;
+      user-select: none;
+    }
+    .module-card .card-header:hover { background: #282b40; }
+    .module-card .card-header h3 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #c8d6e5;
+    }
+    .module-card .card-header .count {
+      font-size: 0.7rem;
+      background: #53B175;
+      color: #fff;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .module-card .routes { padding: 0.5rem 0; }
+
+    .route-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      padding: 0.3rem 1rem;
+      border-bottom: 1px solid #1f2235;
+      font-size: 0.78rem;
+    }
+    .route-row:last-child { border-bottom: none; }
+    .route-row:hover { background: #1f2235; }
+
+    .method {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      min-width: 38px;
+      text-align: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .GET    { background: #1a3a5c; color: #60a5fa; }
+    .POST   { background: #1a3a27; color: #4ade80; }
+    .PATCH  { background: #3a2e10; color: #fbbf24; }
+    .PUT    { background: #3a1f10; color: #fb923c; }
+    .DELETE { background: #3a1a1a; color: #f87171; }
+
+    .route-path  { color: #94a3b8; font-family: monospace; flex-shrink: 0; }
+    .route-desc  { color: #8892a4; flex: 1; }
+
+    /* Pages grid */
+    .pages-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+    .page-group {
+      background: #1a1d2e;
+      border: 1px solid #2d3048;
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .page-group h4 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #53B175;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #2d3048;
+    }
+    .page-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.3rem 0;
+      font-size: 0.78rem;
+      border-bottom: 1px solid #1f2235;
+    }
+    .page-item:last-child { border-bottom: none; }
+    .page-item .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+    .dot-done    { background: #53B175; }
+    .dot-done  { background: #fbbf24; }
+    .dot-done { background: #f87171; }
+    .page-item .path { color: #94a3b8; font-family: monospace; font-size: 0.72rem; }
+    .page-item .desc { color: #8892a4; }
+
+    /* Mobile screens */
+    .screens-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    .screen-group {
+      background: #1a1d2e;
+      border: 1px solid #2d3048;
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .screen-group h4 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #53B175;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #2d3048;
+    }
+    .screen-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      padding: 0.3rem 0;
+      font-size: 0.78rem;
+      border-bottom: 1px solid #1f2235;
+    }
+    .screen-item:last-child { border-bottom: none; }
+    .screen-item .path { color: #94a3b8; font-family: monospace; font-size: 0.72rem; }
+    .screen-item .desc { color: #8892a4; }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+      padding: 0.75rem 1rem;
+      background: #1a1d2e;
+      border: 1px solid #2d3048;
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+      font-size: 0.75rem;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; color: #8892a4; }
+
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: #4a5568;
+      font-size: 0.8rem;
+      border-top: 1px solid #2d3048;
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Dash Meal — Inventaire complet des fonctionnalités</h1>
+  <p>Généré le 22 mai 2026 · Monorepo Next.js + Express + Expo · Zone CEMAC (XAF)</p>
+</header>
+
+<div class="stats-bar">
+  <div class="stat"><div class="num">36</div><div class="label">Modules backend</div></div>
+  <div class="stat"><div class="num">350+</div><div class="label">Endpoints API</div></div>
+  <div class="stat"><div class="num">40+</div><div class="label">Pages admin</div></div>
+  <div class="stat"><div class="num">25+</div><div class="label">Écrans mobile</div></div>
+  <div class="stat"><div class="num">6</div><div class="label">Rôles</div></div>
+  <div class="stat"><div class="num">25+</div><div class="label">Entités DB</div></div>
+</div>
+
+<main>
+
+  <!-- ═══════════════════════════════════════════ BACKEND ═══════════════════════════════════════════ -->
+  <div class="section-header">
+    <span class="badge">Backend</span>
+    <h2>API Express — Modules &amp; Routes</h2>
+  </div>
+
+  <div class="modules-grid">
+
+    <!-- AUTH -->
+    <div class="module-card">
+      <div class="card-header"><h3>AUTH — Authentification</h3><span class="count">18</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/user/register</span><span class="route-desc">Inscription utilisateur mobile</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/user/verify-phone</span><span class="route-desc">Vérification OTP SMS → créé compte</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/user/verify-email</span><span class="route-desc">Vérification OTP email → créé compte</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/user/resend-email-otp</span><span class="route-desc">Renvoyer OTP email inscription</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/user/login</span><span class="route-desc">Connexion (email ou téléphone)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/user/google</span><span class="route-desc">OAuth Google (id_token)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/user/request-reset</span><span class="route-desc">Demander réinit. mot de passe (OTP SMS)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/user/reset-password</span><span class="route-desc">Réinitialiser mot de passe</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/driver/login</span><span class="route-desc">Connexion livreur (téléphone + PIN)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/driver/send-otp</span><span class="route-desc">Envoyer OTP SMS livreur (web PWA)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/driver/verify-otp</span><span class="route-desc">Vérifier OTP livreur</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/admin/login</span><span class="route-desc">Connexion admin marque (étape 1)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/admin/verify-otp</span><span class="route-desc">Vérifier OTP email admin (étape 2)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/superadmin/register</span><span class="route-desc">Créer compte superadmin</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/superadmin/login</span><span class="route-desc">Connexion superadmin (étape 1)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/superadmin/verify-otp</span><span class="route-desc">Vérifier OTP superadmin (étape 2)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/apply</span><span class="route-desc">Demande d'accès marque (landing)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/auth/refresh</span><span class="route-desc">Rafraîchir tokens JWT</span></div>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="module-card">
+      <div class="card-header"><h3>USERS — Profil Utilisateur</h3><span class="count">20</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/users/me</span><span class="route-desc">Mon profil</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/users/me</span><span class="route-desc">Modifier profil</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/users/me/change-password</span><span class="route-desc">Changer mot de passe</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/users/me/avatar</span><span class="route-desc">Upload avatar</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/users/me/default-payment</span><span class="route-desc">Méthode paiement par défaut</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/users/me/favorites</span><span class="route-desc">Agences favorites</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/users/me/favorites/:branchId</span><span class="route-desc">Toggle favori agence</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/users/me/addresses</span><span class="route-desc">Adresses sauvegardées</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/users/me/addresses</span><span class="route-desc">Ajouter adresse</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/users/me/addresses/:id</span><span class="route-desc">Modifier adresse</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/users/me/addresses/:id</span><span class="route-desc">Supprimer adresse</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/users/me/notifications</span><span class="route-desc">Mes notifications</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/users/me/notifications/:id/read</span><span class="route-desc">Marquer notification lue</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/users/me/notifications/read-all</span><span class="route-desc">Tout marquer lu</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/users/me/push-token</span><span class="route-desc">Enregistrer token push Expo</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/users/</span><span class="route-desc">Lister utilisateurs (superadmin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/users/:id</span><span class="route-desc">Détail utilisateur (superadmin)</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/users/:id/toggle-active</span><span class="route-desc">Activer/désactiver utilisateur</span></div>
+      </div>
+    </div>
+
+    <!-- BRANDS -->
+    <div class="module-card">
+      <div class="card-header"><h3>BRANDS — Gestion Marques</h3><span class="count">13</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/brands/</span><span class="route-desc">Lister toutes marques (superadmin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/brands/</span><span class="route-desc">Créer marque (superadmin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/brands/applications</span><span class="route-desc">Demandes d'accès (superadmin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/brands/applications/:id</span><span class="route-desc">Détail demande (superadmin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/brands/applications/:id/review</span><span class="route-desc">Approuver / rejeter demande</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/brands/:id/suspend</span><span class="route-desc">Suspendre marque</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/brands/:id/review-legal</span><span class="route-desc">Valider documents légaux</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/brands/:id</span><span class="route-desc">Détail marque</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/brands/:id</span><span class="route-desc">Modifier marque</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/brands/:id/logo</span><span class="route-desc">Upload logo marque</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/brands/:id/legal-doc</span><span class="route-desc">Upload document légal</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/brands/:id/submit-legal</span><span class="route-desc">Soumettre dossier KYC marque</span></div>
+      </div>
+    </div>
+
+    <!-- BRANCHES -->
+    <div class="module-card">
+      <div class="card-header"><h3>BRANCHES — Agences / Succursales</h3><span class="count">15</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/branches/nearby</span><span class="route-desc">Agences à proximité GPS (public)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/branches/:id</span><span class="route-desc">Détail agence (public)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/branches/:id/time-slots</span><span class="route-desc">Créneaux click &amp; collect (public)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/branches/:id/delivery-zones</span><span class="route-desc">Zones de livraison (public)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/branches/</span><span class="route-desc">Agences de la marque (admin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/branches/</span><span class="route-desc">Créer agence</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/branches/:id</span><span class="route-desc">Modifier agence</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/branches/:id</span><span class="route-desc">Supprimer agence</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/branches/:id/image</span><span class="route-desc">Upload image agence</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/branches/:id/request-live</span><span class="route-desc">Demander mise en ligne</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/branches/:id/review-live</span><span class="route-desc">Approuver/rejeter mise en ligne (superadmin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/branches/time-slots</span><span class="route-desc">Créer créneau click &amp; collect</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/branches/delivery-zones</span><span class="route-desc">Créer zone de livraison</span></div>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="module-card">
+      <div class="card-header"><h3>PRODUCTS — Catalogue Produits</h3><span class="count">15</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/products/search</span><span class="route-desc">Recherche full-text produits (public)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/products/categories</span><span class="route-desc">Lister catégories (public)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/products/:id</span><span class="route-desc">Détail produit (public)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/products/branch/:branch_id</span><span class="route-desc">Produits d'une agence</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/products/</span><span class="route-desc">Créer produit</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/products/:id</span><span class="route-desc">Modifier produit</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/products/:id/toggle-hidden</span><span class="route-desc">Masquer/afficher produit</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/products/:id/promo</span><span class="route-desc">Appliquer promotion produit</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/products/:id</span><span class="route-desc">Supprimer produit</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/products/:id/variants</span><span class="route-desc">Créer variante produit</span></div>
+        <div class="route-row"><span class="method PUT">PUT</span><span class="route-path">/products/stock</span><span class="route-desc">Mettre à jour stock par agence</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/products/:id/stock</span><span class="route-desc">Stock produit par agence</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/products/upload-image</span><span class="route-desc">Upload image produit (Supabase Storage)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/products/categories</span><span class="route-desc">Créer catégorie</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/products/categories/:id</span><span class="route-desc">Supprimer catégorie</span></div>
+      </div>
+    </div>
+
+    <!-- ORDERS -->
+    <div class="module-card">
+      <div class="card-header"><h3>ORDERS — Gestion Commandes</h3><span class="count">13</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/orders/</span><span class="route-desc">Créer commande (livraison ou collect)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/orders/collect</span><span class="route-desc">Créer commande click &amp; collect (legacy)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/orders/delivery</span><span class="route-desc">Créer commande livraison (legacy)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/orders/my-orders</span><span class="route-desc">Mes commandes (utilisateur)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/orders/:id</span><span class="route-desc">Détail commande</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/orders/</span><span class="route-desc">Lister commandes (admin/livreur)</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/orders/:id/status</span><span class="route-desc">Changer statut commande</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/orders/:id/assign-driver</span><span class="route-desc">Assigner livreur à commande</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/orders/:id/history</span><span class="route-desc">Historique changements statut</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/orders/:id/cancel</span><span class="route-desc">Annuler commande</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/orders/:id/convert-to-delivery</span><span class="route-desc">Convertir collect → livraison</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/orders/:id/rate</span><span class="route-desc">Noter la commande</span></div>
+      </div>
+    </div>
+
+    <!-- PAYMENTS -->
+    <div class="module-card">
+      <div class="card-header"><h3>PAYMENTS — Paiements Campay</h3><span class="count">7</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/payments/initiate-order</span><span class="route-desc">Payer → créer commande après confirmation</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/payments/initiate</span><span class="route-desc">Initier paiement pour commande existante</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/payments/webhook/campay</span><span class="route-desc">Webhook callback Campay</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/payments/inperson</span><span class="route-desc">Enregistrer paiement en présentiel</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/payments/status/:reference</span><span class="route-desc">Polling statut paiement</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/payments/order/:orderId</span><span class="route-desc">Historique paiement commande</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/payments/balance</span><span class="route-desc">Solde Campay (superadmin)</span></div>
+      </div>
+    </div>
+
+    <!-- DELIVERY -->
+    <div class="module-card">
+      <div class="card-header"><h3>DELIVERY — Module Livraisons</h3><span class="count">12</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery/me</span><span class="route-desc">Profil livreur connecté</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/delivery/activate</span><span class="route-desc">Activer compte livreur</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/delivery/push-token</span><span class="route-desc">Enregistrer token push livreur</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery/available</span><span class="route-desc">Livraisons disponibles (non assignées)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery/available/:id</span><span class="route-desc">Détail livraison disponible</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/delivery/:id/accept</span><span class="route-desc">Accepter une livraison</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery/my-deliveries</span><span class="route-desc">Mes livraisons assignées</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery/my-deliveries/:id</span><span class="route-desc">Détail ma livraison</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/delivery/:id/status</span><span class="route-desc">Mettre à jour statut livraison</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/delivery/:id/position</span><span class="route-desc">Envoyer position GPS temps réel</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery/track/:orderId</span><span class="route-desc">Suivre sa livraison (utilisateur)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery/</span><span class="route-desc">Lister toutes livraisons (admin)</span></div>
+      </div>
+    </div>
+
+    <!-- DRIVER -->
+    <div class="module-card">
+      <div class="card-header"><h3>DRIVER — Profil &amp; Gains Livreur</h3><span class="count">7</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/driver/deliveries</span><span class="route-desc">Liste livraisons livreur</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/driver/deliveries/:id/status</span><span class="route-desc">MAJ statut livraison</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/driver/earnings</span><span class="route-desc">Gains livreur</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/driver/profile</span><span class="route-desc">Profil livreur</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/driver/profile</span><span class="route-desc">Modifier profil</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/driver/profile/availability</span><span class="route-desc">Changer disponibilité online/offline</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/driver/location</span><span class="route-desc">Mettre à jour position GPS</span></div>
+      </div>
+    </div>
+
+    <!-- WALLET -->
+    <div class="module-card">
+      <div class="card-header"><h3>WALLET — Portefeuilles</h3><span class="count">7</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/wallet/</span><span class="route-desc">Wallet marque (admin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/wallet/transactions</span><span class="route-desc">Transactions wallet marque</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/wallet/verify-phone</span><span class="route-desc">Vérifier numéro retrait</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/wallet/withdraw</span><span class="route-desc">Demander retrait marque</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/wallet/platform</span><span class="route-desc">Wallet plateforme (superadmin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/wallet/platform/transactions</span><span class="route-desc">Transactions plateforme</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/wallet/platform/withdraw</span><span class="route-desc">Retrait plateforme</span></div>
+      </div>
+    </div>
+
+    <!-- DRIVER-WALLET -->
+    <div class="module-card">
+      <div class="card-header"><h3>DRIVER-WALLET — Portefeuille Livreur</h3><span class="count">4</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/driver-wallet/me</span><span class="route-desc">Mon wallet livreur</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/driver-wallet/me/transactions</span><span class="route-desc">Mes transactions</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/driver-wallet/me/withdraw</span><span class="route-desc">Demander retrait livreur</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/driver-wallet/:driver_id</span><span class="route-desc">Wallet livreur (admin)</span></div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="module-card">
+      <div class="card-header"><h3>ANALYTICS — Statistiques</h3><span class="count">8</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/analytics/dashboard</span><span class="route-desc">Dashboard KPIs admin</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/analytics/branches</span><span class="route-desc">Stats par agence</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/analytics/orders-stats</span><span class="route-desc">Stats commandes</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/analytics/top-products</span><span class="route-desc">Top produits vendus</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/analytics/revenue</span><span class="route-desc">Chiffre d'affaires</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/analytics/branch/:branch_id</span><span class="route-desc">Stats agence spécifique</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/analytics/platform</span><span class="route-desc">Stats plateforme (superadmin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/analytics/commissions</span><span class="route-desc">Vue commissions (superadmin)</span></div>
+      </div>
+    </div>
+
+    <!-- PROMOTIONS -->
+    <div class="module-card">
+      <div class="card-header"><h3>PROMOTIONS — Codes Promo</h3><span class="count">7</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/promotions/validate</span><span class="route-desc">Valider un code promo</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/promotions/apply</span><span class="route-desc">Appliquer promotion</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/promotions/</span><span class="route-desc">Lister promotions (admin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/promotions/</span><span class="route-desc">Créer promotion</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/promotions/:id</span><span class="route-desc">Détail promotion</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/promotions/:id</span><span class="route-desc">Modifier promotion</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/promotions/:id</span><span class="route-desc">Supprimer promotion</span></div>
+      </div>
+    </div>
+
+    <!-- TRACKING -->
+    <div class="module-card">
+      <div class="card-header"><h3>TRACKING — Suivi Temps Réel</h3><span class="count">3</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method PUT">PUT</span><span class="route-path">/tracking/location</span><span class="route-desc">MAJ position livreur (livreur)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/tracking/delivery/:order_id</span><span class="route-desc">Position livreur pour commande (user/admin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/tracking/driver/:driver_id</span><span class="route-desc">Position livreur brute (admin)</span></div>
+      </div>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div class="module-card">
+      <div class="card-header"><h3>NOTIFICATIONS — Push Expo</h3><span class="count">3</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/notifications/</span><span class="route-desc">Historique notifications</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/notifications/send</span><span class="route-desc">Envoyer notification ciblée</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/notifications/broadcast</span><span class="route-desc">Broadcast tous utilisateurs (superadmin)</span></div>
+      </div>
+    </div>
+
+    <!-- COLLECT -->
+    <div class="module-card">
+      <div class="card-header"><h3>COLLECT — Click &amp; Collect QR</h3><span class="count">5</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/collect/slots/:branchId</span><span class="route-desc">Créneaux disponibles (public)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/collect/scan</span><span class="route-desc">Scanner QR code retrait (admin/caissier)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/collect/order/:orderId</span><span class="route-desc">QR code commande (utilisateur)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/collect/admin/order/:orderId</span><span class="route-desc">QR code commande (admin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/collect/branch/:branchId</span><span class="route-desc">Commandes collect d'agence</span></div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="module-card">
+      <div class="card-header"><h3>CHAT — Messagerie</h3><span class="count">8</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/chat/conversations/driver/list</span><span class="route-desc">Conversations livreur</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/chat/conversations/order/:orderId</span><span class="route-desc">Créer/récupérer conversation commande</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/chat/conversations/:id/messages</span><span class="route-desc">Lister messages</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/chat/conversations/:id/messages</span><span class="route-desc">Envoyer message</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/chat/conversations/:id/typing</span><span class="route-desc">Indiquer en train d'écrire</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/chat/conversations/:id/read</span><span class="route-desc">Marquer conversation comme lue</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/chat/upload</span><span class="route-desc">Upload média (photo/audio)</span></div>
+      </div>
+    </div>
+
+    <!-- REELS -->
+    <div class="module-card">
+      <div class="card-header"><h3>REELS — Vidéos Agences</h3><span class="count">11</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/reels/</span><span class="route-desc">Lister reels (public)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/reels/:id</span><span class="route-desc">Détail reel</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/reels/:id/comments</span><span class="route-desc">Commentaires reel</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/reels/:id/like</span><span class="route-desc">Liker reel (auth)</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/reels/:id/like</span><span class="route-desc">Unliker reel (auth)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/reels/:id/comments</span><span class="route-desc">Commenter reel (auth)</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/reels/:id/comments/:comment_id</span><span class="route-desc">Supprimer commentaire</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/reels/:id/comments/:comment_id/reply</span><span class="route-desc">Répondre commentaire (admin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/reels/</span><span class="route-desc">Créer reel (admin)</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/reels/:id</span><span class="route-desc">Modifier reel</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/reels/:id</span><span class="route-desc">Supprimer reel</span></div>
+      </div>
+    </div>
+
+    <!-- ADS -->
+    <div class="module-card">
+      <div class="card-header"><h3>ADS — Publicités</h3><span class="count">11</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/ads/user/active</span><span class="route-desc">Publicité active pour utilisateur (public)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/ads/:id/impression</span><span class="route-desc">Enregistrer impression</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/ads/price</span><span class="route-desc">Prix publicité (admin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/ads/</span><span class="route-desc">Mes publicités (admin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/ads/</span><span class="route-desc">Créer publicité avec image + paiement</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/ads/:id</span><span class="route-desc">Supprimer publicité</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/ads/payment/:reference/status</span><span class="route-desc">Statut paiement publicité</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/ads/superadmin/all</span><span class="route-desc">Toutes publicités (superadmin)</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/ads/superadmin/:id/approve</span><span class="route-desc">Approuver publicité</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/ads/superadmin/:id/reject</span><span class="route-desc">Rejeter publicité</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/ads/superadmin/withdraw</span><span class="route-desc">Retrait revenus publicités</span></div>
+      </div>
+    </div>
+
+    <!-- STOCK -->
+    <div class="module-card">
+      <div class="card-header"><h3>STOCK — Gestion Stock</h3><span class="count">5</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/stock/:branch_id</span><span class="route-desc">Stock agence</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/stock/:branch_id/movements</span><span class="route-desc">Mouvements de stock</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/stock/:branch_id/alerts</span><span class="route-desc">Alertes stock bas</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/stock/:branch_id/bulk</span><span class="route-desc">Mise à jour stock en masse</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/stock/:branch_id/:product_id</span><span class="route-desc">Mettre à jour stock article</span></div>
+      </div>
+    </div>
+
+    <!-- BRANCH-HOURS -->
+    <div class="module-card">
+      <div class="card-header"><h3>BRANCH-HOURS — Horaires</h3><span class="count">4</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/branch-hours/:branch_id/is-open</span><span class="route-desc">Agence ouverte en ce moment (public)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/branch-hours/:branch_id</span><span class="route-desc">Horaires complets agence</span></div>
+        <div class="route-row"><span class="method PUT">PUT</span><span class="route-path">/branch-hours/:branch_id</span><span class="route-desc">Définir horaires complets (7 jours)</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/branch-hours/:branch_id/:day</span><span class="route-desc">Modifier horaires un jour</span></div>
+      </div>
+    </div>
+
+    <!-- BRANCH-MANAGERS -->
+    <div class="module-card">
+      <div class="card-header"><h3>BRANCH-MANAGERS — Gérants Agences</h3><span class="count">6</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/branch-managers/</span><span class="route-desc">Lister gérants (admin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/branch-managers/</span><span class="route-desc">Créer gérant d'agence</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/branch-managers/:id</span><span class="route-desc">Détail gérant</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/branch-managers/:id</span><span class="route-desc">Modifier gérant</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/branch-managers/:id</span><span class="route-desc">Supprimer gérant</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/branch-managers/:id/reset-password</span><span class="route-desc">Réinitialiser mot de passe gérant</span></div>
+      </div>
+    </div>
+
+    <!-- DELIVERY-ZONES -->
+    <div class="module-card">
+      <div class="card-header"><h3>DELIVERY-ZONES — Zones Livraison</h3><span class="count">6</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery-zones/public/:branch_id</span><span class="route-desc">Zones livraison publiques</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery-zones/</span><span class="route-desc">Lister zones (admin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/delivery-zones/</span><span class="route-desc">Créer zone</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/delivery-zones/:id</span><span class="route-desc">Détail zone</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/delivery-zones/:id</span><span class="route-desc">Modifier zone</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/delivery-zones/:id</span><span class="route-desc">Supprimer zone</span></div>
+      </div>
+    </div>
+
+    <!-- ADMINS -->
+    <div class="module-card">
+      <div class="card-header"><h3>ADMINS — Gestion Admins &amp; Livreurs</h3><span class="count">14</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/admins/drivers</span><span class="route-desc">Lister livreurs</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/admins/drivers</span><span class="route-desc">Créer livreur</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/admins/drivers/:id</span><span class="route-desc">Détail livreur</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/admins/drivers/:id</span><span class="route-desc">Modifier livreur</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/admins/drivers/:id/toggle-active</span><span class="route-desc">Activer/désactiver livreur</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/admins/drivers/:id/pin</span><span class="route-desc">Définir PIN livreur</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/admins/drivers/upload-photo</span><span class="route-desc">Upload photo livreur</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/admins/</span><span class="route-desc">Lister admins (superadmin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/admins/</span><span class="route-desc">Créer admin (superadmin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/admins/:id</span><span class="route-desc">Détail admin</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/admins/:id</span><span class="route-desc">Modifier admin</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/admins/:id/toggle-active</span><span class="route-desc">Activer/désactiver admin</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/admins/:id/reset-password</span><span class="route-desc">Réinitialiser mot de passe admin</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/admins/:id</span><span class="route-desc">Supprimer admin</span></div>
+      </div>
+    </div>
+
+    <!-- Autres modules en liste condensée -->
+    <div class="module-card">
+      <div class="card-header"><h3>CART — Panier Serveur</h3><span class="count">5</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/cart/</span><span class="route-desc">Récupérer panier</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/cart/items</span><span class="route-desc">Ajouter article au panier</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/cart/items/:itemId</span><span class="route-desc">Modifier quantité article</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/cart/items/:itemId</span><span class="route-desc">Supprimer article</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/cart/</span><span class="route-desc">Vider panier</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>GROUP-ORDERS — Commandes Groupées</h3><span class="count">7</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/group-orders/</span><span class="route-desc">Créer commande groupée</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/group-orders/join</span><span class="route-desc">Rejoindre commande groupée</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/group-orders/:id</span><span class="route-desc">Détail commande groupée</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/group-orders/:id/items</span><span class="route-desc">Ajouter article</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/group-orders/:id/items/:product_id</span><span class="route-desc">Retirer article</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/group-orders/:id/lock</span><span class="route-desc">Verrouiller panier groupé</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/group-orders/:id/order</span><span class="route-desc">Confirmer commande groupée</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>COMMISSIONS — Revenus Plateforme</h3><span class="count">5</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/commissions/summary</span><span class="route-desc">Résumé commissions (admin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/commissions/</span><span class="route-desc">Lister commissions</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/commissions/:id</span><span class="route-desc">Détail commission</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/commissions/:id/settle</span><span class="route-desc">Marquer réglée (superadmin)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/commissions/settle-batch</span><span class="route-desc">Règlement en masse (superadmin)</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>LOYALTY — Programme Fidélité</h3><span class="count">4</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/loyalty/me</span><span class="route-desc">Mon compte fidélité &amp; solde points</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/loyalty/transactions</span><span class="route-desc">Historique transactions points</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/loyalty/earn</span><span class="route-desc">Gagner points (auto après commande)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/loyalty/redeem</span><span class="route-desc">Convertir points en remise</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>FAVORITES — Produits Favoris</h3><span class="count">4</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/favorites/</span><span class="route-desc">Mes produits favoris</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/favorites/check/:product_id</span><span class="route-desc">Vérifier si favori</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/favorites/:product_id</span><span class="route-desc">Ajouter aux favoris</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/favorites/:product_id</span><span class="route-desc">Supprimer des favoris</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>INVOICES — Factures PDF</h3><span class="count">2</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/invoices/generate/:orderId</span><span class="route-desc">Générer facture PDF (Supabase Storage)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/invoices/:orderId</span><span class="route-desc">Récupérer facture générée</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>REPORTS — Exports</h3><span class="count">3</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/reports/orders.csv</span><span class="route-desc">Export commandes CSV</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/reports/products.csv</span><span class="route-desc">Export ventes produits CSV</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/reports/summary</span><span class="route-desc">Résumé rapport</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>AUDIT — Journal d'Audit</h3><span class="count">2</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/audit/</span><span class="route-desc">Lister activités (superadmin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/audit/:id</span><span class="route-desc">Détail log</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>MAPS — Géolocalisation Google</h3><span class="count">4</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/maps/autocomplete</span><span class="route-desc">Autocomplétion adresse</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/maps/place</span><span class="route-desc">Détails lieu Google Places</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/maps/reverse</span><span class="route-desc">Géocodage inverse (lat/lng → adresse)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/maps/staticmap</span><span class="route-desc">Image statique carte</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>DRIVER-DOCS — KYC Livreurs</h3><span class="count">4</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/driver-docs/list</span><span class="route-desc">Livreurs avec statut KYC (admin)</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/driver-docs/driver/:driver_id</span><span class="route-desc">Détail KYC livreur</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/driver-docs/driver/:driver_id/upload</span><span class="route-desc">Upload document KYC (CNI, permis…)</span></div>
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/driver-docs/driver/:driver_id/review</span><span class="route-desc">Approuver/rejeter KYC</span></div>
+      </div>
+    </div>
+
+    <div class="module-card">
+      <div class="card-header"><h3>DOCUMENTS — Documents Marque</h3><span class="count">4</span></div>
+      <div class="routes">
+        <div class="route-row"><span class="method POST">POST</span><span class="route-path">/documents/upload</span><span class="route-desc">Upload document demande d'accès</span></div>
+        <div class="route-row"><span class="method GET">GET</span><span class="route-path">/documents/:applicationId</span><span class="route-desc">Lister documents demande (superadmin)</span></div>
+        <div class="route-row"><span class="method PATCH">PATCH</span><span class="route-path">/documents/:id/verify</span><span class="route-desc">Vérifier document</span></div>
+        <div class="route-row"><span class="method DELETE">DELETE</span><span class="route-path">/documents/:id</span><span class="route-desc">Supprimer document</span></div>
+      </div>
+    </div>
+
+  </div><!-- end modules-grid -->
+
+
+  <!-- ═══════════════════════════════════════════ ADMIN WEB ═══════════════════════════════════════════ -->
+  <div class="section-header">
+    <span class="badge">Admin Web</span>
+    <h2>Next.js 16 App Router — Pages &amp; Composants</h2>
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><span class="dot dot-done" style="width:10px;height:10px;border-radius:50%;display:inline-block;"></span> Implémenté</div>
+    <div class="legend-item"><span class="dot dot-done" style="width:10px;height:10px;border-radius:50%;display:inline-block;"></span> Statique / UI partielle</div>
+    <div class="legend-item"><span class="dot dot-done" style="width:10px;height:10px;border-radius:50%;display:inline-block;"></span> Pending / à brancher</div>
+  </div>
+
+  <div class="pages-grid">
+
+    <div class="page-group">
+      <h4>Authentification</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(auth)/login</div><div class="desc">Connexion admin (email + OTP email)</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(auth)/apply</div><div class="desc">Formulaire demande d'accès marque</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/superadmin/auth</div><div class="desc">Connexion superadmin</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Dashboard</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/dashboard</div><div class="desc">KPIs, revenus, commandes, graphiques</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Commandes</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/orders</div><div class="desc">Liste commandes + filtres statut</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/orders/global</div><div class="desc">Vue globale commandes (superadmin)</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/collect</div><div class="desc">Gestion click &amp; collect + scan QR</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/delivery</div><div class="desc">Suivi livraisons en cours</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Produits &amp; Catalogue</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/products</div><div class="desc">Liste produits, CRUD, upload images</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Agences</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/branches</div><div class="desc">Liste agences, créer, modifier</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/branches/[id]</div><div class="desc">Détail agence + gestion avancée</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/delivery-zones</div><div class="desc">Gérer zones de livraison par agence</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Livreurs</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/drivers</div><div class="desc">Liste livreurs, créer, PIN</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/drivers/kyc</div><div class="desc">Validation documents KYC livreurs</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Finances</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/wallet</div><div class="desc">Wallet marque, solde, retraits</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/commissions</div><div class="desc">Commissions générées</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Marketing</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/promotions</div><div class="desc">Codes promo &amp; promotions produits</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/ads</div><div class="desc">Créer publicités, payer, suivre impressions</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/reels</div><div class="desc">Uploader et gérer vidéos reels</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/notifications</div><div class="desc">Envoyer notifications push ciblées</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Analytics &amp; Rapports</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/analytics</div><div class="desc">Dashboard analytique détaillé</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/reports</div><div class="desc">Export CSV/PDF commandes &amp; produits</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Paramètres</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/settings</div><div class="desc">Profil, logo marque, infos contact</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/[locale]/(dashboard)/branch-managers</div><div class="desc">Gérer gérants d'agence</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Super Admin</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/superadmin/platform</div><div class="desc">Vue d'ensemble plateforme</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/superadmin/brands</div><div class="desc">Gestion marques (approuver, suspendre)</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/superadmin/applications</div><div class="desc">Demandes d'accès marques en attente</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/superadmin/users</div><div class="desc">Gestion utilisateurs mobiles</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/superadmin/audit</div><div class="desc">Journal d'audit activités</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/superadmin/ads</div><div class="desc">Gestion &amp; approbation publicités</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/superadmin/wallet</div><div class="desc">Wallet plateforme &amp; retraits</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/superadmin/commissions</div><div class="desc">Gestion commissions inter-marques</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Branch Manager (Gérant Agence)</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/branch/login</div><div class="desc">Connexion gérant</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/branch/dashboard</div><div class="desc">Dashboard agence</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/branch/orders</div><div class="desc">Commandes agence + statuts</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/branch/stock</div><div class="desc">Gestion stock produits</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/branch/wallet</div><div class="desc">Wallet agence</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/branch/hours</div><div class="desc">Horaires d'ouverture agence</div></div></div>
+    </div>
+
+    <div class="page-group">
+      <h4>Livreur PWA (Driver App)</h4>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/driver/login</div><div class="desc">Connexion livreur (OTP SMS)</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/driver/deliveries</div><div class="desc">Liste livraisons</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/driver/deliveries/[id]</div><div class="desc">Détail livraison + carte</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/driver/earnings</div><div class="desc">Gains livreur</div></div></div>
+      <div class="page-item"><span class="dot dot-done"></span><div><div class="path">/driver/profile</div><div class="desc">Profil livreur</div></div></div>
+    </div>
+
+  </div><!-- end pages-grid -->
+
+
+  <!-- ═══════════════════════════════════════════ MOBILE ═══════════════════════════════════════════ -->
+  <div class="section-header">
+    <span class="badge">Mobile</span>
+    <h2>Expo 54 + React Native — Écrans &amp; Navigation</h2>
+  </div>
+
+  <div class="screens-grid">
+
+    <div class="screen-group">
+      <h4>Auth Utilisateur</h4>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(auth)/welcome</div><div class="desc">Écran bienvenue + guest mode</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(auth)/login</div><div class="desc">Connexion email ou téléphone</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(auth)/register</div><div class="desc">Inscription</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(auth)/otp</div><div class="desc">Vérification OTP SMS/email</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">onboarding</div><div class="desc">Guide initial 3 slides</div></div></div>
+    </div>
+
+    <div class="screen-group">
+      <h4>Onglet Home (Tab 1)</h4>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(tabs)/index</div><div class="desc">Bannière carousel + catégories + produits</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">reels</div><div class="desc">Fil vertical reels vidéos (TikTok-like)</div></div></div>
+    </div>
+
+    <div class="screen-group">
+      <h4>Onglet Explore (Tab 2)</h4>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(tabs)/explore</div><div class="desc">Grille catégories + recherche produits</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(tabs)/marketplace</div><div class="desc">Marketplace étendue (fusionnée explore)</div></div></div>
+    </div>
+
+    <div class="screen-group">
+      <h4>Onglet Panier (Tab 3)</h4>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(tabs)/cart</div><div class="desc">Panier Zustand + quantités</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">checkout</div><div class="desc">Paiement Campay + adresse + type livraison</div></div></div>
+    </div>
+
+    <div class="screen-group">
+      <h4>Onglet Favoris (Tab 4)</h4>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(tabs)/favorites</div><div class="desc">Produits favoris (auth wall)</div></div></div>
+    </div>
+
+    <div class="screen-group">
+      <h4>Onglet Profil (Tab 5)</h4>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(tabs)/profile</div><div class="desc">Profil + commandes + settings + langue</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">profile/personal</div><div class="desc">Données personnelles</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">profile/addresses</div><div class="desc">Adresses sauvegardées</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">profile/payment</div><div class="desc">Méthodes de paiement</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">profile/loyalty</div><div class="desc">Programme fidélité &amp; points</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">profile/settings</div><div class="desc">Paramètres app, langue, notifs</div></div></div>
+    </div>
+
+    <div class="screen-group">
+      <h4>Détails &amp; Suivi</h4>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">product/[id]</div><div class="desc">Détail produit + variantes + favoris</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">order/[id]</div><div class="desc">Détail commande + statuts</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(tabs)/orders</div><div class="desc">Historique commandes (href:null)</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">tracking/[id]</div><div class="desc">Carte suivi livraison temps réel</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">chat/[id]</div><div class="desc">Messagerie utilisateur-livreur</div></div></div>
+    </div>
+
+    <div class="screen-group">
+      <h4>Livreur Mobile (Driver App)</h4>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(driver)/login</div><div class="desc">Connexion livreur PIN</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(driver)/deliveries</div><div class="desc">Liste livraisons dispo + assignées</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(driver)/delivery/[id]</div><div class="desc">Détail livraison + carte GPS</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(driver)/earnings</div><div class="desc">Gains livreur — total + détail par jour</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(driver)/profile</div><div class="desc">Profil livreur + disponibilité</div></div></div>
+      <div class="screen-item"><span class="dot dot-done"></span><div><div class="path">(driver)/messages</div><div class="desc">Messagerie livreur</div></div></div>
+    </div>
+
+  </div><!-- end screens-grid -->
+
+</main>
+
+<footer>
+  Dash Meal · Inventaire généré le 22 mai 2026 · 36 modules · 350+ endpoints · 40+ pages admin · 25+ écrans mobile
+</footer>
+
+</body>
+</html>
