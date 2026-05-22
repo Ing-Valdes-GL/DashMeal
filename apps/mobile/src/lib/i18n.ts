@@ -164,6 +164,22 @@ const fr = {
     deleteError: "Impossible de supprimer le compte pour l'instant.",
     deleting: "Suppression en cours…",
   },
+  payment: {
+    title: "Paiement par défaut",
+    current: "Paiement actuel",
+    infoText: "Ce numéro sera pré-rempli automatiquement à chaque commande pour vous faire gagner du temps.",
+    numberLabel: "Numéro Mobile Money",
+    operatorLabel: "Opérateur",
+    edit: "Modifier",
+    save: "Enregistrer comme paiement par défaut",
+    update: "Mettre à jour",
+    successTitle: "Succès",
+    successMsg: "Paiement par défaut enregistré.",
+    errorTitle: "Erreur",
+    errorMsg: "Impossible d'enregistrer le paiement.",
+    invalidTitle: "Numéro invalide",
+    invalidMsg: "Entrez un numéro Mobile Money valide.",
+  },
 };
 
 const en: typeof fr = {
@@ -322,6 +338,22 @@ const en: typeof fr = {
     saveError: "Unable to save settings.",
     deleteError: "Unable to delete account at this time.",
     deleting: "Deleting…",
+  },
+  payment: {
+    title: "Default payment",
+    current: "Current payment",
+    infoText: "This number will be pre-filled automatically with each order to save you time.",
+    numberLabel: "Mobile Money number",
+    operatorLabel: "Operator",
+    edit: "Edit",
+    save: "Save as default payment",
+    update: "Update",
+    successTitle: "Success",
+    successMsg: "Default payment saved.",
+    errorTitle: "Error",
+    errorMsg: "Unable to save payment.",
+    invalidTitle: "Invalid number",
+    invalidMsg: "Enter a valid Mobile Money number.",
   },
 };
 

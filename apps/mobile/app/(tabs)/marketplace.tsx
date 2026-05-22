@@ -161,21 +161,24 @@ function TabContent({ tab, products, isLoading }: { tab: MarketTab; products: Pr
 
   if (isLoading) return <ActivityIndicator color={Colors.primary} style={{ marginTop: 40 }} />;
 
-  const displayProducts = products.length > 0
-    ? products
-    : Array.from({ length: 6 }, (_, i) => ({
-        id: `mock-${i}`,
-        name: ["Poulet braisé", "Ndolé", "Pizza", "Jus de fruit", "Pastels", "Beignets"][i],
-        price: [3500, 2500, 5000, 1000, 800, 600][i],
-        original_price: tab === "promos" || tab === "flash" ? [5000, 3500, 7000, 1500, 1200, 1000][i] : undefined,
-        branch: { name: ["Chez Paul", "Saveurs du Pays", "La Bella Napoli", "Fresh Bar", "Street Food", "Tradition"][i] },
-      } as Product));
+  if (products.length === 0) {
+    return (
+      <View style={styles.empty}>
+        <Ionicons name="storefront-outline" size={48} color={Colors.border} />
+        <Text style={styles.emptyTitle}>
+          {tab === "flash" ? "Aucune offre flash en ce moment" :
+           tab === "promos" ? "Aucune promotion disponible" :
+           "Aucun produit disponible"}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
       {tab === "flash" && <FlashTimer />}
       <View style={styles.productsGrid}>
-        {displayProducts.map((p) => (
+        {products.map((p) => (
           <ProductCard
             key={p.id}
             item={p}
@@ -332,4 +335,7 @@ const styles = StyleSheet.create({
   tabLabelActive: { color: Colors.primary },
 
   productsGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: 0 },
+
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingTop: 80 },
+  emptyTitle: { fontSize: 15, fontWeight: "600", color: Colors.text3, textAlign: "center", paddingHorizontal: 32 },
 });

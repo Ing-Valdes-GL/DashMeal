@@ -2,6 +2,30 @@ import type { Request, Response, NextFunction } from "express";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess } from "../../utils/response.js";
+import { env } from "../../config/env.js";
+
+async function sendPushToUser(userId: string, title: string, body: string, data?: Record<string, unknown>) {
+  try {
+    const { data: tokens } = await supabase
+      .from("push_tokens")
+      .select("token, locale")
+      .eq("user_id", userId);
+    if (!tokens || tokens.length === 0) return;
+
+    const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
+    if (env.EXPO_ACCESS_TOKEN) headers["Authorization"] = `Bearer ${env.EXPO_ACCESS_TOKEN}`;
+
+    await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(tokens.map((t: { token: string }) => ({
+        to: t.token, title, body, data: data ?? {}, sound: "default",
+      }))),
+    });
+  } catch {
+    // push est best-effort
+  }
+}
 
 export async function getSlots(req: Request, res: Response, next: NextFunction) {
   try {
@@ -94,7 +118,16 @@ export async function scanQrCode(req: Request, res: Response, next: NextFunction
       note: "Retrait validé par scan QR",
     });
 
-    // TODO: Notifier l'utilisateur
+    // Notifier l'utilisateur que sa commande a été récupérée
+    const userId = order.user_id as string | undefined;
+    if (userId) {
+      void sendPushToUser(
+        userId,
+        "Commande récupérée ✅",
+        "Votre commande a été remise avec succès. Merci !",
+        { order_id: order.id, screen: "order_detail" }
+      );
+    }
 
     sendSuccess(res, {
       order_id: order.id,
