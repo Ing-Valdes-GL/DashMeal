@@ -1,4 +1,5 @@
 import axios, { type AxiosError } from "axios";
+import { toast } from "@/hooks/use-toast";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://hopeful-gentleness-production.up.railway.app/api/v1";
 
@@ -46,8 +47,8 @@ api.interceptors.response.use(
         original.headers!.Authorization = `Bearer ${access_token}`;
         return api(original);
       } catch {
-        // Refresh échoué → déconnexion
         clearAuthCookies();
+        toast.warning("Session expirée", "Veuillez vous reconnecter.");
         window.location.href = `/${getCurrentLocale()}/login`;
       }
     }

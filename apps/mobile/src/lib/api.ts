@@ -35,9 +35,9 @@ api.interceptors.response.use(
         await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
         original.headers.Authorization = `Bearer ${tokens.access_token}`;
         return api(original);
-      } catch {
+      } catch (refreshErr) {
+        console.warn("[api] Refresh token failed — clearing session", refreshErr);
         await clearTokens();
-        // Navigation to login handled by auth store listener
       }
     }
     return Promise.reject(error);

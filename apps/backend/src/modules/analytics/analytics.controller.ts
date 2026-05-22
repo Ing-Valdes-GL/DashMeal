@@ -299,6 +299,8 @@ export async function getBranchStats(req: Request, res: Response, next: NextFunc
 // ─── GET /analytics/platform (superadmin) ────────────────────────────────────
 export async function getPlatformStats(req: Request, res: Response, next: NextFunction) {
   try {
+    const days30ago = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
     const [
       { count: activeBrands },
       { count: suspendedBrands },
@@ -311,6 +313,8 @@ export async function getPlatformStats(req: Request, res: Response, next: NextFu
       { count: pendingApplications },
       { count: approvedApplications },
       { count: rejectedApplications },
+      { data: recentCommissions },
+      { data: brandCommissions },
     ] = await Promise.all([
       supabase.from("brands").select("id", { count: "exact" }).eq("is_active", true),
       supabase.from("brands").select("id", { count: "exact" }).eq("is_active", false),
@@ -323,6 +327,8 @@ export async function getPlatformStats(req: Request, res: Response, next: NextFu
       supabase.from("brand_applications").select("id", { count: "exact" }).eq("status", "pending"),
       supabase.from("brand_applications").select("id", { count: "exact" }).eq("status", "approved"),
       supabase.from("brand_applications").select("id", { count: "exact" }).eq("status", "rejected"),
+      supabase.from("commissions").select("amount, type, created_at").gte("created_at", days30ago),
+      supabase.from("commissions").select("amount, type, brand_id, brands(name)").eq("is_settled", false),
     ]);
 
     const commissions = (commissionsData ?? []) as { amount: number; is_settled: boolean; type: string }[];
@@ -332,6 +338,30 @@ export async function getPlatformStats(req: Request, res: Response, next: NextFu
     const commSettled = commissions.filter(c => c.is_settled).reduce((s, c) => s + c.amount, 0);
     const commPending = commissions.filter(c => !c.is_settled).reduce((s, c) => s + c.amount, 0);
 
+    // GMV par jour sur 30 jours — agréger les commissions par date
+    const gmvDayMap: Record<string, number> = {};
+    for (const c of (recentCommissions ?? []) as { amount: number; type: string; created_at: string }[]) {
+      const day = c.created_at.split("T")[0];
+      const gmv = c.type === "online" ? c.amount / 0.02 : c.amount / 0.015;
+      gmvDayMap[day] = (gmvDayMap[day] ?? 0) + gmv;
+    }
+    const gmv_by_day = Object.entries(gmvDayMap)
+      .map(([date, gmv]) => ({ date, gmv: Math.round(gmv) }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Top marques par volume de commission en attente de règlement
+    const brandMap: Record<string, { name: string; total: number }> = {};
+    for (const c of (brandCommissions ?? []) as { amount: number; brand_id: string; brands: { name: string } | null }[]) {
+      if (!c.brand_id) continue;
+      const name = c.brands?.name ?? c.brand_id;
+      if (!brandMap[c.brand_id]) brandMap[c.brand_id] = { name, total: 0 };
+      brandMap[c.brand_id].total += c.amount;
+    }
+    const top_brands = Object.values(brandMap)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5)
+      .map(b => ({ name: b.name, commission: Math.round(b.total) }));
+
     sendSuccess(res, {
       brands: { total: (activeBrands ?? 0) + (suspendedBrands ?? 0), active: activeBrands ?? 0, suspended: suspendedBrands ?? 0 },
       users: { total: totalUsers ?? 0, verified: verifiedUsers ?? 0 },
@@ -339,8 +369,8 @@ export async function getPlatformStats(req: Request, res: Response, next: NextFu
       revenue: { gmv_total: Math.round(gmvOnline + gmvInperson), gmv_online: Math.round(gmvOnline), gmv_inperson: Math.round(gmvInperson) },
       commissions: { total: Math.round(commTotal), pending: Math.round(commPending), settled: Math.round(commSettled) },
       applications: { pending: pendingApplications ?? 0, approved: approvedApplications ?? 0, rejected: rejectedApplications ?? 0 },
-      gmv_by_day: [],
-      top_brands: [],
+      gmv_by_day,
+      top_brands,
     });
   } catch (err) {
     next(err);

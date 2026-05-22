@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert,
@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Colors, Radius, Shadow } from "@/lib/theme";
+import { useTranslation } from "react-i18next";
 
 type PaymentMethod = "orange_money" | "mtn_mobile_money";
 
@@ -31,6 +32,7 @@ function detectOperator(phone: string): PaymentMethod | null {
 
 export default function PaymentScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user, setUser } = useAuthStore();
 
   const savedPhone  = (user as any)?.default_payment_phone  as string | undefined;
@@ -54,14 +56,14 @@ export default function PaymentScreen() {
       const data = resp?.data ?? resp;
       if (user) setUser({ ...user, default_payment_phone: data.default_payment_phone ?? phone, default_payment_method: data.default_payment_method ?? method } as any);
       setEdited(false);
-      Alert.alert("Succès", "Paiement par défaut enregistré.");
+      Alert.alert(t("payment.successTitle"), t("payment.successMsg"));
     },
-    onError: () => Alert.alert("Erreur", "Impossible d'enregistrer le paiement."),
+    onError: () => Alert.alert(t("payment.errorTitle"), t("payment.errorMsg")),
   });
 
   const handleSave = () => {
     if (phone.trim().length < 8) {
-      Alert.alert("Numéro invalide", "Entrez un numéro Mobile Money valide.");
+      Alert.alert(t("payment.invalidTitle"), t("payment.invalidMsg"));
       return;
     }
     saveMutation.mutate();
@@ -77,7 +79,7 @@ export default function PaymentScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={20} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Paiement par défaut</Text>
+          <Text style={styles.headerTitle}>{t("payment.title")}</Text>
           <View style={{ width: 38 }} />
         </View>
       </SafeAreaView>
@@ -91,7 +93,7 @@ export default function PaymentScreen() {
               <Ionicons name="checkmark-circle" size={22} color={Colors.success} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.savedLabel}>Paiement actuel</Text>
+              <Text style={styles.savedLabel}>{t("payment.current")}</Text>
               <Text style={styles.savedPhone}>{savedPhone}</Text>
               <Text style={styles.savedMethod}>
                 {OPERATORS.find((o) => o.id === savedMethod)?.label ?? savedMethod}
@@ -99,7 +101,7 @@ export default function PaymentScreen() {
             </View>
             <TouchableOpacity style={styles.editBtn} onPress={() => setEdited(true)}>
               <Ionicons name="pencil-outline" size={16} color={Colors.primary} />
-              <Text style={styles.editBtnText}>Modifier</Text>
+              <Text style={styles.editBtnText}>{t("payment.edit")}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -107,14 +109,12 @@ export default function PaymentScreen() {
         {/* Info banner */}
         <View style={styles.infoBanner}>
           <Ionicons name="information-circle-outline" size={18} color="#2196F3" />
-          <Text style={styles.infoText}>
-            Ce numéro sera pré-rempli automatiquement à chaque commande pour vous faire gagner du temps.
-          </Text>
+          <Text style={styles.infoText}>{t("payment.infoText")}</Text>
         </View>
 
         {/* Form */}
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Numéro Mobile Money</Text>
+          <Text style={styles.sectionLabel}>{t("payment.numberLabel")}</Text>
           <View style={styles.phoneRow}>
             <View style={styles.countryCode}>
               <Text style={styles.countryCodeText}>🇨🇲 +237</Text>
@@ -130,7 +130,7 @@ export default function PaymentScreen() {
             />
           </View>
 
-          <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Opérateur</Text>
+          <Text style={[styles.sectionLabel, { marginTop: 16 }]}>{t("payment.operatorLabel")}</Text>
           <View style={styles.operatorsRow}>
             {OPERATORS.map((op) => (
               <TouchableOpacity
@@ -159,7 +159,7 @@ export default function PaymentScreen() {
           {saveMutation.isPending
             ? <ActivityIndicator color="#fff" size="small" />
             : <Text style={styles.saveBtnText}>
-                {hasSaved ? "Mettre à jour" : "Enregistrer comme paiement par défaut"}
+                {hasSaved ? t("payment.update") : t("payment.save")}
               </Text>
           }
         </TouchableOpacity>
