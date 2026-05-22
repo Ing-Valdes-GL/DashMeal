@@ -57,7 +57,7 @@ function normalizeEmail(email: string): string {
 
 export async function sendCodeByEmail(email: string, code: string): Promise<{ emailSent: boolean }> {
   const normalizedEmail = normalizeEmail(email);
-  console.log(`[OTP][EMAIL] ${normalizedEmail}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
+  if (env.OTP_LOG_CODES) console.log(`[OTP][EMAIL] ${normalizedEmail}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
 
   const expiresAt = new Date(Date.now() + OTP_EXPIRES_IN_MINUTES * 60 * 1000);
   await supabase.from("otps").delete().eq("email", normalizedEmail);
