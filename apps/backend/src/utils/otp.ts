@@ -32,11 +32,11 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
     { onConflict: "phone" }
   );
 
-  console.log(`[OTP][SMS] ${normalized}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
+  if (env.OTP_LOG_CODES) console.log(`[OTP][SMS] ${normalized}: ${code} (expires in ${OTP_EXPIRES_IN_MINUTES} min)`);
 
   if (!env.AT_API_KEY || !env.AT_USERNAME) {
     console.warn("⚠️  AT_API_KEY / AT_USERNAME manquants — SMS non envoyé");
-    console.log(`[OTP] Code pour ***${normalized.slice(-4)} : ${code}`);
+    if (env.OTP_LOG_CODES) console.log(`[OTP] Code pour ***${normalized.slice(-4)} : ${code}`);
     return { code, smsSent: false };
   }
 
@@ -65,7 +65,7 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
     const recipient = result.SMSMessageData?.Recipients?.[0];
     if (!response.ok || !recipient || recipient.statusCode !== 101) {
       console.error(`❌ Échec SMS Africa's Talking (${response.status}): ${JSON.stringify(result)}`);
-      console.log(`[OTP] Code pour ***${normalized.slice(-4)} : ${code}`);
+      if (env.OTP_LOG_CODES) console.log(`[OTP] Code pour ***${normalized.slice(-4)} : ${code}`);
       return { code, smsSent: false };
     }
 
@@ -73,7 +73,7 @@ export async function sendOtp(phone: string): Promise<{ code: string; smsSent: b
     return { code, smsSent: true };
   } catch (err) {
     console.error("❌ Erreur réseau SMS Africa's Talking:", err);
-    console.log(`[OTP] Code pour ***${normalized.slice(-4)} : ${code}`);
+    if (env.OTP_LOG_CODES) console.log(`[OTP] Code pour ***${normalized.slice(-4)} : ${code}`);
     return { code, smsSent: false };
   }
 }

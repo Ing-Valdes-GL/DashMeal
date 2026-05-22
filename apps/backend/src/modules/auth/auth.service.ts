@@ -17,34 +17,41 @@ import type {
 
 export async function registerUser(input: RegisterUserInput) {
   const { name, phone, password, email } = input;
-
-  // Bloquer si le numéro est déjà un compte vérifié
-  const { data: existing } = await supabase
+  // Ne jamais garder/creer un user non verifie avant OTP confirme
+  const { data: existingByPhone } = await supabase
     .from("users")
-    .select("id")
+    .select("id, is_verified")
     .eq("phone", phone)
-    .single();
+    .maybeSingle();
 
-  if (existing) {
+  if (existingByPhone?.is_verified) {
     throw new AppError(409, "PHONE_ALREADY_EXISTS", "Ce numéro est déjà utilisé");
+  }
+  if (existingByPhone && !existingByPhone.is_verified) {
+    await supabase.from("users").delete().eq("id", existingByPhone.id);
   }
 
   if (email) {
+    const normalizedEmail = email.trim().toLowerCase();
     const { data: existingEmail } = await supabase
       .from("users")
-      .select("id")
-      .eq("email", email)
-      .single();
-    if (existingEmail) {
+      .select("id, is_verified")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+    if (existingEmail?.is_verified) {
       throw new AppError(409, "EMAIL_ALREADY_EXISTS", "Cet email est déjà utilisé");
+    }
+    if (existingEmail && !existingEmail.is_verified) {
+      await supabase.from("users").delete().eq("id", existingEmail.id);
     }
   }
 
   const password_hash = await bcrypt.hash(password, 12);
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-  // Stocker temporairement — aucun compte créé avant la vérification OTP
-  const { error: pendingErr } = await supabase.from("pending_registrations").upsert({
+  // Stocker temporairement � aucun compte cree dans users avant verification OTP
+  await supabase.from("pending_registrations").delete().eq("phone", phone);
+  const { error: pendingErr } = await supabase.from("pending_registrations").insert({
     phone,
     name,
     email: email ?? null,
@@ -53,6 +60,7 @@ export async function registerUser(input: RegisterUserInput) {
   });
 
   if (pendingErr) {
+    console.error("[registerUser] pending_registrations insert failed:", pendingErr);
     throw new AppError(500, "REGISTRATION_ERROR", "Échec de l'inscription temporaire");
   }
 
@@ -172,12 +180,11 @@ export async function resendUserEmailOtp(email: string) {
     throw new AppError(404, "REGISTRATION_NOT_FOUND", "Aucune inscription en attente pour cet email");
   }
 
-  const { code } = await sendOtp(pending.phone);
-  await sendCodeByEmail(normalizedEmail, code);
+  const { emailSent, code } = await sendEmailOtp(normalizedEmail);
 
   return {
     message: "Code OTP renvoyé",
-    ...(env.OTP_EXPOSE_CODE ? { otp_code: code } : {}),
+    ...(env.OTP_EXPOSE_CODE || !emailSent ? { otp_code: code } : {}),
   };
 }
 
@@ -185,7 +192,7 @@ export async function loginUser(input: { identifier?: string; email?: string; ph
   const { password } = input;
   const rawIdentifier = input.identifier ?? input.email ?? input.phone;
   if (!rawIdentifier) {
-    throw new AppError(400, "MISSING_IDENTIFIER", "Email ou numÃ©ro requis");
+    throw new AppError(400, "MISSING_IDENTIFIER", "Email ou numéro requis");
   }
 
   const identifier = rawIdentifier.trim();
@@ -710,3 +717,5 @@ function buildTokensFromRole(user: Record<string, unknown>, role: string): AuthT
     expires_in: 15 * 60,
   };
 }
+
+
