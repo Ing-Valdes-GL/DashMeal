@@ -351,7 +351,7 @@ export async function getPlatformStats(req: Request, res: Response, next: NextFu
 
     // Top marques par volume de commission en attente de règlement
     const brandMap: Record<string, { name: string; total: number }> = {};
-    for (const c of (brandCommissions ?? []) as { amount: number; brand_id: string; brands: { name: string } | null }[]) {
+    for (const c of (brandCommissions ?? []) as unknown as { amount: number; brand_id: string; brands: { name: string } | null }[]) {
       if (!c.brand_id) continue;
       const name = c.brands?.name ?? c.brand_id;
       if (!brandMap[c.brand_id]) brandMap[c.brand_id] = { name, total: 0 };
