@@ -87,6 +87,7 @@ router.post(
 );
 
 // ─── Mobile ───────────────────────────────────────────────────────────────────
+router.get("/public/active",   controller.getPublicActiveAds);
 router.get("/user/active",     authenticate, controller.getAdForUser);
 router.post("/:id/impression", authenticate, controller.recordImpression);
 
