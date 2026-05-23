@@ -22,8 +22,11 @@ const UpdateProfileSchema = z.object({
 });
 
 const ChangePasswordSchema = z.object({
-  current_password: z.string().min(1),
+  method: z.enum(["current", "email", "sms"]).default("current"),
+  current_password: z.string().min(1).optional(),
   new_password: z.string().min(8).max(100),
+  contact: z.string().optional(),
+  otp: z.string().length(6).optional(),
 });
 
 const SavedAddressSchema = z.object({
