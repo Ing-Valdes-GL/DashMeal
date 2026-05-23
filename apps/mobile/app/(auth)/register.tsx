@@ -21,8 +21,8 @@ function AuthDecoration() {
 const deco = StyleSheet.create({
   wrap:   { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   circle: { position: "absolute", borderRadius: 999, borderWidth: 1 },
-  c1:     { width: 300, height: 300, top: -120, right: -80, backgroundColor: "rgba(255,122,47,0.06)", borderColor: "rgba(255,122,47,0.1)" },
-  c2:     { width: 180, height: 180, top: 60,   right: -50, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.05)" },
+  c1:     { width: 300, height: 300, top: -120, right: -80, backgroundColor: "rgba(83,177,117,0.06)", borderColor: "rgba(83,177,117,0.12)" },
+  c2:     { width: 180, height: 180, top: 60,   right: -50, backgroundColor: "transparent", borderColor: "rgba(83,177,117,0.08)" },
 });
 
 export default function RegisterScreen() {
@@ -84,7 +84,7 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <AuthDecoration />
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
@@ -275,53 +275,55 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.darkBg },
+  container: { flex: 1, backgroundColor: Colors.bg },
   scroll:    { flexGrow: 1, padding: 24, paddingTop: 52 },
 
   backBtn: {
     width: 40, height: 40, borderRadius: Radius.full,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: Colors.pageBg,
+    borderWidth: 1, borderColor: Colors.border,
     alignItems: "center", justifyContent: "center", marginBottom: 24,
   },
-  title:    { fontSize: 26, fontWeight: "800", color: "#fff", marginBottom: 6 },
-  subtitle: { fontSize: 14, color: Colors.textDark2, marginBottom: 24 },
+  title:    { fontSize: 26, fontWeight: "800", color: Colors.text, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: Colors.text2, marginBottom: 24 },
 
   // Social
   socialRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
   socialBtn: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     height: 46, borderRadius: Radius.md,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: Colors.card,
+    borderWidth: 1, borderColor: Colors.border,
   },
-  socialIcon: { fontSize: 18, fontWeight: "800", color: "#fff" },
-  socialText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  socialIcon: { fontSize: 18, fontWeight: "800", color: Colors.text },
+  socialText: { color: Colors.text, fontSize: 14, fontWeight: "600" },
 
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 20 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.1)" },
-  dividerText: { color: Colors.textDark2, fontSize: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dividerText: { color: Colors.text2, fontSize: 12 },
 
   // Form
   form:    { gap: 2 },
   nameRow: { flexDirection: "row", gap: 12 },
-  label:   { fontSize: 11, fontWeight: "600", color: Colors.textDark2, letterSpacing: 0.8, marginBottom: 8 },
+  label:   { fontSize: 11, fontWeight: "600", color: Colors.text2, letterSpacing: 0.8, marginBottom: 8 },
   required: { color: Colors.primary },
   optional: { color: Colors.text3, fontWeight: "400", fontSize: 10, letterSpacing: 0 },
   inputWrap: {
     flexDirection: "row", alignItems: "center",
-    backgroundColor: Colors.darkInput, borderRadius: Radius.md,
+    backgroundColor: Colors.inputBg, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.border,
     paddingHorizontal: 14, height: 50,
   },
   icon:  { marginRight: 10 },
-  input: { flex: 1, color: "#fff", fontSize: 15 },
+  input: { flex: 1, color: Colors.text, fontSize: 15 },
 
   // Password strength
   strengthRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
   strengthBar: {
     flex: 1, height: 4, borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: Colors.border,
   },
-  strengthLabel: { fontSize: 11, color: Colors.textDark2, minWidth: 36 },
+  strengthLabel: { fontSize: 11, color: Colors.text2, minWidth: 36 },
 
   // Checkbox
   checkboxRow: {
@@ -330,15 +332,15 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     width: 20, height: 20, borderRadius: 6,
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.pageBg,
     alignItems: "center", justifyContent: "center", marginTop: 1,
   },
   checkboxChecked: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  checkboxText: { flex: 1, fontSize: 13, color: Colors.textDark2, lineHeight: 19 },
+  checkboxText: { flex: 1, fontSize: 13, color: Colors.text2, lineHeight: 19 },
   link: { color: Colors.primary, textDecorationLine: "underline" },
 
-  error: { color: "#FF6B6B", fontSize: 13, textAlign: "center", marginTop: 8 },
+  error: { color: "#EF4444", fontSize: 13, textAlign: "center", marginTop: 8 },
 
   btn: {
     height: 52, borderRadius: Radius.full,
@@ -350,6 +352,6 @@ const styles = StyleSheet.create({
   btnText: { color: "#fff", fontWeight: "700", fontSize: 15, letterSpacing: 1 },
 
   loginRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 20, marginBottom: 16 },
-  loginText: { color: Colors.textDark2, fontSize: 14 },
+  loginText: { color: Colors.text2, fontSize: 14 },
   loginLink: { color: Colors.primary, fontWeight: "700", fontSize: 14 },
 });
