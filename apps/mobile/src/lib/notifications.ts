@@ -54,11 +54,18 @@ export async function registerForPushNotifications(): Promise<string | null> {
     console.warn("[Push] projectId manquant dans app.json (eas.projectId) — token ne sera pas lié au bon projet");
   }
 
-  const tokenData = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined
-  );
-  const token = tokenData.data;
-  console.log("[Push] Token obtenu:", token);
+  let token: string;
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
+    token = tokenData.data;
+    console.log("[Push] Token obtenu:", token);
+  } catch (err) {
+    // Expo Go ne supporte pas getExpoPushTokenAsync sans development build
+    console.warn("[Push] Token non disponible (Expo Go ou projectId manquant):", err);
+    return null;
+  }
 
   // Enregistrer côté backend
   try {
@@ -93,10 +100,16 @@ export async function registerDriverPushToken(): Promise<void> {
   if (finalStatus !== "granted") return;
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-  const tokenData = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined
-  );
-  const token = tokenData.data;
+  let token: string;
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
+    token = tokenData.data;
+  } catch {
+    console.warn("[Push] Token livreur non disponible (Expo Go)");
+    return;
+  }
 
   try {
     await apiPost("/delivery/push-token", { token });
