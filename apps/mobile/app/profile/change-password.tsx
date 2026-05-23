@@ -70,8 +70,8 @@ export default function ChangePasswordScreen() {
 
   const sendOtpMutation = useMutation({
     mutationFn: () => {
-      if (method === "email") return apiPost("/auth/user/send-email-otp", { email: contact });
-      return apiPost("/auth/user/send-otp", { phone: contact });
+      if (method === "email") return apiPost("/auth/user/resend-email-otp", { email: contact });
+      return apiPost("/auth/user/request-reset", { phone: contact });
     },
     onSuccess: () => { setStep(2); startCountdown(); },
     onError: () => Alert.alert(t("common.error"), t("changePassword.errorGeneric")),
