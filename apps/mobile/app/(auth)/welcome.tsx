@@ -20,22 +20,13 @@ export default function WelcomeScreen() {
   const { continueAsGuest } = useAuthStore();
 
   // ── Animation du logo (flottement vertical doux) ──────────────────────────
-  const floatY     = useSharedValue(0);
-  const shadowScale = useSharedValue(1);
+  const floatY = useSharedValue(0);
 
   useEffect(() => {
     floatY.value = withRepeat(
       withSequence(
-        withTiming(-14, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(-10, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
         withTiming(0,   { duration: 1800, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1, // infini
-      false,
-    );
-    shadowScale.value = withRepeat(
-      withSequence(
-        withTiming(0.7, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
-        withTiming(1.0, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
       ),
       -1,
       false,
@@ -46,10 +37,6 @@ export default function WelcomeScreen() {
     transform: [{ translateY: floatY.value }],
   }));
 
-  const shadowStyle = useAnimatedStyle(() => ({
-    transform: [{ scaleX: shadowScale.value }],
-    opacity: shadowScale.value * 0.35,
-  }));
 
   return (
     <View style={s.root}>
@@ -71,8 +58,8 @@ export default function WelcomeScreen() {
       />
 
       <SafeAreaView style={s.safe} edges={["top"]}>
-        {/* ── Logo flottant ─────────────────────────────────────────────── */}
-        <View style={s.heroArea}>
+        {/* ── Logo haut droite ──────────────────────────────────────────── */}
+        <View style={s.topBar}>
           <Animated.View style={[s.logoWrap, logoStyle]}>
             <Image
               source={require("../../assets/logo2.png")}
@@ -80,9 +67,6 @@ export default function WelcomeScreen() {
               contentFit="contain"
             />
           </Animated.View>
-
-          {/* Ombre portée qui pulse avec le logo */}
-          <Animated.View style={[s.logoShadow, shadowStyle]} />
         </View>
       </SafeAreaView>
 
@@ -124,37 +108,26 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#111" },
   safe: { flex: 1 },
 
-  heroArea: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 40,
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
 
   logoWrap: {
-    width: 130,
-    height: 130,
-    borderRadius: 32,
+    width: 64,
+    height: 64,
+    borderRadius: 18,
     overflow: "hidden",
-    // Ombre iOS
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    // Elevation Android
-    elevation: 18,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
     backgroundColor: "#fff",
   },
-  logo: { width: 130, height: 130 },
-
-  // Ellipse sombre sous le logo qui "pulse"
-  logoShadow: {
-    width: 100,
-    height: 14,
-    borderRadius: 50,
-    backgroundColor: "#000",
-    marginTop: 8,
-  },
+  logo: { width: 64, height: 64 },
 
   sheet: {
     backgroundColor: "#fff",
