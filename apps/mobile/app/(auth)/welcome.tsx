@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Image } from "expo-image";
@@ -12,10 +12,8 @@ import Animated, {
 import { useAuthStore } from "@/stores/auth";
 import { Colors, Radius } from "@/lib/theme";
 
-const { width: W, height: H } = Dimensions.get("window");
-
-const BG_IMAGE =
-  "https://www.rollsrapides.com/wp-content/uploads/2023/02/erreur-mise-en-rayon.jpg";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const BG_IMAGE = require("../../assets/welcome-bg.jpg") as number;
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -59,7 +57,7 @@ export default function WelcomeScreen() {
 
       {/* ── Image de fond plein écran ──────────────────────────────────────── */}
       <Image
-        source={{ uri: BG_IMAGE }}
+        source={BG_IMAGE}
         style={StyleSheet.absoluteFill}
         contentFit="cover"
         transition={600}
