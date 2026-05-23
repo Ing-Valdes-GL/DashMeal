@@ -323,3 +323,72 @@ export async function deleteCategory(req: Request, res: Response, next: NextFunc
     next(err);
   }
 }
+
+// ─── Public mobile : liste des produits visibles ──────────────────────────────
+export async function listPublicProducts(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { promo, flash, limit = "12", category, branch_id, search } = req.query as Record<string, string>;
+
+    let query = supabase
+      .from("products")
+      .select(`
+        id, name, name_fr, name_en, price, original_price, image_url,
+        discount_pct, unit, is_hidden,
+        branches!inner ( id, name, category, is_active ),
+        product_images ( url, is_primary )
+      `)
+      .eq("is_hidden", false)
+      .eq("branches.is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(Number(limit));
+
+    if (promo === "true") query = query.not("original_price", "is", null);
+    if (flash === "true") query = query.eq("is_flash", true);
+    if (branch_id)        query = query.eq("branch_id", branch_id);
+    if (category)         query = query.eq("branches.category", category);
+    if (search)           query = query.ilike("name", `%${search}%`);
+
+    const { data, error } = await query;
+    if (error) throw new AppError(500, "FETCH_ERROR", error.message);
+    sendSuccess(res, data ?? []);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Public mobile : top 5 produits les plus vendus par catégorie ─────────────
+export async function listBestSellers(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { category, limit = "5" } = req.query as Record<string, string>;
+
+    // Jointure order_items → products → branches pour compter les ventes
+    const { data, error } = await supabase.rpc("get_best_sellers", {
+      p_category: category ?? null,
+      p_limit: Number(limit),
+    });
+
+    if (error) {
+      // Fallback si la RPC n'existe pas encore : retourne les produits récents
+      let q = supabase
+        .from("products")
+        .select(`
+          id, name, name_fr, name_en, price, original_price, image_url,
+          unit, is_hidden,
+          branches!inner ( id, name, category, is_active ),
+          product_images ( url, is_primary )
+        `)
+        .eq("is_hidden", false)
+        .eq("branches.is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(Number(limit));
+
+      if (category) q = q.eq("branches.category", category);
+      const { data: fallback } = await q;
+      return sendSuccess(res, fallback ?? []);
+    }
+
+    sendSuccess(res, data ?? []);
+  } catch (err) {
+    next(err);
+  }
+}
