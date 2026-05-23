@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList,
-  ActivityIndicator, RefreshControl, Dimensions,
+  ActivityIndicator, RefreshControl, Dimensions, Platform,
 } from "react-native";
+import { Video, ResizeMode } from "expo-av";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -22,8 +23,13 @@ const { width: W } = Dimensions.get("window");
 interface Product {
   id: string; name: string; name_fr?: string; name_en?: string;
   price: number; original_price?: number; image_url?: string;
-  discount_pct?: number; branch?: { name: string }; unit?: string;
+  discount_pct?: number; branch?: { name: string; category?: string }; unit?: string;
   product_images?: { url: string; is_primary: boolean }[];
+}
+
+interface Ad {
+  id: string; title: string; image_url?: string; video_url?: string;
+  cta_url?: string; brand_id?: string;
 }
 
 interface Notification { id: string; is_read: boolean; }
@@ -209,6 +215,37 @@ function ProductListSkeleton() {
 
 const CARD_W = (W - 48) / 2; // 16 padding × 2 + 16 gap
 
+// ─── Composant publicité (image ou vidéo) ────────────────────────────────────
+function AdCard({ ad }: { ad: Ad }) {
+  const AW = W - 64; // ~311px sur iPhone 375
+  if (ad.video_url) {
+    return (
+      <View style={[adS.wrap, { width: AW }]}>
+        <Video
+          source={{ uri: ad.video_url }}
+          style={adS.media}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay
+          isLooping
+          isMuted
+        />
+        {ad.title && <View style={adS.overlay}><Text style={adS.title} numberOfLines={2}>{ad.title}</Text></View>}
+      </View>
+    );
+  }
+  return (
+    <View style={[adS.wrap, { width: AW }]}>
+      {ad.image_url
+        ? <Image source={{ uri: ad.image_url }} style={adS.media} contentFit="cover" transition={300} />
+        : <View style={[adS.media, { backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center" }]}>
+            <Ionicons name="megaphone-outline" size={40} color={Colors.primary} />
+          </View>
+      }
+      {ad.title && <View style={adS.overlay}><Text style={adS.title} numberOfLines={2}>{ad.title}</Text></View>}
+    </View>
+  );
+}
+
 // ─── Composant catégorie ──────────────────────────────────────────────────────
 function CategoryCard({ item, onPress }: { item: typeof CATEGORIES[0]; onPress: () => void }) {
   return (
@@ -236,17 +273,19 @@ export default function HomeScreen() {
 
   const { locationLabel, loading: locLoading } = useCurrentLocation();
 
-  // Produits promo
-  const { data: promoRes, isLoading: l1, refetch, isRefetching } = useQuery<{ data: Product[] }>({
-    queryKey: ["home-promo"],
-    queryFn: () => apiGet("/products/public", { promo: true, limit: 8 }),
+  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0].key);
+
+  // Publicités actives
+  const { data: adsRes, isLoading: lAds, refetch, isRefetching } = useQuery<{ data: Ad[] }>({
+    queryKey: ["home-ads"],
+    queryFn: () => apiGet("/ads/public/active"),
     staleTime: 120_000,
   });
 
-  // Produits featured
-  const { data: featRes, isLoading: l2 } = useQuery<{ data: Product[] }>({
-    queryKey: ["home-featured"],
-    queryFn: () => apiGet("/products/public", { limit: 8 }),
+  // Best sellers par catégorie
+  const { data: bsRes, isLoading: lBs } = useQuery<{ data: Product[] }>({
+    queryKey: ["home-best-sellers", activeCategory],
+    queryFn: () => apiGet("/products/public/best-sellers", { category: activeCategory, limit: 5 }),
     staleTime: 120_000,
   });
 
@@ -258,10 +297,9 @@ export default function HomeScreen() {
     staleTime: 60_000,
   });
 
-  const unreadCount = (notifRes?.data ?? []).filter((n) => !n.is_read).length;
-
-  const promo    = promoRes?.data ?? [];
-  const featured = featRes?.data ?? [];
+  const unreadCount  = (notifRes?.data ?? []).filter((n) => !n.is_read).length;
+  const ads          = adsRes?.data ?? [];
+  const bestSellers  = bsRes?.data ?? [];
 
   const handleAdd = useCallback((p: Product) => addItem({
     product_id: p.id,
@@ -331,35 +369,48 @@ export default function HomeScreen() {
           <BannerCarousel />
         </View>
 
-        {/* Exclusive Offer */}
-        <Section title="Exclusive Offer" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
-          {l1 ? <ProductListSkeleton /> : promo.length === 0 ? null : (
-            <FlatList
-              horizontal data={promo} keyExtractor={(i) => i.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
-              renderItem={({ item }) => (
-                <View style={{ width: 160 }}>
-                  <ProductCard
-                    item={item} lang={lang}
-                    onPress={() => router.push({ pathname: "/product/[id]", params: { id: item.id } })}
-                    onAdd={() => handleAdd(item)}
-                  />
-                </View>
-              )}
-            />
-          )}
-        </Section>
+        {/* ── Exclusive Offer : publicités actives ──────────────────────── */}
+        {(lAds || ads.length > 0) && (
+          <Section title="Exclusive Offer" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
+            {lAds ? <ProductListSkeleton /> : (
+              <FlatList
+                horizontal data={ads} keyExtractor={(i) => i.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
+                renderItem={({ item }) => <AdCard ad={item} />}
+              />
+            )}
+          </Section>
+        )}
 
-        {/* Best Selling */}
+        {/* ── Best Selling : top 5 par catégorie ───────────────────────── */}
         <Section title="Best Selling" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
-          {l2 ? <ProductListSkeleton /> : featured.length === 0 ? (
+          {/* Onglets catégorie */}
+          <ScrollView
+            horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}
+          >
+            {CATEGORIES.map((c) => (
+              <TouchableOpacity
+                key={c.key}
+                style={[bs.tab, activeCategory === c.key && bs.tabActive]}
+                onPress={() => setActiveCategory(c.key)}
+                activeOpacity={0.8}
+              >
+                <Text style={[bs.tabText, activeCategory === c.key && bs.tabTextActive]}>
+                  {c.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {lBs ? <ProductListSkeleton /> : bestSellers.length === 0 ? (
             <View style={s.emptySection}>
               <Text style={s.emptySectionText}>Aucun produit disponible</Text>
             </View>
           ) : (
             <FlatList
-              horizontal data={featured} keyExtractor={(i) => i.id}
+              horizontal data={bestSellers} keyExtractor={(i) => i.id}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
               renderItem={({ item }) => (
@@ -484,6 +535,32 @@ const bn = StyleSheet.create({
   dots:       { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 10 },
   dot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.border },
   dotActive:  { width: 24, borderRadius: 4, backgroundColor: Colors.primary },
+});
+
+const adS = StyleSheet.create({
+  wrap:    {
+    height: 160, borderRadius: Radius.lg, overflow: "hidden",
+    backgroundColor: Colors.pageBg,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+  },
+  media:   { width: "100%", height: "100%" },
+  overlay: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: "rgba(0,0,0,0.45)", paddingHorizontal: 12, paddingVertical: 8,
+  },
+  title:   { color: "#fff", fontSize: 13, fontWeight: "700" },
+});
+
+const bs = StyleSheet.create({
+  tab: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.card,
+  },
+  tabActive:     { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  tabText:       { fontSize: 13, fontWeight: "600", color: Colors.text2 },
+  tabTextActive: { color: "#fff" },
 });
 
 const cat = StyleSheet.create({
