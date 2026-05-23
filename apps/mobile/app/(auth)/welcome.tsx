@@ -1,50 +1,99 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  useSharedValue, useAnimatedStyle,
+  withRepeat, withTiming, withSequence, Easing,
+} from "react-native-reanimated";
 import { useAuthStore } from "@/stores/auth";
 import { Colors, Radius } from "@/lib/theme";
+
+const { width: W, height: H } = Dimensions.get("window");
+
+const BG_IMAGE =
+  "https://images.unsplash.com/photo-1534723328310-e82dad3ee43f?w=900&q=90";
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const { continueAsGuest } = useAuthStore();
 
+  // ── Animation du logo (flottement vertical doux) ──────────────────────────
+  const floatY     = useSharedValue(0);
+  const shadowScale = useSharedValue(1);
+
+  useEffect(() => {
+    floatY.value = withRepeat(
+      withSequence(
+        withTiming(-14, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0,   { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1, // infini
+      false,
+    );
+    shadowScale.value = withRepeat(
+      withSequence(
+        withTiming(0.7, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1.0, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    );
+  }, []);
+
+  const logoStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatY.value }],
+  }));
+
+  const shadowStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: shadowScale.value }],
+    opacity: shadowScale.value * 0.35,
+  }));
+
   return (
-    <View style={s.container}>
-      <StatusBar style="dark" />
+    <View style={s.root}>
+      <StatusBar style="light" />
 
-      {/* Green hero */}
-      <View style={s.hero}>
-        <View style={s.logoWrap}>
-          <Image
-            source={require("../../assets/logo.png")}
-            style={s.logo}
-            resizeMode="contain"
-          />
+      {/* ── Image de fond plein écran ──────────────────────────────────────── */}
+      <Image
+        source={{ uri: BG_IMAGE }}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        transition={600}
+      />
+
+      {/* ── Dégradé sombre sur l'image (du haut vers le bas) ─────────────── */}
+      <LinearGradient
+        colors={["rgba(0,0,0,0.18)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.82)"]}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <SafeAreaView style={s.safe} edges={["top"]}>
+        {/* ── Logo flottant ─────────────────────────────────────────────── */}
+        <View style={s.heroArea}>
+          <Animated.View style={[s.logoWrap, logoStyle]}>
+            <Image
+              source={require("../../assets/logo2.png")}
+              style={s.logo}
+              contentFit="contain"
+            />
+          </Animated.View>
+
+          {/* Ombre portée qui pulse avec le logo */}
+          <Animated.View style={[s.logoShadow, shadowStyle]} />
         </View>
-        <Text style={s.brand}>Dash Meal</Text>
-        <Text style={s.tagline}>Vos courses, livrées en un clin d'œil</Text>
+      </SafeAreaView>
 
-        {/* Illustration */}
-        <View style={s.illustrationWrap}>
-          <View style={s.illustrationCircle}>
-            <Ionicons name="basket-outline" size={80} color="#fff" />
-          </View>
-          <View style={[s.floatCard, s.floatCard1]}>
-            <Ionicons name="bicycle-outline" size={14} color={Colors.primary} />
-            <Text style={s.floatText}>Livraison rapide</Text>
-          </View>
-          <View style={[s.floatCard, s.floatCard2]}>
-            <Ionicons name="star" size={14} color="#FFC107" />
-            <Text style={s.floatText}>4.9 / 5 clients</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* CTA sheet */}
+      {/* ── Feuille CTA en bas ────────────────────────────────────────────── */}
       <View style={s.sheet}>
         <Text style={s.sheetTitle}>Bienvenue !</Text>
-        <Text style={s.sheetSub}>La meilleure nourriture de votre région, livrée en un instant.</Text>
+        <Text style={s.sheetSub}>
+          La meilleure nourriture de votre région, livrée en un instant.
+        </Text>
 
         <TouchableOpacity
           style={s.btnPrimary}
@@ -74,49 +123,60 @@ export default function WelcomeScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.primary },
+  root: { flex: 1, backgroundColor: "#111" },
+  safe: { flex: 1 },
 
-  hero: {
-    flex: 1, alignItems: "center", justifyContent: "center",
-    paddingTop: 60, paddingHorizontal: 24,
+  heroArea: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 40,
   },
+
   logoWrap: {
-    width: 72, height: 72, borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    alignItems: "center", justifyContent: "center", marginBottom: 12,
+    width: 130,
+    height: 130,
+    borderRadius: 32,
+    overflow: "hidden",
+    // Ombre iOS
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.45,
+    shadowRadius: 24,
+    // Elevation Android
+    elevation: 18,
+    backgroundColor: "#fff",
   },
-  logo: { width: 52, height: 52 },
-  brand: { fontSize: 28, fontWeight: "800", color: "#fff", marginBottom: 4 },
-  tagline: { fontSize: 14, color: "rgba(255,255,255,0.75)", marginBottom: 28 },
+  logo: { width: 130, height: 130 },
 
-  illustrationWrap: { position: "relative", alignItems: "center" },
-  illustrationCircle: {
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    alignItems: "center", justifyContent: "center",
+  // Ellipse sombre sous le logo qui "pulse"
+  logoShadow: {
+    width: 100,
+    height: 14,
+    borderRadius: 50,
+    backgroundColor: "#000",
+    marginTop: 8,
   },
-  floatCard: {
-    position: "absolute", flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "#fff", borderRadius: Radius.full,
-    paddingHorizontal: 12, paddingVertical: 8,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
-  },
-  floatCard1: { top: 10, right: -30 },
-  floatCard2: { bottom: 10, left: -30 },
-  floatText: { fontSize: 11, fontWeight: "700", color: Colors.text },
 
   sheet: {
-    backgroundColor: Colors.bg,
-    borderTopLeftRadius: 36, borderTopRightRadius: 36,
-    padding: 28, paddingBottom: 44,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    padding: 28,
+    paddingBottom: 48,
   },
   sheetTitle: { fontSize: 26, fontWeight: "800", color: Colors.text, marginBottom: 6 },
-  sheetSub: { fontSize: 14, color: Colors.text2, lineHeight: 22, marginBottom: 24 },
+  sheetSub:   { fontSize: 14, color: Colors.text2, lineHeight: 22, marginBottom: 28 },
 
   btnPrimary: {
-    height: 67, borderRadius: Radius.full, backgroundColor: Colors.primary,
+    height: 67, borderRadius: Radius.full,
+    backgroundColor: Colors.primary,
     alignItems: "center", justifyContent: "center", marginBottom: 14,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 6,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
   },
   btnPrimaryText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 
