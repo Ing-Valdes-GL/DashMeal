@@ -27,16 +27,19 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from "react-i18next";
 import { apiGet, apiDelete, apiPatch } from "@/lib/api";
 import { Colors, Radius, Shadow } from "@/lib/theme";
-import { setLanguage } from "@/lib/i18n";
+import { setLanguage, SUPPORTED_LANGUAGES } from "@/lib/i18n";
 import i18n from "@/lib/i18n";
 import { useAuthStore } from "@/stores/auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type SupportedLang = (typeof SUPPORTED_LANGUAGES)[number]["code"];
+
 interface UserSettings {
-  language: "fr" | "en";
+  language: SupportedLang;
   notifications_orders: boolean;
   notifications_promos: boolean;
 }
@@ -155,6 +158,7 @@ const rowStyles = StyleSheet.create({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function SettingsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { logout } = useAuthStore();
   const queryClient = useQueryClient();
@@ -171,8 +175,8 @@ export default function SettingsScreen() {
   // Local state (mirrors remote, tracks dirty changes)
   const [notifOrders, setNotifOrders] = useState(true);
   const [notifPromos, setNotifPromos] = useState(true);
-  const [currentLang, setCurrentLang] = useState<"fr" | "en">(
-    (i18n.language as "fr" | "en") ?? "fr"
+  const [currentLang, setCurrentLang] = useState<SupportedLang>(
+    (i18n.language as SupportedLang) ?? "fr"
   );
   const [dirty, setDirty] = useState(false);
 
@@ -195,9 +199,9 @@ export default function SettingsScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["user-settings"] });
       setDirty(false);
-      Alert.alert("Succès", "Paramètres de notification enregistrés.");
+      Alert.alert(t("common.success"), t("settings.savedSuccess"));
     },
-    onError: () => Alert.alert("Erreur", "Impossible de sauvegarder les paramètres."),
+    onError: () => Alert.alert(t("common.error"), t("settings.saveError")),
   });
 
   // ── Delete account ─────────────────────────────────────────────────────────
@@ -207,25 +211,25 @@ export default function SettingsScreen() {
       await logout();
       router.replace("/(auth)/login");
     },
-    onError: () => Alert.alert("Erreur", "Impossible de supprimer le compte pour l'instant."),
+    onError: () => Alert.alert(t("common.error"), t("settings.deleteError")),
   });
 
   const confirmDeleteAccount = () => {
     Alert.alert(
-      "Supprimer le compte",
-      "Cette action est irréversible. Toutes vos données seront supprimées définitivement.",
+      t("settings.deleteAccount"),
+      t("settings.deleteConfirm1"),
       [
-        { text: "Annuler", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Supprimer définitivement",
+          text: t("settings.deleteForever"),
           style: "destructive",
           onPress: () => {
             Alert.alert(
-              "Confirmation finale",
-              "Êtes-vous absolument certain de vouloir supprimer votre compte ?",
+              t("common.confirm"),
+              t("settings.deleteConfirm2"),
               [
-                { text: "Non", style: "cancel" },
-                { text: "Oui, supprimer", style: "destructive", onPress: () => deleteMutation.mutate() },
+                { text: t("common.no"), style: "cancel" },
+                { text: t("settings.deleteYes"), style: "destructive", onPress: () => deleteMutation.mutate() },
               ]
             );
           },
@@ -235,11 +239,10 @@ export default function SettingsScreen() {
   };
 
   // ── Language change ────────────────────────────────────────────────────────
-  const handleLanguageChange = async (lang: "fr" | "en") => {
+  const handleLanguageChange = async (lang: SupportedLang) => {
     if (lang === currentLang) return;
     setCurrentLang(lang);
     await setLanguage(lang);
-    // Persist preference to backend
     apiPatch("/users/settings", { language: lang }).catch(() => {});
   };
 
@@ -261,7 +264,7 @@ export default function SettingsScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={20} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Paramètres</Text>
+          <Text style={styles.headerTitle}>{t("settings.title")}</Text>
           <View style={{ width: 40 }} />
         </View>
       </SafeAreaView>
@@ -271,30 +274,25 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scroll}
       >
         {/* ── Language ─────────────────────────────────────────────────── */}
-        <Section title="Langue">
+        <Section title={t("settings.language")}>
           <View style={styles.langRow}>
             <View style={[rowStyles.iconWrap, { backgroundColor: "#E3F2FD" }]}>
               <Ionicons name="language-outline" size={18} color="#2196F3" />
             </View>
-            <Text style={[rowStyles.label, { flex: 1 }]}>Langue de l'application</Text>
+            <Text style={[rowStyles.label, { flex: 1 }]}>{t("settings.language")}</Text>
             <View style={styles.langToggle}>
-              {(["fr", "en"] as const).map((lang) => (
+              {SUPPORTED_LANGUAGES.map((lang) => (
                 <TouchableOpacity
-                  key={lang}
+                  key={lang.code}
                   style={[
                     styles.langBtn,
-                    currentLang === lang && styles.langBtnActive,
+                    currentLang === lang.code && styles.langBtnActive,
                   ]}
-                  onPress={() => handleLanguageChange(lang)}
+                  onPress={() => handleLanguageChange(lang.code)}
                   activeOpacity={0.8}
                 >
-                  <Text
-                    style={[
-                      styles.langBtnText,
-                      currentLang === lang && styles.langBtnTextActive,
-                    ]}
-                  >
-                    {lang === "fr" ? "Français" : "English"}
+                  <Text style={[styles.langBtnText, currentLang === lang.code && styles.langBtnTextActive]}>
+                    {lang.flag} {lang.nativeName}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -303,13 +301,13 @@ export default function SettingsScreen() {
         </Section>
 
         {/* ── Notifications ─────────────────────────────────────────────── */}
-        <Section title="Notifications">
+        <Section title={t("profile.notifications")}>
           <ToggleRow
             icon="receipt-outline"
             iconColor="#FF9800"
             iconBg="#FFF3E0"
-            label="Commandes"
-            sub="Mises à jour du statut de vos commandes"
+            label={t("settings.notifOrders")}
+            sub={t("settings.notifOrdersSub")}
             value={notifOrders}
             onChange={(v) => { setNotifOrders(v); setDirty(true); }}
           />
@@ -317,8 +315,8 @@ export default function SettingsScreen() {
             icon="megaphone-outline"
             iconColor="#9C27B0"
             iconBg="#F3E5F5"
-            label="Promotions"
-            sub="Offres spéciales et nouveaux produits"
+            label={t("settings.notifPromos")}
+            sub={t("settings.notifPromosSub")}
             value={notifPromos}
             onChange={(v) => { setNotifPromos(v); setDirty(true); }}
             isLast
@@ -338,33 +336,32 @@ export default function SettingsScreen() {
             ) : (
               <>
                 <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                <Text style={styles.saveBtnText}>Enregistrer les préférences</Text>
+                <Text style={styles.saveBtnText}>{t("settings.save")}</Text>
               </>
             )}
           </TouchableOpacity>
         )}
 
         {/* ── Account ───────────────────────────────────────────────────── */}
-        <Section title="Compte">
+        <Section title={t("profile.title")}>
           <NavRow
             icon="lock-closed-outline"
             iconColor="#4CAF50"
             iconBg="#E8F5E9"
-            label="Changer mon mot de passe"
-            sub="Modifier votre mot de passe actuel"
+            label={t("settings.changePassword")}
             onPress={() => router.push("/profile/change-password")}
             isLast
           />
         </Section>
 
         {/* ── Danger zone ───────────────────────────────────────────────── */}
-        <Section title="Zone de danger">
+        <Section title="⚠️">
           <NavRow
             icon="trash-outline"
             iconColor={Colors.error}
             iconBg="#FFEBEE"
-            label="Supprimer mon compte"
-            sub="Action irréversible — toutes vos données seront perdues"
+            label={t("settings.deleteAccount")}
+            sub={t("settings.deleteAccountSub")}
             onPress={confirmDeleteAccount}
             danger
             isLast
@@ -375,7 +372,7 @@ export default function SettingsScreen() {
         {deleteMutation.isPending && (
           <View style={styles.deletingRow}>
             <ActivityIndicator color={Colors.error} size="small" />
-            <Text style={styles.deletingText}>Suppression en cours…</Text>
+            <Text style={styles.deletingText}>{t("settings.deleting")}</Text>
           </View>
         )}
 

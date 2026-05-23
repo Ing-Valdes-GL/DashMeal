@@ -4,8 +4,18 @@ import * as Localization from "expo-localization";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const LANG_KEY = "dm_language";
-const SUPPORTED = ["fr", "en"] as const;
-type SupportedLang = (typeof SUPPORTED)[number];
+
+/**
+ * SUPPORTED_LANGUAGES — source de vérité pour toutes les langues disponibles.
+ * Pour ajouter une langue : ajouter une entrée ici + un objet de traduction + l'ajouter dans resources.
+ */
+export const SUPPORTED_LANGUAGES = [
+  { code: "fr", name: "Français",  nativeName: "Français", flag: "🇫🇷" },
+  { code: "en", name: "English",   nativeName: "English",  flag: "🇬🇧" },
+] as const;
+
+type SupportedLang = (typeof SUPPORTED_LANGUAGES)[number]["code"];
+const SUPPORTED_CODES = SUPPORTED_LANGUAGES.map((l) => l.code) as readonly SupportedLang[];
 
 const fr = {
   common: {
@@ -425,12 +435,19 @@ const en: typeof fr = {
   },
 };
 
+/** Parcourt toutes les locales du device dans l'ordre de priorité */
 function getDeviceLang(): SupportedLang {
-  const code = Localization.getLocales()[0]?.languageCode ?? "fr";
-  return (SUPPORTED as readonly string[]).includes(code) ? (code as SupportedLang) : "fr";
+  const locales = Localization.getLocales();
+  for (const locale of locales) {
+    const code = locale.languageCode;
+    if (code && (SUPPORTED_CODES as readonly string[]).includes(code)) {
+      return code as SupportedLang;
+    }
+  }
+  return "fr";
 }
 
-// Initialisation synchrone avec la langue du device (sera éventuellement remplacée par la préférence sauvegardée)
+// Sync init with device language — AsyncStorage preference will override asynchronously
 i18n.use(initReactI18next).init({
   resources: {
     fr: { translation: fr },
@@ -442,10 +459,10 @@ i18n.use(initReactI18next).init({
   compatibilityJSON: "v3",
 });
 
-// Charge la préférence sauvegardée de manière asynchrone et l'applique si elle diffère
+// Apply saved preference asynchronously (overrides device default if user explicitly chose)
 AsyncStorage.getItem(LANG_KEY).then((saved) => {
-  if (saved && (SUPPORTED as readonly string[]).includes(saved) && saved !== i18n.language) {
-    i18n.changeLanguage(saved);
+  if (saved && (SUPPORTED_CODES as readonly string[]).includes(saved) && saved !== i18n.language) {
+    i18n.changeLanguage(saved as SupportedLang);
   }
 });
 
