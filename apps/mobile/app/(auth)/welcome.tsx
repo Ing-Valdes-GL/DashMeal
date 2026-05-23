@@ -15,7 +15,7 @@ import { Colors, Radius } from "@/lib/theme";
 const { width: W, height: H } = Dimensions.get("window");
 
 const BG_IMAGE =
-  "https://images.unsplash.com/photo-1534723328310-e82dad3ee43f?w=900&q=90";
+  "https://www.rollsrapides.com/wp-content/uploads/2023/02/erreur-mise-en-rayon.jpg";
 
 export default function WelcomeScreen() {
   const router = useRouter();
