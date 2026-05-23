@@ -80,13 +80,13 @@ export default function ChangePasswordScreen() {
   const changeMutation = useMutation({
     mutationFn: () => {
       if (method === "current") {
-        return apiPost("/user/me/change-password", {
+        return apiPost("/users/me/change-password", {
           method: "current",
           current_password: currentPassword,
           new_password: newPassword,
         });
       }
-      return apiPost("/user/me/change-password", {
+      return apiPost("/users/me/change-password", {
         method,
         contact,
         otp,
