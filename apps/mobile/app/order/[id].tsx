@@ -41,15 +41,6 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled:  Colors.error,
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  pending:    "En attente",
-  confirmed:  "Confirmée",
-  preparing:  "En préparation",
-  ready:      "Prête",
-  delivering: "En livraison",
-  delivered:  "Livrée",
-  cancelled:  "Annulée",
-};
 
 const STATUS_ICON: Record<string, string> = {
   pending:    "time-outline",
@@ -80,6 +71,16 @@ export default function OrderDetailScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const STATUS_LABEL: Record<string, string> = {
+    pending:    t("orders.pending"),
+    confirmed:  t("orders.confirmed"),
+    preparing:  t("orders.preparing"),
+    ready:      t("orders.ready"),
+    delivering: t("orders.delivering"),
+    delivered:  t("orders.delivered"),
+    cancelled:  t("orders.cancelled"),
+  };
 
   const { data: resp, isLoading, refetch } = useQuery<{ success: boolean; data: OrderDetail }>({
     queryKey: ["order", id],
@@ -117,14 +118,14 @@ export default function OrderDetailScreen() {
     setGpsLoading(true);
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") { Alert.alert("Permission refusée", "Activez la localisation dans les paramètres."); return; }
+      if (status !== "granted") { Alert.alert(t("orderDetail.permissionDenied"), t("orderDetail.permissionMsg")); return; }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const [geo] = await Location.reverseGeocodeAsync({ latitude: location.coords.latitude, longitude: location.coords.longitude });
       if (geo) {
         const parts = [geo.streetNumber, geo.street, geo.district, geo.city].filter(Boolean);
         setAddress(parts.join(", ") || `${location.coords.latitude.toFixed(5)}, ${location.coords.longitude.toFixed(5)}`);
       }
-    } catch { Alert.alert("Erreur", "Impossible d'obtenir votre position."); }
+    } catch { Alert.alert(t("common.error"), t("orderDetail.gpsError")); }
     finally { setGpsLoading(false); }
   };
 
@@ -157,8 +158,8 @@ export default function OrderDetailScreen() {
 
   // ── Soumission conversion ────────────────────────────────────────────────────
   const handleConvertSubmit = async () => {
-    if (!address.trim()) { Alert.alert("Adresse requise", "Veuillez saisir votre adresse de livraison."); return; }
-    if (!paymentPhone.trim()) { Alert.alert("Téléphone requis", "Veuillez saisir votre numéro Mobile Money."); return; }
+    if (!address.trim()) { Alert.alert(t("orderDetail.addressRequired"), t("orderDetail.addressRequiredMsg")); return; }
+    if (!paymentPhone.trim()) { Alert.alert(t("orderDetail.phoneRequired"), t("orderDetail.phoneRequiredMsg")); return; }
     setConvertPhase("processing");
     try {
       const data = await apiPost<{ success: boolean; data: { reference: string; ussd_code: string | null; delivery_fee: number } }>(
@@ -171,7 +172,7 @@ export default function OrderDetailScreen() {
       startPolling(data.data.reference);
     } catch (err: any) {
       setConvertPhase("form");
-      Alert.alert("Erreur", err?.response?.data?.error?.message ?? err?.message ?? "Une erreur est survenue.");
+      Alert.alert(t("common.error"), err?.response?.data?.error?.message ?? err?.message ?? t("auth.genericError"));
     }
   };
 
@@ -226,7 +227,7 @@ export default function OrderDetailScreen() {
             <Ionicons name={STATUS_ICON[order.status] as any} size={26} color={statusColor} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.statusMeta}>Statut actuel</Text>
+            <Text style={styles.statusMeta}>{t("orderDetail.currentStatus")}</Text>
             <Text style={[styles.statusValue, { color: statusColor }]}>{STATUS_LABEL[order.status] ?? order.status}</Text>
           </View>
           <View style={[styles.typePill, { backgroundColor: statusColor + "18" }]}>
@@ -236,7 +237,7 @@ export default function OrderDetailScreen() {
               color={statusColor}
             />
             <Text style={[styles.typeText, { color: statusColor }]}>
-              {order.type === "collect" ? "Retrait" : "Livraison"}
+              {order.type === "collect" ? t("orderDetail.typeCollect") : t("orderDetail.typeDelivery")}
             </Text>
           </View>
         </View>
@@ -250,7 +251,7 @@ export default function OrderDetailScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="navigate" size={18} color="#fff" />
-              <Text style={styles.trackBtnText}>Suivre ma livraison en temps réel</Text>
+              <Text style={styles.trackBtnText}>{t("orderDetail.trackLive")}</Text>
               <View style={styles.livePill}>
                 <View style={styles.liveDot} />
                 <Text style={styles.liveText}>LIVE</Text>
@@ -269,7 +270,7 @@ export default function OrderDetailScreen() {
                 activeOpacity={0.7}
               >
                 <Ionicons name="bicycle-outline" size={16} color={Colors.primary} />
-                <Text style={styles.contactBtnText}>Livreur</Text>
+                <Text style={styles.contactBtnText}>{t("orderDetail.contactDriver")}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -278,7 +279,7 @@ export default function OrderDetailScreen() {
               activeOpacity={0.7}
             >
               <Ionicons name="storefront-outline" size={16} color={Colors.primary} />
-              <Text style={styles.contactBtnText}>Contacter l'agence</Text>
+              <Text style={styles.contactBtnText}>{t("orderDetail.contactAgency")}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -286,11 +287,11 @@ export default function OrderDetailScreen() {
         {/* QR code */}
         {collect && order.type === "collect" && collect.pickup_status === "waiting" && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>QR Code de retrait</Text>
+            <Text style={styles.sectionTitle}>{t("orderDetail.qrTitle")}</Text>
             <View style={styles.qrCard}>
               <Ionicons name="qr-code" size={72} color={Colors.primary} />
               <Text style={styles.qrCode}>{collect.qr_code}</Text>
-              <Text style={styles.qrHint}>Présentez ce code à l'agence</Text>
+              <Text style={styles.qrHint}>{t("orderDetail.qrHint")}</Text>
               {collect.time_slots && (
                 <View style={styles.qrSlotPill}>
                   <Ionicons name="time-outline" size={13} color={Colors.primary} />
@@ -308,11 +309,11 @@ export default function OrderDetailScreen() {
           <View style={styles.section}>
             <View style={styles.convertBanner}>
               <Ionicons name="information-circle-outline" size={18} color="#F59E0B" />
-              <Text style={styles.convertBannerText}>Vous ne pouvez plus vous rendre en agence ?</Text>
+              <Text style={styles.convertBannerText}>{t("orderDetail.convertBanner")}</Text>
             </View>
             <TouchableOpacity style={styles.convertBtn} onPress={() => setShowModal(true)} activeOpacity={0.85}>
               <Ionicons name="bicycle-outline" size={18} color="#fff" />
-              <Text style={styles.convertBtnText}>Me faire livrer à domicile</Text>
+              <Text style={styles.convertBtnText}>{t("orderDetail.convertBtn")}</Text>
               <View style={styles.convertFeePill}>
                 <Text style={styles.convertFeeText}>+{formatCurrency(DELIVERY_FEE)}</Text>
               </View>
@@ -323,7 +324,7 @@ export default function OrderDetailScreen() {
         {/* Delivery info */}
         {delivery && order.type === "delivery" && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Informations de livraison</Text>
+            <Text style={styles.sectionTitle}>{t("orderDetail.deliveryInfoTitle")}</Text>
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
                 <View style={styles.infoIcon}><Ionicons name="location-outline" size={16} color={Colors.primary} /></View>
@@ -341,7 +342,7 @@ export default function OrderDetailScreen() {
 
         {/* Articles */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Articles commandés</Text>
+          <Text style={styles.sectionTitle}>{t("orderDetail.orderedItems")}</Text>
           <View style={styles.itemsCard}>
             {order.order_items.map((item, i) => (
               <View key={i} style={[styles.itemRow, i < order.order_items.length - 1 && styles.itemBorder]}>
@@ -351,7 +352,7 @@ export default function OrderDetailScreen() {
               </View>
             ))}
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalLabel}>{t("cart.total")}</Text>
               <Text style={styles.totalValue}>{formatCurrency(order.total)}</Text>
             </View>
           </View>
@@ -359,7 +360,7 @@ export default function OrderDetailScreen() {
 
         {/* Infos générales */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Informations</Text>
+          <Text style={styles.sectionTitle}>{t("orderDetail.infoTitle")}</Text>
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
               <View style={styles.infoIcon}><Ionicons name="storefront-outline" size={16} color={Colors.text3} /></View>
@@ -389,7 +390,7 @@ export default function OrderDetailScreen() {
             {(convertPhase === "form" || convertPhase === "processing") && (
               <>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Se faire livrer à domicile</Text>
+                  <Text style={styles.modalTitle}>{t("orderDetail.convertModalTitle")}</Text>
                   <TouchableOpacity style={styles.modalCloseBtn} onPress={closeModal}>
                     <Ionicons name="close" size={18} color={Colors.text2} />
                   </TouchableOpacity>
@@ -398,27 +399,27 @@ export default function OrderDetailScreen() {
                 {/* Résumé frais */}
                 <View style={styles.feeCard}>
                   <View style={styles.feeRow}>
-                    <Text style={styles.feeLabel}>Commande (déjà payée)</Text>
+                    <Text style={styles.feeLabel}>{t("orderDetail.orderAlreadyPaid")}</Text>
                     <Text style={styles.feeAmount}>{formatCurrency(order.subtotal ?? order.total)}</Text>
                   </View>
                   <View style={styles.feeRow}>
-                    <Text style={styles.feeLabel}>Frais de livraison</Text>
+                    <Text style={styles.feeLabel}>{t("orderDetail.deliveryFee")}</Text>
                     <Text style={[styles.feeAmount, { color: Colors.primary }]}>+{formatCurrency(DELIVERY_FEE)}</Text>
                   </View>
                   <View style={styles.feeDivider} />
                   <View style={styles.feeRow}>
-                    <Text style={styles.feeTotalLabel}>À payer maintenant</Text>
+                    <Text style={styles.feeTotalLabel}>{t("orderDetail.toPay")}</Text>
                     <Text style={styles.feeTotalValue}>{formatCurrency(DELIVERY_FEE)}</Text>
                   </View>
                 </View>
 
                 <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
                   {/* Adresse */}
-                  <Text style={styles.inputLabel}>Adresse de livraison</Text>
+                  <Text style={styles.inputLabel}>{t("orderDetail.deliveryAddress")}</Text>
                   <View style={styles.addressRow}>
                     <TextInput
                       style={[styles.input, { flex: 1 }]}
-                      placeholder="Ex : Rue Foucauld, Akwa, Douala"
+                      placeholder={t("orderDetail.deliveryAddressPh")}
                       placeholderTextColor={Colors.text3}
                       value={address}
                       onChangeText={setAddress}
@@ -434,10 +435,10 @@ export default function OrderDetailScreen() {
                   </View>
 
                   {/* Paiement */}
-                  <Text style={styles.inputLabel}>Numéro Mobile Money</Text>
+                  <Text style={styles.inputLabel}>{t("orderDetail.mobileMoneyNumber")}</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="Ex : 6 90 00 00 00"
+                    placeholder={t("orderDetail.phonePh")}
                     placeholderTextColor={Colors.text3}
                     keyboardType="phone-pad"
                     value={paymentPhone}
@@ -460,9 +461,7 @@ export default function OrderDetailScreen() {
                     ))}
                   </View>
 
-                  <Text style={styles.modalHint}>
-                    Un code USSD sera envoyé à votre téléphone. Confirmez votre PIN pour valider les frais de livraison.
-                  </Text>
+                  <Text style={styles.modalHint}>{t("orderDetail.modalHint")}</Text>
                 </ScrollView>
 
                 <TouchableOpacity
@@ -487,17 +486,17 @@ export default function OrderDetailScreen() {
                 <Animated.View style={{ transform: [{ rotate: spin }] }}>
                   <Ionicons name="refresh-outline" size={48} color={Colors.primary} />
                 </Animated.View>
-                <Text style={styles.waitingTitle}>En attente de confirmation</Text>
+                <Text style={styles.waitingTitle}>{t("orderDetail.waitingTitle")}</Text>
                 <Text style={styles.waitingBody}>
-                  Confirmez {formatCurrency(DELIVERY_FEE)} sur votre téléphone ({paymentMethod === "orange_money" ? "Orange Money" : "MTN MoMo"}).
+                  {t("orderDetail.waitingHint")}
                 </Text>
                 {ussdCode && (
                   <View style={styles.ussdCard}>
-                    <Text style={styles.ussdLabel}>Code USSD</Text>
+                    <Text style={styles.ussdLabel}>{t("orderDetail.ussdCode")}</Text>
                     <Text style={styles.ussdCode}>{ussdCode}</Text>
                   </View>
                 )}
-                <Text style={styles.waitingHint}>Ne fermez pas cette fenêtre…</Text>
+                <Text style={styles.waitingHint}>{t("orderDetail.waitingHint")}</Text>
               </View>
             )}
 
@@ -507,10 +506,10 @@ export default function OrderDetailScreen() {
                 <View style={[styles.resultIconWrap, { backgroundColor: Colors.success + "18" }]}>
                   <Ionicons name="checkmark-circle" size={56} color={Colors.success} />
                 </View>
-                <Text style={styles.resultTitle}>Livraison confirmée !</Text>
-                <Text style={styles.resultBody}>Vos frais ont été payés. Un livreur sera assigné dès que possible.</Text>
+                <Text style={styles.resultTitle}>{t("orderDetail.successTitle")}</Text>
+                <Text style={styles.resultBody}>{t("orderDetail.successBody")}</Text>
                 <TouchableOpacity style={[styles.resultBtn, { backgroundColor: Colors.success }]} onPress={closeModal}>
-                  <Text style={styles.resultBtnText}>Voir ma commande</Text>
+                  <Text style={styles.resultBtnText}>{t("checkout.viewOrder")}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -521,13 +520,13 @@ export default function OrderDetailScreen() {
                 <View style={[styles.resultIconWrap, { backgroundColor: Colors.error + "18" }]}>
                   <Ionicons name="close-circle" size={56} color={Colors.error} />
                 </View>
-                <Text style={styles.resultTitle}>Paiement échoué</Text>
-                <Text style={styles.resultBody}>Le paiement n'a pas pu être traité. Vérifiez votre solde et réessayez.</Text>
+                <Text style={styles.resultTitle}>{t("orderDetail.failTitle")}</Text>
+                <Text style={styles.resultBody}>{t("orderDetail.failBody")}</Text>
                 <TouchableOpacity style={[styles.resultBtn, { backgroundColor: Colors.primary }]} onPress={() => setConvertPhase("form")}>
-                  <Text style={styles.resultBtnText}>Réessayer</Text>
+                  <Text style={styles.resultBtnText}>{t("common.retry")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.cancelConvertBtn} onPress={closeModal}>
-                  <Text style={styles.cancelConvertText}>Annuler</Text>
+                  <Text style={styles.cancelConvertText}>{t("common.cancel")}</Text>
                 </TouchableOpacity>
               </View>
             )}
