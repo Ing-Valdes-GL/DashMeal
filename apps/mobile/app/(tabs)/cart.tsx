@@ -26,16 +26,16 @@ export default function CartScreen() {
       <View style={s.container}>
         <StatusBar style="dark" />
         <SafeAreaView style={s.safe} edges={["top"]}>
-          <View style={s.header}><Text style={s.headerTitle}>My Cart</Text></View>
+          <View style={s.header}><Text style={s.headerTitle}>{t("cart.title")}</Text></View>
         </SafeAreaView>
         <View style={s.emptyWrap}>
           <View style={s.emptyIcon}>
             <Ionicons name="cart-outline" size={64} color={Colors.text3} />
           </View>
-          <Text style={s.emptyTitle}>Votre panier est vide</Text>
-          <Text style={s.emptySub}>Ajoutez des produits pour commencer</Text>
+          <Text style={s.emptyTitle}>{t("cart.empty")}</Text>
+          <Text style={s.emptySub}>{t("cart.emptyAdd")}</Text>
           <TouchableOpacity style={s.shopBtn} onPress={() => router.push("/(tabs)/explore" as any)}>
-            <Text style={s.shopBtnText}>Parcourir les produits</Text>
+            <Text style={s.shopBtnText}>{t("cart.browse")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -45,11 +45,11 @@ export default function CartScreen() {
   const handleCheckout = () => {
     if (isGuest) {
       Alert.alert(
-        "Connexion requise",
-        "Vous devez être connecté pour passer une commande.",
+        t("cart.loginRequired"),
+        t("cart.loginRequiredMsg"),
         [
-          { text: "Annuler", style: "cancel" },
-          { text: "Se connecter", onPress: () => router.push("/(auth)/login") },
+          { text: t("common.cancel"), style: "cancel" },
+          { text: t("auth.loginButton"), onPress: () => router.push("/(auth)/login") },
         ]
       );
       return;
@@ -62,7 +62,7 @@ export default function CartScreen() {
       <StatusBar style="dark" />
       <SafeAreaView style={s.safe} edges={["top"]}>
         <View style={s.header}>
-          <Text style={s.headerTitle}>My Cart</Text>
+          <Text style={s.headerTitle}>{t("cart.title")}</Text>
           {branch_name && <Text style={s.branchName}>{branch_name}</Text>}
         </View>
       </SafeAreaView>
@@ -104,7 +104,7 @@ export default function CartScreen() {
         {/* Promo */}
         <View style={s.promoWrap}>
           <View style={s.promoInput}>
-            <TextInput placeholder="Promo Code" placeholderTextColor={Colors.text3} style={s.promoTextInput} />
+            <TextInput placeholder={t("cart.promoPlaceholder")} placeholderTextColor={Colors.text3} style={s.promoTextInput} />
           </View>
           <TouchableOpacity style={s.promoBtn}>
             <Ionicons name="arrow-forward" size={20} color="#fff" />
@@ -115,11 +115,11 @@ export default function CartScreen() {
       {/* Checkout bar */}
       <SafeAreaView style={s.bottomBar} edges={["bottom"]}>
         <View style={s.totalRow}>
-          <Text style={s.totalLabel}>Total Cost</Text>
+          <Text style={s.totalLabel}>{t("cart.totalCost")}</Text>
           <Text style={s.totalValue}>{formatCurrency(grandTotal)}</Text>
         </View>
         <TouchableOpacity style={s.checkoutBtn} onPress={handleCheckout} activeOpacity={0.85}>
-          <Text style={s.checkoutBtnText}>Go to Checkout</Text>
+          <Text style={s.checkoutBtnText}>{t("cart.goToCheckout")}</Text>
           <View style={s.checkoutBadge}><Text style={s.checkoutBadgeText}>{getCount()}</Text></View>
         </TouchableOpacity>
       </SafeAreaView>

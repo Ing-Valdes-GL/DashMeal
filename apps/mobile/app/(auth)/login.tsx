@@ -33,7 +33,6 @@ export default function LoginScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError]         = useState("");
 
-  // Google OAuth via expo-auth-session
   const discovery = AuthSession.useAutoDiscovery("https://accounts.google.com");
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "dashmeal", path: "auth" });
 
@@ -50,7 +49,7 @@ export default function LoginScreen() {
 
   const handleGoogleLogin = async () => {
     if (!GOOGLE_CLIENT_ID) {
-      Alert.alert("Configuration manquante", "Google Client ID non configuré. Ajoutez EXPO_PUBLIC_GOOGLE_CLIENT_ID dans .env.local");
+      Alert.alert(t("common.error"), t("auth.googleError"));
       return;
     }
     setGoogleLoading(true);
@@ -67,7 +66,7 @@ export default function LoginScreen() {
         router.replace("/(tabs)");
       }
     } catch (e: any) {
-      setError(e?.response?.data?.error?.message ?? "Connexion Google échouée. Réessayez.");
+      setError(e?.response?.data?.error?.message ?? t("auth.googleError"));
     } finally {
       setGoogleLoading(false);
     }
@@ -76,7 +75,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     setError("");
     if (!identifier.trim() || !password.trim()) {
-      setError("Veuillez remplir tous les champs");
+      setError(t("auth.fillAllFields"));
       return;
     }
     setLoading(true);
@@ -101,7 +100,7 @@ export default function LoginScreen() {
         router.push({ pathname: "/(auth)/otp", params: { identifier, via: "phone" } });
         return;
       }
-      setError(e?.response?.data?.error?.message ?? "Identifiants incorrects. Réessayez.");
+      setError(e?.response?.data?.error?.message ?? t("auth.invalidCredentials"));
     } finally {
       setLoading(false);
     }
@@ -116,8 +115,8 @@ export default function LoginScreen() {
         </TouchableOpacity>
 
         <View style={s.content}>
-          <Text style={s.title}>Connexion</Text>
-          <Text style={s.sub}>Entrez vos identifiants</Text>
+          <Text style={s.title}>{t("auth.titleLogin")}</Text>
+          <Text style={s.sub}>{t("auth.subtitleLogin")}</Text>
 
           {/* Mode toggle */}
           <View style={s.toggle}>
@@ -128,18 +127,18 @@ export default function LoginScreen() {
                 onPress={() => { setMode(m); setIdentifier(""); setError(""); }}
               >
                 <Text style={[s.toggleText, mode === m && s.toggleTextActive]}>
-                  {m === "email" ? "Email" : "Téléphone"}
+                  {m === "email" ? t("auth.loginModeEmail") : t("auth.loginModePhone")}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
-          <Text style={s.label}>{mode === "email" ? "Adresse email" : "Numéro de téléphone"}</Text>
+          <Text style={s.label}>{mode === "email" ? t("auth.emailLabel") : t("auth.phoneLabel")}</Text>
           <View style={s.inputWrap}>
             <Ionicons name={mode === "email" ? "mail-outline" : "call-outline"} size={18} color={Colors.text3} style={s.inputIcon} />
             <TextInput
               style={s.input}
-              placeholder={mode === "email" ? "exemple@email.com" : "+237 6XX XXX XXX"}
+              placeholder={mode === "email" ? t("auth.emailPh") : t("auth.phonePlaceholder")}
               placeholderTextColor={Colors.text3}
               value={identifier}
               onChangeText={(v) => { setIdentifier(v); setError(""); }}
@@ -149,12 +148,12 @@ export default function LoginScreen() {
             />
           </View>
 
-          <Text style={[s.label, { marginTop: 14 }]}>Mot de passe</Text>
+          <Text style={[s.label, { marginTop: 14 }]}>{t("auth.password")}</Text>
           <View style={s.inputWrap}>
             <Ionicons name="lock-closed-outline" size={18} color={Colors.text3} style={s.inputIcon} />
             <TextInput
               style={[s.input, { flex: 1 }]}
-              placeholder="••••••••"
+              placeholder={t("auth.passwordPlaceholder")}
               placeholderTextColor={Colors.text3}
               value={password}
               onChangeText={(v) => { setPassword(v); setError(""); }}
@@ -166,19 +165,19 @@ export default function LoginScreen() {
           </View>
 
           <TouchableOpacity style={s.forgotRow}>
-            <Text style={s.forgotText}>Mot de passe oublié ?</Text>
+            <Text style={s.forgotText}>{t("auth.forgotPassword")}</Text>
           </TouchableOpacity>
 
           {error ? <Text style={s.errorText}>{error}</Text> : null}
 
           <TouchableOpacity style={[s.btn, loading && s.btnDisabled]} onPress={handleLogin} disabled={loading} activeOpacity={0.85}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Se connecter</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>{t("auth.loginButton")}</Text>}
           </TouchableOpacity>
 
           {/* Divider */}
           <View style={s.divider}>
             <View style={s.divLine} />
-            <Text style={s.divText}>ou continuer avec</Text>
+            <Text style={s.divText}>{t("auth.orContinueWith")}</Text>
             <View style={s.divLine} />
           </View>
 
@@ -194,15 +193,15 @@ export default function LoginScreen() {
             ) : (
               <>
                 <Ionicons name="logo-google" size={20} color="#EA4335" />
-                <Text style={s.googleText}>Continuer avec Google</Text>
+                <Text style={s.googleText}>{t("auth.continueWithGoogle")}</Text>
               </>
             )}
           </TouchableOpacity>
 
           <View style={s.regRow}>
-            <Text style={s.regText}>Pas encore de compte ? </Text>
+            <Text style={s.regText}>{t("auth.noAccount")} </Text>
             <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
-              <Text style={s.regLink}>S'inscrire</Text>
+              <Text style={s.regLink}>{t("auth.signup")}</Text>
             </TouchableOpacity>
           </View>
         </View>

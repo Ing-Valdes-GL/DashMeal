@@ -8,6 +8,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiPost } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from "react-i18next";
 import { Colors, Radius, Shadow } from "@/lib/theme";
 
 function AuthDecoration() {
@@ -27,6 +28,7 @@ const deco = StyleSheet.create({
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [firstName, setFirstName] = useState("");
   const [lastName,  setLastName]  = useState("");
   const [email,     setEmail]     = useState("");
@@ -39,7 +41,8 @@ export default function RegisterScreen() {
   const [error, setError] = useState("");
 
   const handleSocial = (provider: "google" | "apple") => {
-    Alert.alert("Bientôt disponible", `L'inscription via ${provider === "google" ? "Google" : "Apple"} sera disponible prochainement.`);
+    const name = provider === "google" ? "Google" : "Apple";
+    Alert.alert(t("auth.comingSoon"), t("auth.comingSoonMsg", { provider: name }));
   };
 
   const registerMutation = useMutation({
@@ -60,17 +63,17 @@ export default function RegisterScreen() {
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.error?.message;
-      if (!err?.response) setError("Impossible de joindre le serveur.");
-      else setError(msg ?? "Une erreur est survenue. Réessayez.");
+      if (!err?.response) setError(t("auth.serverError"));
+      else setError(msg ?? t("auth.genericError"));
     },
   });
 
   const validate = (): boolean => {
-    if (!firstName.trim() || !lastName.trim()) { setError("Le prénom et le nom sont requis."); return false; }
-    if (!email.trim() || !email.includes("@")) { setError("Adresse email invalide."); return false; }
-    if (password.length < 8) { setError("Le mot de passe doit contenir au moins 8 caractères."); return false; }
-    if (password !== confirm) { setError("Les mots de passe ne correspondent pas."); return false; }
-    if (!acceptedTos) { setError("Vous devez accepter les conditions d'utilisation."); return false; }
+    if (!firstName.trim() || !lastName.trim()) { setError(t("auth.nameRequired")); return false; }
+    if (!email.trim() || !email.includes("@")) { setError(t("auth.emailInvalid")); return false; }
+    if (password.length < 8) { setError(t("auth.passwordTooShort")); return false; }
+    if (password !== confirm) { setError(t("auth.passwordMismatch")); return false; }
+    if (!acceptedTos) { setError(t("auth.tosRequired")); return false; }
     return true;
   };
 
@@ -94,8 +97,8 @@ export default function RegisterScreen() {
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
 
-          <Text style={styles.title}>Créer un compte</Text>
-          <Text style={styles.subtitle}>Rejoignez Dash Meal dès maintenant</Text>
+          <Text style={styles.title}>{t("auth.registerTitle")}</Text>
+          <Text style={styles.subtitle}>{t("auth.registerSubtitle")}</Text>
 
           {/* Social */}
           <View style={styles.socialRow}>
@@ -111,7 +114,7 @@ export default function RegisterScreen() {
 
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>ou créez un compte</Text>
+            <Text style={styles.dividerText}>{t("auth.orCreate")}</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -120,12 +123,12 @@ export default function RegisterScreen() {
             {/* Name row */}
             <View style={styles.nameRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>PRÉNOM</Text>
+                <Text style={styles.label}>{t("auth.firstName").toUpperCase()}</Text>
                 <View style={styles.inputWrap}>
                   <Ionicons name="person-outline" size={16} color={Colors.text3} style={styles.icon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Jean"
+                    placeholder={t("auth.firstNamePh")}
                     placeholderTextColor={Colors.text3}
                     autoCapitalize="words"
                     value={firstName}
@@ -134,11 +137,11 @@ export default function RegisterScreen() {
                 </View>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>NOM</Text>
+                <Text style={styles.label}>{t("auth.lastName").toUpperCase()}</Text>
                 <View style={styles.inputWrap}>
                   <TextInput
                     style={styles.input}
-                    placeholder="Dupont"
+                    placeholder={t("auth.lastNamePh")}
                     placeholderTextColor={Colors.text3}
                     autoCapitalize="words"
                     value={lastName}
@@ -153,7 +156,7 @@ export default function RegisterScreen() {
               <Ionicons name="mail-outline" size={18} color={Colors.text3} style={styles.icon} />
               <TextInput
                 style={styles.input}
-                placeholder="exemple@email.com"
+                placeholder={t("auth.emailPh")}
                 placeholderTextColor={Colors.text3}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -163,12 +166,12 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <Text style={[styles.label, { marginTop: 14 }]}>TÉLÉPHONE <Text style={styles.optional}>(optionnel)</Text></Text>
+            <Text style={[styles.label, { marginTop: 14 }]}>{t("auth.phone").toUpperCase()} <Text style={styles.optional}>{t("common.optional")}</Text></Text>
             <View style={styles.inputWrap}>
               <Ionicons name="call-outline" size={18} color={Colors.text3} style={styles.icon} />
               <TextInput
                 style={styles.input}
-                placeholder="6 90 00 00 00"
+                placeholder={t("auth.phonePh")}
                 placeholderTextColor={Colors.text3}
                 keyboardType="phone-pad"
                 value={phone}
@@ -176,12 +179,12 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <Text style={[styles.label, { marginTop: 14 }]}>MOT DE PASSE <Text style={styles.required}>*</Text></Text>
+            <Text style={[styles.label, { marginTop: 14 }]}>{t("auth.password").toUpperCase()} <Text style={styles.required}>*</Text></Text>
             <View style={styles.inputWrap}>
               <Ionicons name="lock-closed-outline" size={18} color={Colors.text3} style={styles.icon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
-                placeholder="8 caractères minimum"
+                placeholder={t("auth.passwordMin")}
                 placeholderTextColor={Colors.text3}
                 secureTextEntry={!showPwd}
                 value={password}
@@ -192,12 +195,12 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.label, { marginTop: 14 }]}>CONFIRMER LE MOT DE PASSE</Text>
+            <Text style={[styles.label, { marginTop: 14 }]}>{t("auth.confirmPassword").toUpperCase()}</Text>
             <View style={styles.inputWrap}>
               <Ionicons name="lock-closed-outline" size={18} color={Colors.text3} style={styles.icon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
-                placeholder="••••••••"
+                placeholder={t("auth.passwordPlaceholder")}
                 placeholderTextColor={Colors.text3}
                 secureTextEntry={!showConfirm}
                 value={confirm}
@@ -225,7 +228,7 @@ export default function RegisterScreen() {
                   />
                 ))}
                 <Text style={styles.strengthLabel}>
-                  {password.length < 4 ? "Faible" : password.length < 8 ? "Moyen" : "Fort"}
+                  {password.length < 4 ? t("auth.passwordWeak") : password.length < 8 ? t("auth.passwordMedium") : t("auth.passwordStrong")}
                 </Text>
               </View>
             )}
@@ -240,10 +243,10 @@ export default function RegisterScreen() {
                 {acceptedTos && <Ionicons name="checkmark" size={12} color="#fff" />}
               </View>
               <Text style={styles.checkboxText}>
-                J'accepte les{" "}
-                <Text style={styles.link} onPress={() => {}}>Conditions d'utilisation</Text>
-                {" "}et la{" "}
-                <Text style={styles.link} onPress={() => {}}>Politique de confidentialité</Text>
+                {t("auth.tosAccept")}{" "}
+                <Text style={styles.link} onPress={() => {}}>{t("auth.tosLink")}</Text>
+                {" "}{t("auth.tosAnd")}{" "}
+                <Text style={styles.link} onPress={() => {}}>{t("auth.privacyLink")}</Text>
               </Text>
             </TouchableOpacity>
 
@@ -257,14 +260,14 @@ export default function RegisterScreen() {
             >
               {registerMutation.isPending
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.btnText}>CRÉER MON COMPTE</Text>
+                : <Text style={styles.btnText}>{t("auth.createBtn")}</Text>
               }
             </TouchableOpacity>
 
             <View style={styles.loginRow}>
-              <Text style={styles.loginText}>Déjà un compte ? </Text>
+              <Text style={styles.loginText}>{t("auth.hasAccount")} </Text>
               <TouchableOpacity onPress={() => router.replace("/(auth)/login")}>
-                <Text style={styles.loginLink}>Se connecter</Text>
+                <Text style={styles.loginLink}>{t("auth.loginButton")}</Text>
               </TouchableOpacity>
             </View>
           </View>
