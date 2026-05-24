@@ -8,8 +8,17 @@ import { useMutation } from "@tanstack/react-query";
 import { apiPost } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { useTranslation } from "react-i18next";
+import { useAuthStore } from "@/stores/auth";
 import { Colors, Radius, Shadow } from "@/lib/theme";
+
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
 function AuthDecoration() {
   return (
@@ -29,22 +38,88 @@ const deco = StyleSheet.create({
 export default function RegisterScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const [firstName, setFirstName] = useState("");
-  const [lastName,  setLastName]  = useState("");
-  const [email,     setEmail]     = useState("");
-  const [phone,     setPhone]     = useState("");
-  const [password,  setPassword]  = useState("");
-  const [confirm,   setConfirm]   = useState("");
-  const [showPwd,   setShowPwd]   = useState(false);
+  const { login } = useAuthStore();
+
+  const [firstName,  setFirstName]  = useState("");
+  const [lastName,   setLastName]   = useState("");
+  const [email,      setEmail]      = useState("");
+  const [phone,      setPhone]      = useState("");
+  const [password,   setPassword]   = useState("");
+  const [confirm,    setConfirm]    = useState("");
+  const [showPwd,    setShowPwd]    = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [acceptedTos, setAcceptedTos] = useState(false);
-  const [error, setError] = useState("");
+  const [error,      setError]      = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading,  setAppleLoading]  = useState(false);
 
-  const handleSocial = (provider: "google" | "apple") => {
-    const name = provider === "google" ? "Google" : "Apple";
-    Alert.alert(t("auth.comingSoon"), t("auth.comingSoonMsg", { provider: name }));
+  // ── Google OAuth ──────────────────────────────────────────────────────────────
+  const discovery   = AuthSession.useAutoDiscovery("https://accounts.google.com");
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: "dashmeal", path: "auth" });
+
+  const [request, , promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: GOOGLE_CLIENT_ID,
+      redirectUri,
+      scopes: ["openid", "profile", "email"],
+      responseType: AuthSession.ResponseType.IdToken,
+      usePKCE: false,
+    },
+    discovery,
+  );
+
+  const handleGoogleLogin = async () => {
+    if (!GOOGLE_CLIENT_ID) {
+      Alert.alert(t("common.error"), t("auth.googleError"));
+      return;
+    }
+    setGoogleLoading(true);
+    setError("");
+    try {
+      const result = await promptAsync();
+      if (result?.type === "success") {
+        const { id_token } = result.params;
+        const res = await apiPost("/auth/user/google", { id_token });
+        const { user, tokens } = res.data;
+        await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
+        await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
+        login(user, tokens.access_token, tokens.refresh_token);
+        router.replace("/(tabs)");
+      }
+    } catch (e: any) {
+      setError(e?.response?.data?.error?.message ?? t("auth.googleError"));
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
+  // ── Apple Sign In (iOS uniquement) ────────────────────────────────────────────
+  const handleAppleLogin = async () => {
+    setAppleLoading(true);
+    setError("");
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const res = await apiPost("/auth/user/apple", { id_token: credential.identityToken });
+      const { user, tokens } = res.data;
+      await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
+      await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
+      login(user, tokens.access_token, tokens.refresh_token);
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      if (e.code !== "ERR_REQUEST_CANCELED") {
+        setError(e?.response?.data?.error?.message ?? t("auth.appleError"));
+      }
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
+  // ── Inscription email ─────────────────────────────────────────────────────────
   const registerMutation = useMutation({
     mutationFn: () => {
       const name = `${firstName.trim()} ${lastName.trim()}`.trim();
@@ -100,17 +175,59 @@ export default function RegisterScreen() {
           <Text style={styles.title}>{t("auth.registerTitle")}</Text>
           <Text style={styles.subtitle}>{t("auth.registerSubtitle")}</Text>
 
-          {/* Social */}
-          <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocial("google")} activeOpacity={0.8}>
-              <Text style={styles.socialIcon}>G</Text>
-              <Text style={styles.socialText}>Google</Text>
+          {/* ── Boutons sociaux — adaptatifs par plateforme ── */}
+          {Platform.OS === "ios" ? (
+            // iOS : Apple + Google côte à côte
+            <View style={styles.socialRow}>
+              <TouchableOpacity
+                style={[styles.socialBtn, styles.appleSocialBtn]}
+                onPress={handleAppleLogin}
+                disabled={appleLoading}
+                activeOpacity={0.8}
+              >
+                {appleLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={18} color="#fff" />
+                    <Text style={[styles.socialText, { color: "#fff" }]}>Apple</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.socialBtn}
+                onPress={handleGoogleLogin}
+                disabled={googleLoading || !request}
+                activeOpacity={0.8}
+              >
+                {googleLoading ? (
+                  <ActivityIndicator color={Colors.text} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-google" size={18} color="#EA4335" />
+                    <Text style={styles.socialText}>Google</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // Android : Google uniquement, pleine largeur
+            <TouchableOpacity
+              style={styles.socialBtnFull}
+              onPress={handleGoogleLogin}
+              disabled={googleLoading || !request}
+              activeOpacity={0.8}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color={Colors.text} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={18} color="#EA4335" />
+                  <Text style={styles.socialText}>{t("auth.continueWithGoogle")}</Text>
+                </>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocial("apple")} activeOpacity={0.8}>
-              <Ionicons name="logo-apple" size={18} color="#fff" />
-              <Text style={styles.socialText}>Apple</Text>
-            </TouchableOpacity>
-          </View>
+          )}
 
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
@@ -290,15 +407,25 @@ const styles = StyleSheet.create({
   title:    { fontSize: 26, fontWeight: "800", color: Colors.text, marginBottom: 6 },
   subtitle: { fontSize: 14, color: Colors.text2, marginBottom: 24 },
 
-  // Social
+  // Social buttons
   socialRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
   socialBtn: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     height: 46, borderRadius: Radius.md,
-    backgroundColor: Colors.card,
+    backgroundColor: Colors.bg,
     borderWidth: 1, borderColor: Colors.border,
   },
-  socialIcon: { fontSize: 18, fontWeight: "800", color: Colors.text },
+  appleSocialBtn: {
+    backgroundColor: "#000",
+    borderColor: "#000",
+  },
+  socialBtnFull: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    height: 52, borderRadius: Radius.full,
+    backgroundColor: Colors.bg,
+    borderWidth: 1.5, borderColor: Colors.border,
+    marginBottom: 20,
+  },
   socialText: { color: Colors.text, fontSize: 14, fontWeight: "600" },
 
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 20 },
@@ -322,10 +449,7 @@ const styles = StyleSheet.create({
 
   // Password strength
   strengthRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  strengthBar: {
-    flex: 1, height: 4, borderRadius: 2,
-    backgroundColor: Colors.border,
-  },
+  strengthBar: { flex: 1, height: 4, borderRadius: 2, backgroundColor: Colors.border },
   strengthLabel: { fontSize: 11, color: Colors.text2, minWidth: 36 },
 
   // Checkbox
