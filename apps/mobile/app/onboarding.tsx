@@ -1,44 +1,83 @@
-import { useRef, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, Modal,
+  View, Text, StyleSheet, TouchableOpacity, Dimensions, Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  useSharedValue, useAnimatedStyle,
+  withTiming, withRepeat, withSequence,
+  cancelAnimation, FadeIn, FadeInUp, Easing,
+} from "react-native-reanimated";
 import * as SecureStore from "expo-secure-store";
 import * as Location from "expo-location";
 import { Colors, Radius } from "@/lib/theme";
 
-const { width } = Dimensions.get("window");
+const { height } = Dimensions.get("window");
+const IMAGE_H = Math.round(height * 0.54);
 
 const SLIDES = [
   {
     key: "fresh",
-    icon: "leaf-outline" as const,
-    iconColor: Colors.primary,
-    bg: Colors.primaryLight,
+    uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop&q=80",
+    bg: "#EDF7ED",
     title: "Produits frais\nlivrés chez vous",
     subtitle: "Des milliers de produits locaux disponibles près de chez vous, livrés en un instant.",
   },
   {
     key: "order",
-    icon: "bag-handle-outline" as const,
-    iconColor: Colors.primary,
-    bg: Colors.primaryLight,
+    uri: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80",
+    bg: "#FFF8EC",
     title: "Commandez\nfacilement",
     subtitle: "Click & Collect ou livraison à domicile. Paiement Mobile Money simple et sécurisé.",
   },
   {
     key: "deliver",
-    icon: "bicycle-outline" as const,
-    iconColor: Colors.primary,
-    bg: Colors.primaryLight,
+    uri: "https://images.unsplash.com/photo-1526367790999-0150786686a2?w=800&auto=format&fit=crop&q=80",
+    bg: "#EAF4FB",
     title: "Livraison rapide\ngarantie",
     subtitle: "Suivez votre commande en temps réel et récupérez-la avec votre QR code en agence.",
   },
 ];
 
-function LocationModal({ visible, onAllow, onSkip }: { visible: boolean; onAllow: () => void; onSkip: () => void }) {
+// ── Image flottante ────────────────────────────────────────────────────────────
+function FloatingImage({ uri }: { uri: string }) {
+  const translateY = useSharedValue(0);
+
+  useEffect(() => {
+    translateY.value = withRepeat(
+      withSequence(
+        withTiming(-14, { duration: 2400, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0,   { duration: 2400, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1
+    );
+    return () => cancelAnimation(translateY);
+  }, []);
+
+  const floatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <Animated.View style={[s.floatWrap, floatStyle]}>
+      <Image
+        source={{ uri }}
+        style={s.heroImage}
+        contentFit="cover"
+        transition={600}
+      />
+    </Animated.View>
+  );
+}
+
+// ── Modal localisation ─────────────────────────────────────────────────────────
+function LocationModal({ visible, onAllow, onSkip }: {
+  visible: boolean; onAllow: () => void; onSkip: () => void;
+}) {
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={loc.overlay}>
@@ -68,16 +107,27 @@ function LocationModal({ visible, onAllow, onSkip }: { visible: boolean; onAllow
   );
 }
 
+// ── Écran principal ────────────────────────────────────────────────────────────
 export default function OnboardingScreen() {
   const router = useRouter();
   const [current, setCurrent] = useState(0);
   const [showLocation, setShowLocation] = useState(false);
-  const flatRef = useRef<FlatList>(null);
+
+  // Animated dot widths (pill → circle)
+  const d0 = useSharedValue(28);
+  const d1 = useSharedValue(8);
+  const d2 = useSharedValue(8);
 
   useEffect(() => {
-    const t = setTimeout(() => setShowLocation(true), 900);
-    return () => clearTimeout(t);
-  }, []);
+    d0.value = withTiming(current === 0 ? 28 : 8, { duration: 300 });
+    d1.value = withTiming(current === 1 ? 28 : 8, { duration: 300 });
+    d2.value = withTiming(current === 2 ? 28 : 8, { duration: 300 });
+  }, [current]);
+
+  const dotStyle0 = useAnimatedStyle(() => ({ width: d0.value }));
+  const dotStyle1 = useAnimatedStyle(() => ({ width: d1.value }));
+  const dotStyle2 = useAnimatedStyle(() => ({ width: d2.value }));
+  const dotStyles = [dotStyle0, dotStyle1, dotStyle2];
 
   const finish = async () => {
     await SecureStore.setItemAsync("dm_onboarded", "true");
@@ -85,13 +135,16 @@ export default function OnboardingScreen() {
   };
 
   const goNext = () => {
-    if (current < SLIDES.length - 1) {
-      flatRef.current?.scrollToIndex({ index: current + 1 });
-      setCurrent(current + 1);
-    } else {
-      finish();
-    }
+    if (current < SLIDES.length - 1) setCurrent((c) => c + 1);
+    else finish();
   };
+
+  useEffect(() => {
+    const t = setTimeout(() => setShowLocation(true), 900);
+    return () => clearTimeout(t);
+  }, []);
+
+  const slide = SLIDES[current];
 
   return (
     <View style={s.container}>
@@ -99,80 +152,154 @@ export default function OnboardingScreen() {
 
       <LocationModal
         visible={showLocation}
-        onAllow={async () => { setShowLocation(false); try { await Location.requestForegroundPermissionsAsync(); } catch {} }}
+        onAllow={async () => {
+          setShowLocation(false);
+          try { await Location.requestForegroundPermissionsAsync(); } catch {}
+        }}
         onSkip={() => setShowLocation(false)}
       />
 
-      {/* Skip */}
+      {/* Bouton Passer */}
       {current < SLIDES.length - 1 && (
         <TouchableOpacity style={s.skipBtn} onPress={finish}>
           <Text style={s.skipText}>Passer</Text>
         </TouchableOpacity>
       )}
 
-      {/* Slides */}
-      <FlatList
-        ref={flatRef}
-        data={SLIDES}
-        horizontal
-        pagingEnabled
-        scrollEnabled={false}
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={(i) => i.key}
-        style={{ flex: 1 }}
-        renderItem={({ item }) => (
-          <View style={s.slide}>
-            <View style={[s.illustrationCircle, { backgroundColor: item.bg }]}>
-              <Ionicons name={item.icon} size={110} color={item.iconColor} />
-            </View>
-            <View style={s.dots}>
-              {SLIDES.map((_, i) => (
-                <View key={i} style={[s.dot, i === current && s.dotActive]} />
-              ))}
-            </View>
-            <Text style={s.title}>{item.title}</Text>
-            <Text style={s.sub}>{item.subtitle}</Text>
-          </View>
-        )}
-      />
+      {/* Zone image — remontage sur changement de slide → animation d'entrée */}
+      <View style={[s.imageSection, { backgroundColor: slide.bg }]}>
+        <Animated.View key={`img-${current}`} entering={FadeIn.duration(500)} style={s.imageFill}>
+          <FloatingImage uri={slide.uri} />
+        </Animated.View>
+        <LinearGradient
+          colors={["transparent", Colors.bg]}
+          style={s.gradient}
+          pointerEvents="none"
+        />
+      </View>
 
-      {/* CTA */}
+      {/* Contenu texte — glisse vers le haut à chaque slide */}
+      <Animated.View key={`txt-${current}`} entering={FadeInUp.delay(160).duration(420)} style={s.textSection}>
+        {/* Indicateurs */}
+        <View style={s.dots}>
+          {SLIDES.map((_, i) => (
+            <Animated.View
+              key={i}
+              style={[s.dot, i === current && s.dotActive, dotStyles[i]]}
+            />
+          ))}
+        </View>
+
+        <Text style={s.title}>{slide.title}</Text>
+        <Text style={s.sub}>{slide.subtitle}</Text>
+      </Animated.View>
+
+      {/* Bouton CTA */}
       <View style={s.bottom}>
         <TouchableOpacity style={s.btn} onPress={goNext} activeOpacity={0.85}>
-          <Text style={s.btnText}>{current === SLIDES.length - 1 ? "Commencer" : "Suivant"}</Text>
+          <Text style={s.btnText}>
+            {current === SLIDES.length - 1 ? "Commencer" : "Suivant"}
+          </Text>
+          <Ionicons
+            name={current === SLIDES.length - 1 ? "rocket-outline" : "arrow-forward"}
+            size={18}
+            color="#fff"
+          />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  skipBtn: { position: "absolute", top: 56, right: 20, zIndex: 10, paddingVertical: 8, paddingHorizontal: 12 },
-  skipText: { fontSize: 14, color: Colors.text2, fontWeight: "600" },
-  slide: { width, flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
-  illustrationCircle: {
-    width: 240, height: 240, borderRadius: 120,
-    alignItems: "center", justifyContent: "center", marginBottom: 40,
+
+  skipBtn: {
+    position: "absolute", top: 56, right: 20, zIndex: 20,
+    paddingVertical: 8, paddingHorizontal: 14,
+    backgroundColor: "rgba(255,255,255,0.85)", borderRadius: Radius.full,
   },
-  dots: { flexDirection: "row", gap: 6, marginBottom: 24 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.border },
-  dotActive: { width: 28, borderRadius: 4, backgroundColor: Colors.primary },
-  title: { fontSize: 26, fontWeight: "800", color: Colors.text, textAlign: "center", lineHeight: 36, marginBottom: 14 },
-  sub: { fontSize: 15, color: Colors.text2, textAlign: "center", lineHeight: 24, maxWidth: 300 },
-  bottom: { paddingHorizontal: 24, paddingBottom: 52, paddingTop: 16 },
+  skipText: { fontSize: 13, color: Colors.text2, fontWeight: "600" },
+
+  // Image section
+  imageSection: {
+    height: IMAGE_H,
+    overflow: "hidden",
+  },
+  imageFill: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 72,
+    paddingBottom: 24,
+  },
+  floatWrap: {
+    flex: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  heroImage: {
+    flex: 1,
+    borderRadius: 28,
+  },
+  gradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 90,
+  },
+
+  // Text section
+  textSection: {
+    flex: 1,
+    paddingHorizontal: 28,
+    paddingTop: 8,
+  },
+  dots: { flexDirection: "row", gap: 6, marginBottom: 20 },
+  dot: {
+    height: 8, borderRadius: 4,
+    backgroundColor: Colors.border,
+  },
+  dotActive: { backgroundColor: Colors.primary },
+  title: {
+    fontSize: 28, fontWeight: "800", color: Colors.text,
+    lineHeight: 38, marginBottom: 12,
+  },
+  sub: {
+    fontSize: 15, color: Colors.text2,
+    lineHeight: 24, maxWidth: 320,
+  },
+
+  // Bottom CTA
+  bottom: { paddingHorizontal: 24, paddingBottom: 48, paddingTop: 12 },
   btn: {
-    height: 67, borderRadius: Radius.full, backgroundColor: Colors.primary,
-    alignItems: "center", justifyContent: "center",
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 6,
+    height: 64, borderRadius: Radius.full,
+    backgroundColor: Colors.primary,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
   },
   btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });
 
 const loc = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#fff", borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 28, alignItems: "center" },
-  iconWrap: { width: 88, height: 88, borderRadius: 44, backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center", marginBottom: 20 },
+  sheet: {
+    backgroundColor: "#fff", borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    padding: 28, alignItems: "center",
+  },
+  iconWrap: {
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: Colors.primaryLight,
+    alignItems: "center", justifyContent: "center", marginBottom: 20,
+  },
   title: { fontSize: 22, fontWeight: "800", color: Colors.text, textAlign: "center", marginBottom: 10 },
   sub: { fontSize: 14, color: Colors.text2, textAlign: "center", lineHeight: 22, marginBottom: 20 },
   row: { flexDirection: "row", alignItems: "center", gap: 10, alignSelf: "stretch", marginBottom: 10 },
