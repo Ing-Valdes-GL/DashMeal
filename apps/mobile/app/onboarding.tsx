@@ -41,6 +41,13 @@ const SLIDES = [
     title: "Livraison rapide\ngarantie",
     subtitle: "Suivez votre commande en temps réel et récupérez-la avec votre QR code en agence.",
   },
+  {
+    key: "pickup",
+    uri: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&auto=format&fit=crop&q=80",
+    bg: "#F3EEFF",
+    title: "Commandez et passez\nrécupérer quand vous décidez",
+    subtitle: "Évitez les longues files d'attente et soyez prioritaire grâce au QR code de votre commande.",
+  },
 ];
 
 // ── Image flottante ────────────────────────────────────────────────────────────
@@ -117,17 +124,20 @@ export default function OnboardingScreen() {
   const d0 = useSharedValue(28);
   const d1 = useSharedValue(8);
   const d2 = useSharedValue(8);
+  const d3 = useSharedValue(8);
 
   useEffect(() => {
     d0.value = withTiming(current === 0 ? 28 : 8, { duration: 300 });
     d1.value = withTiming(current === 1 ? 28 : 8, { duration: 300 });
     d2.value = withTiming(current === 2 ? 28 : 8, { duration: 300 });
+    d3.value = withTiming(current === 3 ? 28 : 8, { duration: 300 });
   }, [current]);
 
   const dotStyle0 = useAnimatedStyle(() => ({ width: d0.value }));
   const dotStyle1 = useAnimatedStyle(() => ({ width: d1.value }));
   const dotStyle2 = useAnimatedStyle(() => ({ width: d2.value }));
-  const dotStyles = [dotStyle0, dotStyle1, dotStyle2];
+  const dotStyle3 = useAnimatedStyle(() => ({ width: d3.value }));
+  const dotStyles = [dotStyle0, dotStyle1, dotStyle2, dotStyle3];
 
   const finish = async () => {
     await SecureStore.setItemAsync("dm_onboarded", "true");
