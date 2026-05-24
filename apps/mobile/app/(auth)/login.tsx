@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
+import * as AppleAuthentication from "expo-apple-authentication";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth";
 import { apiPost } from "@/lib/api";
@@ -25,15 +26,17 @@ export default function LoginScreen() {
   const { t } = useTranslation();
   const { login } = useAuthStore();
 
-  const [mode, setMode]           = useState<Mode>("email");
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword]   = useState("");
-  const [showPwd, setShowPwd]     = useState(false);
-  const [loading, setLoading]     = useState(false);
+  const [mode, setMode]               = useState<Mode>("email");
+  const [identifier, setIdentifier]   = useState("");
+  const [password, setPassword]       = useState("");
+  const [showPwd, setShowPwd]         = useState(false);
+  const [loading, setLoading]         = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [error, setError]         = useState("");
+  const [appleLoading, setAppleLoading]   = useState(false);
+  const [error, setError]             = useState("");
 
-  const discovery = AuthSession.useAutoDiscovery("https://accounts.google.com");
+  // ── Google OAuth ──────────────────────────────────────────────────────────────
+  const discovery  = AuthSession.useAutoDiscovery("https://accounts.google.com");
   const redirectUri = AuthSession.makeRedirectUri({ scheme: "dashmeal", path: "auth" });
 
   const [request, , promptAsync] = AuthSession.useAuthRequest(
@@ -72,6 +75,33 @@ export default function LoginScreen() {
     }
   };
 
+  // ── Apple Sign In (iOS uniquement) ────────────────────────────────────────────
+  const handleAppleLogin = async () => {
+    setAppleLoading(true);
+    setError("");
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const res = await apiPost("/auth/user/apple", { id_token: credential.identityToken });
+      const { user, tokens } = res.data;
+      await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
+      await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
+      login(user, tokens.access_token, tokens.refresh_token);
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      if (e.code !== "ERR_REQUEST_CANCELED") {
+        setError(e?.response?.data?.error?.message ?? t("auth.appleError"));
+      }
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
+  // ── Email / phone login ───────────────────────────────────────────────────────
   const handleLogin = async () => {
     setError("");
     if (!identifier.trim() || !password.trim()) {
@@ -83,8 +113,7 @@ export default function LoginScreen() {
       const normalizedIdentifier = mode === "email"
         ? identifier.trim().toLowerCase()
         : identifier.trim();
-      const payload = { identifier: normalizedIdentifier, password };
-      const res = await apiPost("/auth/user/login", payload);
+      const res = await apiPost("/auth/user/login", { identifier: normalizedIdentifier, password });
       const { user, tokens } = res.data;
       await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
       await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
@@ -181,9 +210,28 @@ export default function LoginScreen() {
             <View style={s.divLine} />
           </View>
 
-          {/* Google */}
+          {/* Apple — iOS uniquement */}
+          {Platform.OS === "ios" && (
+            <TouchableOpacity
+              style={s.appleBtn}
+              onPress={handleAppleLogin}
+              disabled={appleLoading}
+              activeOpacity={0.85}
+            >
+              {appleLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="logo-apple" size={20} color="#fff" />
+                  <Text style={s.appleBtnText}>{t("auth.continueWithApple")}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Google — toutes plateformes */}
           <TouchableOpacity
-            style={s.googleBtn}
+            style={[s.googleBtn, Platform.OS === "ios" && { marginTop: 12 }]}
             onPress={handleGoogleLogin}
             disabled={googleLoading || !request}
             activeOpacity={0.85}
@@ -241,6 +289,13 @@ const s = StyleSheet.create({
   divider: { flexDirection: "row", alignItems: "center", gap: 12, marginVertical: 24 },
   divLine: { flex: 1, height: 1, backgroundColor: Colors.border },
   divText: { fontSize: 12, color: Colors.text3, fontWeight: "500" },
+
+  appleBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12,
+    height: 56, borderRadius: Radius.full,
+    backgroundColor: "#000",
+  },
+  appleBtnText: { fontSize: 15, fontWeight: "600", color: "#fff" },
 
   googleBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 12, height: 56, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.bg },
   googleText: { fontSize: 15, fontWeight: "600", color: Colors.text },
