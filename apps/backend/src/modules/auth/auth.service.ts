@@ -680,6 +680,53 @@ export async function googleAuth(input: { id_token: string }): Promise<{ user: o
   return { user, tokens };
 }
 
+// ─── Supabase OAuth (Google via Supabase Auth) ────────────────────────────────
+
+export async function googleAuthSupabase(input: { supabase_token: string }): Promise<{ user: object; tokens: AuthTokens }> {
+  // Vérifier le token Supabase via le client service-role (auth.getUser vérifie le JWT)
+  const { data: { user: sbUser }, error } = await supabase.auth.getUser(input.supabase_token);
+
+  if (error || !sbUser?.email) {
+    throw new AppError(401, "INVALID_SUPABASE_TOKEN", "Token Supabase invalide ou expiré");
+  }
+
+  const email     = sbUser.email;
+  const name: string = sbUser.user_metadata?.full_name ?? sbUser.user_metadata?.name ?? email.split("@")[0];
+  const googleId  = sbUser.id; // UUID Supabase utilisé comme identifiant OAuth stable
+
+  // Chercher l'utilisateur par email
+  const { data: byEmail } = await supabase
+    .from("users")
+    .select("id, name, phone, email, google_id, is_verified")
+    .eq("email", email)
+    .maybeSingle();
+
+  let user = byEmail;
+
+  if (!user) {
+    // Créer le compte
+    const { data: newUser, error: createErr } = await supabase
+      .from("users")
+      .insert({
+        name, email,
+        google_id: googleId,
+        email_verified: true,
+        is_verified: true,
+        phone: null,
+        password_hash: null,
+      })
+      .select("id, name, phone, email, google_id, is_verified")
+      .single();
+    if (createErr || !newUser) throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte Google");
+    user = newUser;
+  } else if (!user.google_id) {
+    await supabase.from("users").update({ google_id: googleId, email_verified: true }).eq("id", user.id);
+  }
+
+  const tokens = buildUserTokens(user as { id: string; name?: string; phone: string });
+  return { user, tokens };
+}
+
 // ─── Helpers privés ───────────────────────────────────────────────────────────
 
 function buildUserTokens(user: { id: string; name?: string; phone: string }): AuthTokens {
