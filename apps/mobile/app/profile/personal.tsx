@@ -10,10 +10,12 @@ import { apiPatch } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from "react-i18next";
 import { Colors, Radius, Shadow } from "@/lib/theme";
 
 export default function PersonalInfoScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user, setUser } = useAuthStore();
   const queryClient = useQueryClient();
 
@@ -27,14 +29,14 @@ export default function PersonalInfoScreen() {
       if (user) setUser({ ...user, name: updated.name ?? name } as any);
       queryClient.invalidateQueries({ queryKey: ["me"] });
       setEdited(false);
-      Alert.alert("Succès", "Informations mises à jour.");
+      Alert.alert(t("common.success"), t("personal.updateSuccess"));
     },
-    onError: () => Alert.alert("Erreur", "Impossible de mettre à jour le profil."),
+    onError: () => Alert.alert(t("common.error"), t("personal.updateError")),
   });
 
   const handleSave = () => {
     if (!name.trim() || name.trim().length < 2) {
-      Alert.alert("Nom invalide", "Le nom doit contenir au moins 2 caractères.");
+      Alert.alert(t("personal.invalidName"), t("personal.nameMinLength"));
       return;
     }
     updateMutation.mutate({ name: name.trim() });
@@ -48,7 +50,7 @@ export default function PersonalInfoScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={20} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Informations personnelles</Text>
+          <Text style={styles.headerTitle}>{t("personal.title")}</Text>
           <View style={{ width: 38 }} />
         </View>
       </SafeAreaView>
@@ -65,7 +67,7 @@ export default function PersonalInfoScreen() {
           {user?.is_verified && (
             <View style={styles.verifiedBadge}>
               <Ionicons name="checkmark-circle" size={13} color={Colors.success} />
-              <Text style={styles.verifiedText}>Compte vérifié</Text>
+              <Text style={styles.verifiedText}>{t("personal.verified")}</Text>
             </View>
           )}
         </View>
@@ -74,12 +76,12 @@ export default function PersonalInfoScreen() {
         <View style={styles.card}>
           {/* Nom */}
           <View style={styles.field}>
-            <Text style={styles.label}>Nom complet</Text>
+            <Text style={styles.label}>{t("personal.fullName")}</Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={(v) => { setName(v); setEdited(v.trim() !== user?.name); }}
-              placeholder="Votre nom"
+              placeholder={t("personal.namePh")}
               placeholderTextColor={Colors.text3}
               autoCapitalize="words"
               maxLength={100}
@@ -90,14 +92,14 @@ export default function PersonalInfoScreen() {
 
           {/* Téléphone (lecture seule) */}
           <View style={styles.field}>
-            <Text style={styles.label}>Numéro de téléphone</Text>
+            <Text style={styles.label}>{t("personal.phoneNumber")}</Text>
             <View style={styles.readonlyRow}>
               <Text style={styles.readonlyValue}>{user?.phone ?? "—"}</Text>
               <View style={styles.readonlyBadge}>
-                <Text style={styles.readonlyBadgeText}>Non modifiable</Text>
+                <Text style={styles.readonlyBadgeText}>{t("personal.notEditable")}</Text>
               </View>
             </View>
-            <Text style={styles.hint}>Le numéro est lié à votre compte via OTP</Text>
+            <Text style={styles.hint}>{t("personal.phoneHint")}</Text>
           </View>
         </View>
 
@@ -108,7 +110,7 @@ export default function PersonalInfoScreen() {
               <Ionicons name="calendar-outline" size={16} color={Colors.text3} />
             </View>
             <View>
-              <Text style={styles.infoLabel}>Membre depuis</Text>
+              <Text style={styles.infoLabel}>{t("personal.memberSince")}</Text>
               <Text style={styles.infoValue}>
                 {(user as any)?.created_at
                   ? new Date((user as any).created_at).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })
@@ -127,7 +129,7 @@ export default function PersonalInfoScreen() {
           >
             {updateMutation.isPending
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.saveBtnText}>Enregistrer les modifications</Text>
+              : <Text style={styles.saveBtnText}>{t("personal.saveChanges")}</Text>
             }
           </TouchableOpacity>
         )}

@@ -9,6 +9,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from "react-i18next";
 import { Colors, Radius, Shadow } from "@/lib/theme";
 
 interface FavoriteItem {
@@ -25,6 +26,7 @@ interface FavoriteItem {
 
 export default function FavoritesScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const { data: resp, isLoading, refetch, isRefetching } = useQuery<{ success: boolean; data: FavoriteItem[] }>({
@@ -37,13 +39,13 @@ export default function FavoritesScreen() {
   const removeMutation = useMutation({
     mutationFn: (branchId: string) => apiPost(`/users/me/favorites/${branchId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-favorites"] }),
-    onError: () => Alert.alert("Erreur", "Impossible de retirer ce favori."),
+    onError: () => Alert.alert(t("common.error"), t("favorites.removeError")),
   });
 
-  const confirmRemove = (branchId: string, name: string) => {
-    Alert.alert("Retirer des favoris", `Retirer "${name}" de vos favoris ?`, [
-      { text: "Annuler", style: "cancel" },
-      { text: "Retirer", style: "destructive", onPress: () => removeMutation.mutate(branchId) },
+  const confirmRemove = (branchId: string, branchName: string) => {
+    Alert.alert(t("favorites.removeConfirmTitle"), `${t("favorites.removeConfirmMsg").replace("?", "")} "${branchName}" ?`, [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("common.delete"), style: "destructive", onPress: () => removeMutation.mutate(branchId) },
     ]);
   };
 
@@ -55,7 +57,7 @@ export default function FavoritesScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={20} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Mes favoris</Text>
+          <Text style={styles.headerTitle}>{t("favorites.title")}</Text>
           <View style={{ width: 38 }} />
         </View>
       </SafeAreaView>
@@ -94,7 +96,7 @@ export default function FavoritesScreen() {
                     <Text style={styles.metaText} numberOfLines={1}>{branch.city}</Text>
                     <View style={styles.typePill}>
                       <Text style={styles.typeText}>
-                        {branch.type === "restaurant" ? "Restaurant" : branch.type === "grocery" ? "Épicerie" : branch.type}
+                        {branch.type === "restaurant" ? t("favorites.restaurant") : branch.type === "grocery" ? t("favorites.grocery") : branch.type}
                       </Text>
                     </View>
                   </View>
@@ -106,7 +108,7 @@ export default function FavoritesScreen() {
                     style={styles.orderBtn}
                     onPress={() => router.push({ pathname: "/(tabs)/catalog" })}
                   >
-                    <Text style={styles.orderBtnText}>Commander</Text>
+                    <Text style={styles.orderBtnText}>{t("favorites.order")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.heartBtn}
@@ -122,12 +124,10 @@ export default function FavoritesScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="heart-outline" size={56} color={Colors.border} />
-              <Text style={styles.emptyTitle}>Aucun favori</Text>
-              <Text style={styles.emptySubtitle}>
-                Ajoutez des agences en favoris depuis le catalogue pour les retrouver ici
-              </Text>
+              <Text style={styles.emptyTitle}>{t("favorites.emptyStores")}</Text>
+              <Text style={styles.emptySubtitle}>{t("favorites.emptyStoresSub")}</Text>
               <TouchableOpacity style={styles.emptyBtn} onPress={() => router.push("/(tabs)/catalog")}>
-                <Text style={styles.emptyBtnText}>Explorer le catalogue</Text>
+                <Text style={styles.emptyBtnText}>{t("favorites.exploreCatalog")}</Text>
               </TouchableOpacity>
             </View>
           }

@@ -9,6 +9,7 @@ import { useAuthStore } from "@/stores/auth";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 import { Colors, Radius, Shadow } from "@/lib/theme";
 
 function AuthDecoration() {
@@ -28,6 +29,7 @@ const deco = StyleSheet.create({
 
 export default function OtpScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { identifier, via, prefill } = useLocalSearchParams<{ identifier: string; via?: string; prefill?: string }>();
   const isEmail = via === "email" || (identifier && identifier.includes("@"));
   const { login } = useAuthStore();
@@ -66,7 +68,7 @@ export default function OtpScreen() {
       await login(res.data.user, res.data.tokens.access_token, res.data.tokens.refresh_token);
       router.replace("/(tabs)");
     },
-    onError: () => setError("Code invalide ou expiré. Vérifiez et réessayez."),
+    onError: () => setError(t("auth.invalidCode")),
   });
 
   const resendMutation = useMutation({
@@ -76,7 +78,7 @@ export default function OtpScreen() {
       startCountdown();
       if (res.data.otp_code) setOtp(res.data.otp_code.split("").slice(0, 6));
     },
-    onError: () => setError("Impossible de renvoyer le code."),
+    onError: () => setError(t("auth.cantResend")),
   });
 
   const handleDigit = (val: string, idx: number) => {
@@ -118,16 +120,16 @@ export default function OtpScreen() {
             />
           </View>
 
-          <Text style={styles.title}>Vérification</Text>
+          <Text style={styles.title}>{t("auth.verificationTitle")}</Text>
           <Text style={styles.subtitle}>
-            {isEmail ? "Nous avons envoyé un code à\n" : "SMS envoyé au numéro\n"}
+            {isEmail ? t("auth.verificationEmailSub") + "\n" : t("auth.verificationSmsSub") + "\n"}
             <Text style={styles.identifierText}>{identifier}</Text>
           </Text>
 
           {isEmail && (
             <View style={styles.emailHintBox}>
               <Ionicons name="information-circle-outline" size={14} color="#60A5FA" />
-              <Text style={styles.emailHintText}>Vérifiez votre boîte mail et vos spams</Text>
+              <Text style={styles.emailHintText}>{t("auth.emailHint")}</Text>
             </View>
           )}
 
@@ -160,10 +162,10 @@ export default function OtpScreen() {
               <ActivityIndicator size="small" color={Colors.primary} />
             ) : countdown > 0 ? (
               <Text style={styles.resendText}>
-                Renvoyer dans <Text style={styles.resendTimer}>{countdown}s</Text>
+                {t("auth.resendIn")} <Text style={styles.resendTimer}>{countdown}s</Text>
               </Text>
             ) : (
-              <Text style={[styles.resendText, { color: Colors.primary }]}>Renvoyer le code</Text>
+              <Text style={[styles.resendText, { color: Colors.primary }]}>{t("auth.resendCode")}</Text>
             )}
           </TouchableOpacity>
 
@@ -177,13 +179,13 @@ export default function OtpScreen() {
           >
             {verifyMutation.isPending
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.btnText}>VÉRIFIER</Text>
+              : <Text style={styles.btnText}>{t("auth.verify")}</Text>
             }
           </TouchableOpacity>
 
           <Text style={styles.changeHint}>
-            Mauvaise adresse ?{" "}
-            <Text style={{ color: Colors.primary }} onPress={() => router.back()}>Modifier</Text>
+            {t("auth.wrongAddress")}{" "}
+            <Text style={{ color: Colors.primary }} onPress={() => router.back()}>{t("auth.modify")}</Text>
           </Text>
         </View>
       </SafeAreaView>
