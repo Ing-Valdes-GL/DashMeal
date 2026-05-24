@@ -19,6 +19,11 @@ router.post(
   validate(z.object({ id_token: z.string().min(1, "Le token Google est requis") })),
   controller.googleAuth
 );
+router.post(
+  "/user/supabase-oauth",
+  validate(z.object({ supabase_token: z.string().min(1, "Token Supabase requis") })),
+  controller.googleAuthSupabase
+);
 router.post("/user/register", validate(RegisterUserSchema), controller.registerUser);
 router.post("/user/verify-phone", validate(VerifyOtpSchema), controller.verifyPhone);
 router.post(
