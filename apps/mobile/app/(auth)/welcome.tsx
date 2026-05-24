@@ -9,6 +9,7 @@ import Animated, {
   useSharedValue, useAnimatedStyle,
   withRepeat, withTiming, withSequence, Easing,
 } from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth";
 import { Colors, Radius } from "@/lib/theme";
 
@@ -17,9 +18,9 @@ const BG_IMAGE = require("../../assets/welcome-bg.jpg") as number;
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { continueAsGuest } = useAuthStore();
 
-  // ── Animation du logo (flottement vertical doux) ──────────────────────────
   const floatY = useSharedValue(0);
 
   useEffect(() => {
@@ -37,12 +38,10 @@ export default function WelcomeScreen() {
     transform: [{ translateY: floatY.value }],
   }));
 
-
   return (
     <View style={s.root}>
       <StatusBar style="light" />
 
-      {/* ── Image de fond plein écran ──────────────────────────────────────── */}
       <Image
         source={BG_IMAGE}
         style={StyleSheet.absoluteFill}
@@ -50,7 +49,6 @@ export default function WelcomeScreen() {
         transition={600}
       />
 
-      {/* ── Dégradé sombre sur l'image (du haut vers le bas) ─────────────── */}
       <LinearGradient
         colors={["rgba(0,0,0,0.18)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.82)"]}
         locations={[0, 0.45, 1]}
@@ -58,7 +56,6 @@ export default function WelcomeScreen() {
       />
 
       <SafeAreaView style={s.safe} edges={["top"]}>
-        {/* ── Logo haut droite ──────────────────────────────────────────── */}
         <View style={s.topBar}>
           <Animated.View style={[s.logoWrap, logoStyle]}>
             <Image
@@ -70,19 +67,16 @@ export default function WelcomeScreen() {
         </View>
       </SafeAreaView>
 
-      {/* ── Feuille CTA en bas ────────────────────────────────────────────── */}
       <View style={s.sheet}>
-        <Text style={s.sheetTitle}>Bienvenue !</Text>
-        <Text style={s.sheetSub}>
-          La meilleure nourriture de votre région, livrée en un instant.
-        </Text>
+        <Text style={s.sheetTitle}>{t("welcome.title")}</Text>
+        <Text style={s.sheetSub}>{t("welcome.sub")}</Text>
 
         <TouchableOpacity
           style={s.btnPrimary}
           onPress={() => router.push("/(auth)/login")}
           activeOpacity={0.88}
         >
-          <Text style={s.btnPrimaryText}>Se connecter</Text>
+          <Text style={s.btnPrimaryText}>{t("welcome.login")}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -90,14 +84,14 @@ export default function WelcomeScreen() {
           onPress={() => router.push("/(auth)/register")}
           activeOpacity={0.88}
         >
-          <Text style={s.btnOutlineText}>Créer un compte</Text>
+          <Text style={s.btnOutlineText}>{t("welcome.register")}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={s.guestBtn}
           onPress={() => { continueAsGuest(); router.replace("/(tabs)"); }}
         >
-          <Text style={s.guestText}>Continuer sans compte</Text>
+          <Text style={s.guestText}>{t("welcome.guest")}</Text>
         </TouchableOpacity>
       </View>
     </View>

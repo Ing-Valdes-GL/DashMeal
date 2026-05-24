@@ -10,6 +10,7 @@ import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth";
 import { Colors, Radius, Shadow } from "@/lib/theme";
 
@@ -21,13 +22,6 @@ interface Order {
 
 type OrderTab = "pending" | "transit" | "delivered" | "collect";
 
-const TABS: { key: OrderTab; label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
-  { key: "pending",   label: "En attente", icon: "time-outline" },
-  { key: "transit",   label: "En transit", icon: "bicycle-outline" },
-  { key: "delivered", label: "Livrée",     icon: "checkmark-circle-outline" },
-  { key: "collect",   label: "Click & Collect", icon: "qr-code-outline" },
-];
-
 const STATUS_COLOR: Record<string, string> = {
   pending:    "#FFC107",
   confirmed:  "#2196F3",
@@ -38,16 +32,6 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled:  Colors.error,
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  pending:    "En attente",
-  confirmed:  "Confirmée",
-  preparing:  "En préparation",
-  ready:      "Prête",
-  delivering: "En livraison",
-  delivered:  "Livrée",
-  cancelled:  "Annulée",
-};
-
 function getOrderTab(order: Order): OrderTab {
   if (order.type === "collect") return "collect";
   if (["pending", "confirmed"].includes(order.status)) return "pending";
@@ -55,7 +39,7 @@ function getOrderTab(order: Order): OrderTab {
   return "delivered";
 }
 
-function OrderCard({ order, onPress, onChat }: { order: Order; onPress: () => void; onChat?: () => void }) {
+function OrderCard({ order, onPress, onChat, statusLabel, t }: { order: Order; onPress: () => void; onChat?: () => void; statusLabel: string; t: (k: string) => string }) {
   const statusColor = STATUS_COLOR[order.status] ?? Colors.text3;
 
   return (
@@ -74,7 +58,7 @@ function OrderCard({ order, onPress, onChat }: { order: Order; onPress: () => vo
             <View style={[styles.statusBadge, { backgroundColor: statusColor + "18" }]}>
               <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
               <Text style={[styles.statusText, { color: statusColor }]}>
-                {STATUS_LABEL[order.status] ?? order.status}
+                {statusLabel}
               </Text>
             </View>
           </View>
@@ -92,17 +76,17 @@ function OrderCard({ order, onPress, onChat }: { order: Order; onPress: () => vo
           {order.status === "delivered" && !order.rating && (
             <TouchableOpacity style={styles.btnPrimary} onPress={onPress}>
               <Ionicons name="star-outline" size={13} color="#fff" />
-              <Text style={styles.btnPrimaryText}>Noter</Text>
+              <Text style={styles.btnPrimaryText}>{t("orders.rate")}</Text>
             </TouchableOpacity>
           )}
           {["pending", "confirmed", "preparing", "delivering"].includes(order.status) && (
             <TouchableOpacity style={styles.btnSecondary} onPress={onPress}>
               <Ionicons name="navigate-outline" size={13} color={Colors.primary} />
-              <Text style={styles.btnSecondaryText}>Suivre</Text>
+              <Text style={styles.btnSecondaryText}>{t("orders.track")}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.btnOutline} onPress={onPress}>
-            <Text style={styles.btnOutlineText}>Détail</Text>
+            <Text style={styles.btnOutlineText}>{t("orders.detail")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -118,12 +102,12 @@ function OrderCard({ order, onPress, onChat }: { order: Order; onPress: () => vo
                 onPress={() => onChat?.()}
               >
                 <Ionicons name="bicycle-outline" size={13} color={Colors.primary} />
-                <Text style={styles.contactBtnText}>Livreur</Text>
+                <Text style={styles.contactBtnText}>{t("orders.driver")}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.contactBtn} onPress={() => onChat?.()}>
               <Ionicons name="chatbubble-outline" size={13} color={Colors.primary} />
-              <Text style={styles.contactBtnText}>Agence</Text>
+              <Text style={styles.contactBtnText}>{t("orders.agency")}</Text>
             </TouchableOpacity>
           </View>
         </>
@@ -134,8 +118,26 @@ function OrderCard({ order, onPress, onChat }: { order: Order; onPress: () => vo
 
 export default function OrdersScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { isAuthenticated } = useAuthStore();
   const [activeTab, setActiveTab] = useState<OrderTab>("pending");
+
+  const TABS: { key: OrderTab; label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
+    { key: "pending",   label: t("orders.tabPending"),   icon: "time-outline" },
+    { key: "transit",   label: t("orders.tabTransit"),   icon: "bicycle-outline" },
+    { key: "delivered", label: t("orders.tabDelivered"), icon: "checkmark-circle-outline" },
+    { key: "collect",   label: t("orders.tabCollect"),   icon: "qr-code-outline" },
+  ];
+
+  const STATUS_LABEL: Record<string, string> = {
+    pending:    t("orders.pending"),
+    confirmed:  t("orders.confirmed"),
+    preparing:  t("orders.preparing"),
+    ready:      t("orders.ready"),
+    delivering: t("orders.delivering"),
+    delivered:  t("orders.delivered"),
+    cancelled:  t("orders.cancelled"),
+  };
 
   const { data: resp, isLoading, refetch, isRefetching } = useQuery<{ success: boolean; data: Order[] }>({
     queryKey: ["my-orders"],
@@ -158,22 +160,20 @@ export default function OrdersScreen() {
         <StatusBar style="dark" />
         <SafeAreaView style={styles.safe} edges={["top"]}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Mes commandes</Text>
+            <Text style={styles.headerTitle}>{t("orders.title")}</Text>
           </View>
         </SafeAreaView>
         <View style={styles.authWall}>
           <View style={styles.authIconWrap}>
             <Ionicons name="receipt-outline" size={52} color={Colors.border} />
           </View>
-          <Text style={styles.authTitle}>Connectez-vous pour voir vos commandes</Text>
-          <Text style={styles.authSubtitle}>
-            Suivez vos commandes en temps réel et consultez votre historique
-          </Text>
+          <Text style={styles.authTitle}>{t("orders.authTitle")}</Text>
+          <Text style={styles.authSubtitle}>{t("orders.authSubtitle")}</Text>
           <TouchableOpacity style={styles.authBtn} onPress={() => router.push("/(auth)/welcome")}>
-            <Text style={styles.authBtnText}>Se connecter</Text>
+            <Text style={styles.authBtnText}>{t("auth.loginButton")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.authBtnSecondary} onPress={() => router.push("/(auth)/register")}>
-            <Text style={styles.authBtnSecondaryText}>Créer un compte</Text>
+            <Text style={styles.authBtnSecondaryText}>{t("auth.registerButton")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -186,7 +186,7 @@ export default function OrdersScreen() {
       <SafeAreaView style={styles.safe} edges={["top"]}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Mes commandes</Text>
+          <Text style={styles.headerTitle}>{t("orders.title")}</Text>
           <TouchableOpacity>
             <Ionicons name="filter-outline" size={20} color={Colors.text} />
           </TouchableOpacity>
@@ -232,23 +232,25 @@ export default function OrdersScreen() {
               order={item}
               onPress={() => router.push({ pathname: "/order/[id]", params: { id: item.id } })}
               onChat={() => router.push({ pathname: "/chat/[id]", params: { id: item.id } })}
+              statusLabel={STATUS_LABEL[item.status] ?? item.status}
+              t={t}
             />
           )}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons
-                name={TABS.find((t) => t.key === activeTab)?.icon ?? "receipt-outline"}
+                name={TABS.find((tab) => tab.key === activeTab)?.icon ?? "receipt-outline"}
                 size={52} color={Colors.border}
               />
               <Text style={styles.emptyTitle}>
-                {activeTab === "pending"   ? "Aucune commande en attente"
-                : activeTab === "transit"  ? "Aucune commande en transit"
-                : activeTab === "delivered"? "Aucune commande livrée"
-                : "Aucun retrait prévu"}
+                {activeTab === "pending"   ? t("orders.emptyPending")
+                : activeTab === "transit"  ? t("orders.emptyTransit")
+                : activeTab === "delivered"? t("orders.emptyDelivered")
+                : t("orders.emptyCollect")}
               </Text>
-              <Text style={styles.emptySubtitle}>Vos commandes apparaîtront ici</Text>
+              <Text style={styles.emptySubtitle}>{t("orders.emptySubtitle")}</Text>
               <TouchableOpacity style={styles.shopBtn} onPress={() => router.push("/(tabs)")}>
-                <Text style={styles.shopBtnText}>Parcourir les boutiques</Text>
+                <Text style={styles.shopBtnText}>{t("orders.shopBtn")}</Text>
               </TouchableOpacity>
             </View>
           }

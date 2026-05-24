@@ -34,49 +34,18 @@ interface Ad {
 
 interface Notification { id: string; is_read: boolean; }
 
-// ─── Catégories avec vraies images ───────────────────────────────────────────
-const CATEGORIES = [
-  {
-    key: "restaurant",
-    label: "Restaurants",
-    image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&q=80",
-    bg: "#FFF3E0",
-  },
-  {
-    key: "supermarket",
-    label: "Supermarché",
-    image: "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=300&q=80",
-    bg: "#E3F2FD",
-  },
-  {
-    key: "bakery",
-    label: "Boulangerie",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&q=80",
-    bg: "#FFF8E1",
-  },
-  {
-    key: "cafe",
-    label: "Cafés & Bars",
-    image: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&q=80",
-    bg: "#EFEBE9",
-  },
-  {
-    key: "pharmacy",
-    label: "Pharmacies",
-    image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&q=80",
-    bg: "#E8F5E9",
-  },
-];
-
-const BANNERS = [
-  { id: "1", bg: Colors.primaryLight, title: "Légumes frais",     sub: "Jusqu'à 40% de réduction !", icon: "leaf-outline" as const,    iconColor: Colors.primary },
-  { id: "2", bg: "#FFF3E0",           title: "Flash Sales",       sub: "Offres limitées du jour",    icon: "flash-outline" as const,   iconColor: "#FF9800" },
-  { id: "3", bg: "#E3F2FD",           title: "Livraison offerte", sub: "Sur votre 1re commande",     icon: "bicycle-outline" as const, iconColor: "#2196F3" },
-];
+// ─── Catégories (images statiques, labels via i18n) ──────────────────────────
+const CATEGORY_IMAGES = [
+  { key: "restaurant", image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&q=80", bg: "#FFF3E0" },
+  { key: "supermarket", image: "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=300&q=80", bg: "#E3F2FD" },
+  { key: "bakery", image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&q=80", bg: "#FFF8E1" },
+  { key: "cafe", image: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&q=80", bg: "#EFEBE9" },
+  { key: "pharmacy", image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&q=80", bg: "#E8F5E9" },
+] as const;
 
 // ─── Hook géolocalisation dynamique ──────────────────────────────────────────
-function useCurrentLocation() {
-  const [locationLabel, setLocationLabel] = useState<string>("Localisation...");
+function useCurrentLocation(locationLoadingLabel: string, locationUnknownLabel: string) {
+  const [locationLabel, setLocationLabel] = useState<string>(locationLoadingLabel);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -96,7 +65,7 @@ function useCurrentLocation() {
         if (!cancelled && place) {
           const city    = place.city || place.district || place.subregion || place.region || "";
           const country = place.country || "";
-          setLocationLabel(city && country ? `${city}, ${country}` : city || country || "Localisation inconnue");
+          setLocationLabel(city && country ? `${city}, ${country}` : city || country || locationUnknownLabel);
         }
       } catch {
         if (!cancelled) setLocationLabel("Yaoundé, Cameroun");
@@ -155,18 +124,20 @@ function ProductCard({ item, onPress, onAdd, lang }: {
   );
 }
 
+type BannerItem = { id: string; bg: string; title: string; sub: string; icon: React.ComponentProps<typeof Ionicons>["name"]; iconColor: string };
+
 // ─── Carrousel bannières ──────────────────────────────────────────────────────
-function BannerCarousel() {
+function BannerCarousel({ banners }: { banners: BannerItem[] }) {
   const scrollRef = useRef<ScrollView>(null);
   const [idx, setIdx] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => {
-      const next = (idx + 1) % BANNERS.length;
+    const timer = setInterval(() => {
+      const next = (idx + 1) % banners.length;
       scrollRef.current?.scrollTo({ x: next * (W - 32), animated: true });
       setIdx(next);
     }, 3500);
-    return () => clearInterval(t);
-  }, [idx]);
+    return () => clearInterval(timer);
+  }, [idx, banners.length]);
 
   return (
     <View>
@@ -177,7 +148,7 @@ function BannerCarousel() {
         onMomentumScrollEnd={(e) => setIdx(Math.round(e.nativeEvent.contentOffset.x / (W - 32)))}
         style={{ borderRadius: Radius.lg, overflow: "hidden" }}
       >
-        {BANNERS.map((b) => (
+        {banners.map((b) => (
           <View key={b.id} style={[bn.card, { backgroundColor: b.bg, width: W - 32 }]}>
             <View style={{ flex: 1 }}>
               <Text style={bn.title}>{b.title}</Text>
@@ -190,7 +161,7 @@ function BannerCarousel() {
         ))}
       </ScrollView>
       <View style={bn.dots}>
-        {BANNERS.map((_, i) => <View key={i} style={[bn.dot, i === idx && bn.dotActive]} />)}
+        {banners.map((_, i) => <View key={i} style={[bn.dot, i === idx && bn.dotActive]} />)}
       </View>
     </View>
   );
@@ -247,7 +218,7 @@ function AdCard({ ad }: { ad: Ad }) {
 }
 
 // ─── Composant catégorie ──────────────────────────────────────────────────────
-function CategoryCard({ item, onPress }: { item: typeof CATEGORIES[0]; onPress: () => void }) {
+function CategoryCard({ item, onPress }: { item: typeof CATEGORY_IMAGES[0] & { label: string }; onPress: () => void }) {
   return (
     <TouchableOpacity style={[cat.chip, { width: CARD_W }]} onPress={onPress} activeOpacity={0.8}>
       <View style={cat.imgWrap}>
@@ -263,6 +234,58 @@ function CategoryCard({ item, onPress }: { item: typeof CATEGORIES[0]; onPress: 
   );
 }
 
+// ─── Wallet mini-card (home) ──────────────────────────────────────────────────
+interface WalletSummary { balance: number; card_number: string; }
+
+function HomeWalletCard({ wallet, loading, onPress }: {
+  wallet: WalletSummary | null;
+  loading: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  const activated = !!wallet;
+
+  return (
+    <TouchableOpacity style={wc.card} onPress={onPress} activeOpacity={0.88}>
+      {/* Background decoration circles */}
+      <View style={wc.circle1} />
+      <View style={wc.circle2} />
+      <View style={wc.circle3} />
+
+      {/* Card content (dimmed when not activated) */}
+      <View style={[wc.content, !activated && { opacity: 0.28 }]}>
+        <View style={wc.topRow}>
+          <View style={wc.chip}>
+            <Ionicons name="wallet-outline" size={15} color="#FFC107" />
+          </View>
+          <Text style={wc.cardLabel}>Dash Wallet</Text>
+          <Ionicons name="card-outline" size={18} color="rgba(255,255,255,0.55)" />
+        </View>
+        <Text style={wc.balance}>
+          {loading ? "···" : activated ? `${wallet!.balance.toLocaleString("fr-FR")} FCFA` : "0 FCFA"}
+        </Text>
+        <View style={wc.bottomRow}>
+          <Text style={wc.cardNum}>
+            {activated ? `•••• ${wallet!.card_number.slice(-4)}` : "•••• ••••"}
+          </Text>
+          <Text style={wc.tag}>Wallet</Text>
+        </View>
+      </View>
+
+      {/* Frosted overlay when not activated */}
+      {!activated && !loading && (
+        <View style={wc.frosted}>
+          <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.9)" />
+          <Text style={wc.frostedText}>{t("wallet.activateTitle")}</Text>
+          <View style={wc.cta}>
+            <Text style={wc.ctaText}>{t("wallet.activate")}</Text>
+          </View>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 // ─── Écran principal ──────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
@@ -271,9 +294,32 @@ export default function HomeScreen() {
   const addItem = useCartStore((s) => s.addItem);
   const { isAuthenticated } = useAuthStore();
 
-  const { locationLabel, loading: locLoading } = useCurrentLocation();
+  const [walletData, setWalletData] = useState<WalletSummary | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
 
-  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0].key);
+  useEffect(() => {
+    if (!isAuthenticated) { setWalletData(null); return; }
+    setWalletLoading(true);
+    apiGet("/user-wallet")
+      .then((d: any) => setWalletData(d ?? null))
+      .catch(() => setWalletData(null))
+      .finally(() => setWalletLoading(false));
+  }, [isAuthenticated]);
+
+  const CATEGORIES = CATEGORY_IMAGES.map((c) => ({
+    ...c,
+    label: t(`home.cat${c.key.charAt(0).toUpperCase() + c.key.slice(1)}` as any),
+  }));
+
+  const BANNERS: BannerItem[] = [
+    { id: "1", bg: Colors.primaryLight, title: t("home.bannerVeggies"),   sub: t("home.bannerVeggiesSub"),   icon: "leaf-outline",    iconColor: Colors.primary },
+    { id: "2", bg: "#FFF3E0",           title: t("home.bannerFlash"),     sub: t("home.bannerFlashSub"),     icon: "flash-outline",   iconColor: "#FF9800" },
+    { id: "3", bg: "#E3F2FD",           title: t("home.bannerDelivery"),  sub: t("home.bannerDeliverySub"),  icon: "bicycle-outline", iconColor: "#2196F3" },
+  ];
+
+  const { locationLabel, loading: locLoading } = useCurrentLocation(t("home.locationLoading"), t("home.locationUnknown"));
+
+  const [activeCategory, setActiveCategory] = useState(CATEGORY_IMAGES[0].key);
 
   // Publicités actives
   const { data: adsRes, isLoading: lAds, refetch, isRefetching } = useQuery<{ data: Ad[] }>({
@@ -350,7 +396,7 @@ export default function HomeScreen() {
         {/* ─── Barre de recherche ───────────────────────────────────────── */}
         <TouchableOpacity style={s.searchBar} onPress={() => router.push("/(tabs)/explore" as any)}>
           <Ionicons name="search-outline" size={18} color={Colors.text3} />
-          <Text style={s.searchPlaceholder}>Search Store</Text>
+          <Text style={s.searchPlaceholder}>{t("explore.searchPlaceholder")}</Text>
           <View style={s.filterIcon}>
             <Ionicons name="options-outline" size={18} color="#fff" />
           </View>
@@ -366,12 +412,19 @@ export default function HomeScreen() {
       >
         {/* Bannières */}
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-          <BannerCarousel />
+          <BannerCarousel banners={BANNERS} />
         </View>
+
+        {/* ── Wallet mini-card ──────────────────────────────────────────── */}
+        <HomeWalletCard
+          wallet={walletData}
+          loading={walletLoading}
+          onPress={() => router.push("/wallet" as any)}
+        />
 
         {/* ── Exclusive Offer : publicités actives ──────────────────────── */}
         {(lAds || ads.length > 0) && (
-          <Section title="Exclusive Offer" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
+          <Section title={t("home.exclusiveOffer")} onSeeAll={() => router.push("/(tabs)/explore" as any)}>
             {lAds ? <ProductListSkeleton /> : (
               <FlatList
                 horizontal data={ads} keyExtractor={(i) => i.id}
@@ -384,7 +437,7 @@ export default function HomeScreen() {
         )}
 
         {/* ── Best Selling : top 5 par catégorie ───────────────────────── */}
-        <Section title="Best Selling" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
+        <Section title={t("home.bestSelling")} onSeeAll={() => router.push("/(tabs)/explore" as any)}>
           {/* Onglets catégorie */}
           <ScrollView
             horizontal showsHorizontalScrollIndicator={false}
@@ -406,7 +459,7 @@ export default function HomeScreen() {
 
           {lBs ? <ProductListSkeleton /> : bestSellers.length === 0 ? (
             <View style={s.emptySection}>
-              <Text style={s.emptySectionText}>Aucun produit disponible</Text>
+              <Text style={s.emptySectionText}>{t("explore.noProducts")}</Text>
             </View>
           ) : (
             <FlatList
@@ -427,7 +480,7 @@ export default function HomeScreen() {
         </Section>
 
         {/* Catégories — grille verticale 2 par ligne */}
-        <Section title="Catégories" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
+        <Section title={t("home.categories")} onSeeAll={() => router.push("/(tabs)/explore" as any)}>
           <View style={cat.grid}>
             {CATEGORIES.map((item) => (
               <CategoryCard
@@ -444,11 +497,12 @@ export default function HomeScreen() {
 }
 
 function Section({ title, onSeeAll, children }: { title: string; onSeeAll: () => void; children: React.ReactNode }) {
+  const { t } = useTranslation();
   return (
     <View style={{ marginTop: 20 }}>
       <View style={s.sectionRow}>
         <Text style={s.sectionTitle}>{title}</Text>
-        <TouchableOpacity onPress={onSeeAll}><Text style={s.seeAll}>See all</Text></TouchableOpacity>
+        <TouchableOpacity onPress={onSeeAll}><Text style={s.seeAll}>{t("common.seeAll")}</Text></TouchableOpacity>
       </View>
       {children}
     </View>
@@ -561,6 +615,59 @@ const bs = StyleSheet.create({
   tabActive:     { backgroundColor: Colors.primary, borderColor: Colors.primary },
   tabText:       { fontSize: 13, fontWeight: "600", color: Colors.text2 },
   tabTextActive: { color: "#fff" },
+});
+
+const wc = StyleSheet.create({
+  card: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    height: 108,
+    borderRadius: Radius.lg,
+    backgroundColor: "#C0392B",
+    overflow: "hidden",
+    position: "relative",
+  },
+  circle1: {
+    position: "absolute", width: 180, height: 180, borderRadius: 90,
+    backgroundColor: "#E74C3C", top: -50, right: -40, opacity: 0.7,
+  },
+  circle2: {
+    position: "absolute", width: 110, height: 110, borderRadius: 55,
+    backgroundColor: "#FFC107", bottom: -40, left: 20, opacity: 0.45,
+  },
+  circle3: {
+    position: "absolute", width: 70, height: 70, borderRadius: 35,
+    backgroundColor: "#F39C12", top: 10, left: -20, opacity: 0.3,
+  },
+  content: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    paddingHorizontal: 18, paddingVertical: 14, justifyContent: "space-between",
+  },
+  topRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  chip: {
+    width: 28, height: 20, backgroundColor: "rgba(255,193,7,0.25)",
+    borderRadius: 4, alignItems: "center", justifyContent: "center",
+  },
+  cardLabel: { flex: 1, fontSize: 12, fontWeight: "700", color: "rgba(255,255,255,0.9)", letterSpacing: 0.5 },
+  balance:   { fontSize: 19, fontWeight: "800", color: "#fff", letterSpacing: 0.3 },
+  bottomRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  cardNum:   { fontSize: 13, color: "rgba(255,255,255,0.75)", letterSpacing: 2.5, fontWeight: "600" },
+  tag: {
+    fontSize: 10, fontWeight: "700", color: "rgba(255,255,255,0.8)",
+    backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 8,
+    paddingVertical: 3, borderRadius: 99,
+  },
+  frosted: {
+    position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(10,10,10,0.58)",
+    flexDirection: "row", alignItems: "center", paddingHorizontal: 18, gap: 10,
+  },
+  frostedText: { flex: 1, color: "#fff", fontSize: 14, fontWeight: "700" },
+  cta: {
+    backgroundColor: "#FFC107", paddingHorizontal: 16, paddingVertical: 8,
+    borderRadius: 99,
+  },
+  ctaText: { color: "#1A1A1A", fontSize: 13, fontWeight: "800" },
 });
 
 const cat = StyleSheet.create({

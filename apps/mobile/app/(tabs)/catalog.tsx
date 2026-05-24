@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { apiGet, apiPost } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { useCartStore } from "@/stores/cart";
@@ -28,17 +29,36 @@ const BRANCH_TYPE_LABEL: Record<string, { fr: string; en: string }> = {
 
 interface Branch {
   id: string; name: string; city: string; address: string; type?: string;
+  image_url: string | null;
+  avg_rating: number; ratings_count: number;
   brands?: { id: string; name: string; logo_url: string | null };
 }
 interface Product {
   id: string; name_fr: string; name_en: string; price: number;
   image_url: string | null; promo_price: number | null; is_hidden: boolean;
   category_id: string | null;
+  avg_rating?: number; ratings_count?: number;
   categories?: { name_fr: string; name_en: string };
   product_images?: { url: string; is_primary: boolean }[];
 }
 interface Category { id: string; name_fr: string; name_en: string; icon: string | null }
 type ApiResponse<T> = { success: boolean; data: T };
+
+function StarRow({ rating, count, light }: { rating: number; count: number; light?: boolean }) {
+  const color = light ? "#FFE066" : "#FFC107";
+  const textColor = light ? "rgba(255,255,255,0.9)" : Colors.text3;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+      {[1, 2, 3, 4, 5].map((s) => {
+        const name = rating >= s ? "star" : rating >= s - 0.5 ? "star-half" : "star-outline";
+        return <Ionicons key={s} name={name as any} size={12} color={color} />;
+      })}
+      <Text style={{ fontSize: 11, color: textColor, marginLeft: 3 }}>
+        {count > 0 ? `${rating.toFixed(1)} (${count})` : ""}
+      </Text>
+    </View>
+  );
+}
 
 export default function CatalogScreen() {
   const { t, i18n } = useTranslation();
@@ -101,78 +121,132 @@ export default function CatalogScreen() {
       addItem({ product_id: item.id, product_name: getName(item), product_image: getImage(item) ?? undefined, unit_price: item.promo_price ?? item.price, quantity: 1 });
     };
     if (cartBranchId && cartBranchId !== selectedBranch.id) {
-      Alert.alert("Changer d'agence ?", "Votre panier contient des articles d'une autre agence. Le vider pour continuer ?", [
-        { text: "Annuler", style: "cancel" },
-        { text: "Vider et continuer", style: "destructive", onPress: () => { clearCart(); doAdd(); } },
-      ]);
+      Alert.alert(
+        t("catalog.changeAlert"),
+        t("catalog.changeAlertMsg"),
+        [
+          { text: t("common.cancel"), style: "cancel" },
+          { text: t("catalog.clearAndContinue"), style: "destructive", onPress: () => { clearCart(); doAdd(); } },
+        ],
+      );
     } else { doAdd(); }
   }, [selectedBranch, cartBranchId, addItem, setBranch, clearCart, i18n.language]);
 
   // ── Sélection d'agence ────────────────────────────────────────────────────
   if (!selectedBranch) {
+    const filtered = branches.filter((b) =>
+      !search ||
+      b.name.toLowerCase().includes(search.toLowerCase()) ||
+      b.brands?.name?.toLowerCase().includes(search.toLowerCase())
+    );
+
     return (
       <View style={styles.container}>
         <StatusBar style="dark" />
         <SafeAreaView style={styles.safe} edges={["top"]}>
           <View style={styles.header}>
-            <Text style={styles.title}>Choisir une agence</Text>
-            <Text style={styles.subtitle}>Sélectionnez où vous souhaitez commander</Text>
+            <Text style={styles.title}>{t("catalog.title")}</Text>
+            <Text style={styles.subtitle}>{t("catalog.subtitle")}</Text>
             <View style={styles.searchBar}>
               <Ionicons name="search-outline" size={16} color={Colors.text3} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Rechercher une agence…"
+                placeholder={t("catalog.searchPlaceholder")}
                 placeholderTextColor={Colors.text3}
                 value={search}
                 onChangeText={setSearch}
               />
+              {search ? (
+                <TouchableOpacity onPress={() => setSearch("")}>
+                  <Ionicons name="close-circle" size={16} color={Colors.text3} />
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         </SafeAreaView>
+
         {branchesLoading ? (
           <ActivityIndicator color={Colors.primary} style={{ flex: 1 }} />
         ) : (
           <FlatList
-            data={branches.filter((b) => !search || b.name.toLowerCase().includes(search.toLowerCase()) || b.brands?.name?.toLowerCase().includes(search.toLowerCase()))}
+            data={filtered}
             keyExtractor={(b) => b.id}
             contentContainerStyle={styles.branchList}
             showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.branchCard} onPress={() => { setSelectedBranch(item); setSearch(""); setCategory("all"); }} activeOpacity={0.85}>
-                <View style={styles.branchLogo}>
-                  {item.brands?.logo_url ? (
-                    <Image source={{ uri: item.brands.logo_url }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
-                  ) : (
-                    <Ionicons name="storefront-outline" size={24} color={Colors.primary} />
-                  )}
-                </View>
-                <View style={styles.branchInfo}>
-                  <Text style={styles.branchName}>{item.brands?.name ?? item.name}</Text>
-                  <View style={styles.branchMeta}>
-                    <View style={styles.typePill}>
-                      <Text style={styles.typePillText}>{BRANCH_TYPE_LABEL[item.type ?? "other"]?.[i18n.language === "en" ? "en" : "fr"] ?? "Autre"}</Text>
-                    </View>
-                    <Text style={styles.branchCity}>{item.city}</Text>
-                  </View>
-                  <Text style={styles.branchAddress} numberOfLines={1}>{item.address}</Text>
-                </View>
+            renderItem={({ item }) => {
+              const coverImage = item.image_url ?? item.brands?.logo_url ?? null;
+              const typeLabel = BRANCH_TYPE_LABEL[item.type ?? "other"]?.[i18n.language === "en" ? "en" : "fr"] ?? "Autre";
+              const isFav = favoriteIds.has(item.id);
+
+              return (
                 <TouchableOpacity
-                  style={styles.favBtn}
-                  onPress={(e) => { e.stopPropagation(); favMutation.mutate(item.id); }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.branchCard}
+                  onPress={() => { setSelectedBranch(item); setSearch(""); setCategory("all"); }}
+                  activeOpacity={0.88}
                 >
-                  <Ionicons
-                    name={favoriteIds.has(item.id) ? "heart" : "heart-outline"}
-                    size={20}
-                    color={favoriteIds.has(item.id) ? Colors.error : Colors.text3}
-                  />
+                  {/* Cover image */}
+                  <View style={styles.coverWrap}>
+                    {coverImage ? (
+                      <Image source={{ uri: coverImage }} style={styles.cover} contentFit="cover" />
+                    ) : (
+                      <View style={[styles.cover, styles.coverFallback]}>
+                        <Ionicons name="storefront-outline" size={48} color={Colors.border} />
+                      </View>
+                    )}
+
+                    {/* Gradient overlay */}
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.62)"]}
+                      style={styles.coverGradient}
+                    />
+
+                    {/* Brand logo badge */}
+                    {item.brands?.logo_url && (
+                      <View style={styles.logoBadge}>
+                        <Image source={{ uri: item.brands.logo_url }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                      </View>
+                    )}
+
+                    {/* Favourite button */}
+                    <TouchableOpacity
+                      style={styles.favBtn}
+                      onPress={(e) => { e.stopPropagation(); favMutation.mutate(item.id); }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons
+                        name={isFav ? "heart" : "heart-outline"}
+                        size={20}
+                        color={isFav ? "#FF6B6B" : "#fff"}
+                      />
+                    </TouchableOpacity>
+
+                    {/* Name + rating over image */}
+                    <View style={styles.coverMeta}>
+                      <Text style={styles.coverName} numberOfLines={1}>
+                        {item.brands?.name ?? item.name}
+                      </Text>
+                      <StarRow rating={item.avg_rating ?? 0} count={item.ratings_count ?? 0} light />
+                    </View>
+                  </View>
+
+                  {/* Below image */}
+                  <View style={styles.cardBottom}>
+                    <View style={styles.typePill}>
+                      <Text style={styles.typePillText}>{typeLabel}</Text>
+                    </View>
+                    <View style={styles.locationRow}>
+                      <Ionicons name="location-outline" size={13} color={Colors.text3} />
+                      <Text style={styles.locationText} numberOfLines={1}>{item.city}</Text>
+                    </View>
+                    <Text style={styles.addressText} numberOfLines={1}>{item.address}</Text>
+                  </View>
                 </TouchableOpacity>
-              </TouchableOpacity>
-            )}
+              );
+            }}
             ListEmptyComponent={
               <View style={styles.empty}>
-                <Ionicons name="storefront-outline" size={48} color={Colors.border} />
-                <Text style={styles.emptyText}>Aucune agence disponible</Text>
+                <Ionicons name="storefront-outline" size={52} color={Colors.border} />
+                <Text style={styles.emptyText}>{search ? t("catalog.noResults") : t("catalog.noBranch")}</Text>
               </View>
             }
           />
@@ -189,7 +263,7 @@ export default function CatalogScreen() {
         <View style={styles.header}>
           <TouchableOpacity style={styles.backRow} onPress={() => { setSelectedBranch(null); setSearch(""); setCategory("all"); }}>
             <Ionicons name="arrow-back" size={18} color={Colors.text3} />
-            <Text style={styles.backText}>Changer d'agence</Text>
+            <Text style={styles.backText}>{t("catalog.changeBranch")}</Text>
           </TouchableOpacity>
           <Text style={styles.title}>{selectedBranch.brands?.name ?? selectedBranch.name}</Text>
           <View style={styles.searchBar}>
@@ -262,7 +336,12 @@ export default function CatalogScreen() {
               </View>
               <View style={styles.cardBody}>
                 <Text style={styles.productName} numberOfLines={2}>{getName(item)}</Text>
-                <Text style={styles.categoryLabel} numberOfLines={1}>{item.categories?.name_fr ?? ""}</Text>
+                {(item.avg_rating ?? 0) > 0 && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 2, marginBottom: 2 }}>
+                    <Ionicons name="star" size={11} color="#FFC107" />
+                    <Text style={{ fontSize: 11, color: Colors.text3 }}>{(item.avg_rating ?? 0).toFixed(1)}</Text>
+                  </View>
+                )}
                 <View style={styles.cardFooter}>
                   <View>
                     {item.promo_price ? (
@@ -288,7 +367,7 @@ export default function CatalogScreen() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <Ionicons name="search-outline" size={48} color={Colors.border} />
-              <Text style={styles.emptyText}>{search ? "Aucun résultat" : t("common.noResults")}</Text>
+              <Text style={styles.emptyText}>{search ? t("catalog.noResults") : t("common.noResults")}</Text>
             </View>
           }
         />
@@ -298,7 +377,9 @@ export default function CatalogScreen() {
       {cartCount > 0 && (
         <TouchableOpacity style={styles.cartFab} onPress={() => router.push("/(tabs)/cart")} activeOpacity={0.9}>
           <Ionicons name="cart" size={20} color="#fff" />
-          <Text style={styles.cartFabText}>{cartCount} article{cartCount > 1 ? "s" : ""} dans le panier</Text>
+          <Text style={styles.cartFabText}>
+            {cartCount === 1 ? t("catalog.itemsInCart", { count: cartCount }) : t("catalog.itemsInCartPlural", { count: cartCount })}
+          </Text>
         </TouchableOpacity>
       )}
     </View>
@@ -327,36 +408,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 8,
     borderRadius: Radius.full, backgroundColor: Colors.inputBg,
   },
-  pillActive:      { backgroundColor: Colors.primary },
-  pillText:        { fontSize: 13, fontWeight: "600", color: Colors.text2 },
-  pillTextActive:  { color: "#fff" },
-  // Branch list
-  branchList: { padding: 16, paddingTop: 8, gap: 10 },
+  pillActive:     { backgroundColor: Colors.primary },
+  pillText:       { fontSize: 13, fontWeight: "600", color: Colors.text2 },
+  pillTextActive: { color: "#fff" },
+
+  // Branch cards (new visual design)
+  branchList: { padding: 16, paddingTop: 12, gap: 16 },
   branchCard: {
-    flexDirection: "row", alignItems: "center", gap: 14,
-    backgroundColor: Colors.card, borderRadius: Radius.lg,
-    padding: 14, ...Shadow.sm,
+    backgroundColor: Colors.card, borderRadius: Radius.xl,
+    overflow: "hidden", ...Shadow.sm,
   },
-  branchLogo: {
-    width: 56, height: 56, borderRadius: Radius.md,
-    backgroundColor: Colors.pageBg, alignItems: "center", justifyContent: "center", overflow: "hidden",
+  coverWrap:     { height: 190, position: "relative" },
+  cover:         { width: "100%", height: "100%" },
+  coverFallback: { backgroundColor: Colors.pageBg, alignItems: "center", justifyContent: "center" },
+  coverGradient: { ...StyleSheet.absoluteFillObject },
+  logoBadge: {
+    position: "absolute", top: 12, left: 12,
+    width: 44, height: 44, borderRadius: Radius.md,
+    backgroundColor: Colors.bg, overflow: "hidden",
+    borderWidth: 2, borderColor: "rgba(255,255,255,0.9)",
   },
-  branchInfo: { flex: 1, gap: 4 },
-  branchName: { fontSize: 15, fontWeight: "700", color: Colors.text },
-  branchMeta: { flexDirection: "row", alignItems: "center", gap: 8 },
-  typePill: { backgroundColor: Colors.primaryLight, borderRadius: Radius.full, paddingHorizontal: 8, paddingVertical: 2 },
+  favBtn: {
+    position: "absolute", top: 12, right: 12,
+    width: 36, height: 36, borderRadius: Radius.full,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center", justifyContent: "center",
+  },
+  coverMeta: {
+    position: "absolute", bottom: 12, left: 14, right: 58, gap: 4,
+  },
+  coverName: { fontSize: 18, fontWeight: "800", color: "#fff" },
+  cardBottom: { paddingHorizontal: 14, paddingVertical: 12, gap: 6 },
+  typePill: {
+    alignSelf: "flex-start",
+    backgroundColor: Colors.primaryLight, borderRadius: Radius.full,
+    paddingHorizontal: 10, paddingVertical: 3,
+  },
   typePillText: { fontSize: 11, fontWeight: "600", color: Colors.primary },
-  branchCity: { fontSize: 12, color: Colors.text3 },
-  branchAddress: { fontSize: 11, color: Colors.text3 },
-  favBtn: { padding: 6 },
+  locationRow:  { flexDirection: "row", alignItems: "center", gap: 4 },
+  locationText: { fontSize: 13, color: Colors.text2, fontWeight: "500", flex: 1 },
+  addressText:  { fontSize: 12, color: Colors.text3 },
+
   // Product grid
   grid: { padding: 12, paddingBottom: 100 },
   card: {
     flex: 1, backgroundColor: Colors.card, borderRadius: Radius.lg,
     marginBottom: 12, overflow: "hidden", ...Shadow.sm,
   },
-  imgWrap:    { height: 130, backgroundColor: Colors.inputBg },
-  img:        { width: "100%", height: "100%" },
+  imgWrap:     { height: 130, backgroundColor: Colors.inputBg },
+  img:         { width: "100%", height: "100%" },
   imgFallback: { flex: 1, alignItems: "center", justifyContent: "center" },
   promoBadge: {
     position: "absolute", top: 8, right: 8,
@@ -364,10 +464,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2,
   },
   promoText:     { color: "#fff", fontSize: 10, fontWeight: "700" },
-  cardBody:      { padding: 10, gap: 3 },
+  cardBody:      { padding: 10, gap: 2 },
   productName:   { fontSize: 13, fontWeight: "600", color: Colors.text },
-  categoryLabel: { fontSize: 11, color: Colors.text3 },
-  cardFooter:    { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 8 },
+  cardFooter:    { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 6 },
   price:         { fontSize: 13, fontWeight: "700", color: Colors.primary },
   priceOriginal: { fontSize: 10, color: Colors.text3, textDecorationLine: "line-through" },
   pricePromo:    { fontSize: 13, fontWeight: "700", color: Colors.primary },
