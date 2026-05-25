@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
@@ -18,7 +18,92 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Pencil, Trash2, MapPin, Phone, Clock, Store, Package, Camera, Radio, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Pencil, Trash2, MapPin, Phone, Clock, Store, Package, Camera, Radio, CheckCircle, XCircle, Loader2, Navigation } from "lucide-react";
+
+// ─── Google Places Autocomplete input ─────────────────────────────────────────
+
+interface PlaceResult { address: string; city: string; lat: number; lng: number }
+
+function PlacesAutocompleteInput({
+  value,
+  onChange,
+  onPlaceSelect,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onPlaceSelect: (r: PlaceResult) => void;
+  placeholder?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
+    if (!key || !inputRef.current) return;
+
+    const g = (window as any).google;
+
+    const attach = () => {
+      const maps = (window as any).google?.maps;
+      if (!maps?.places || !inputRef.current) return;
+      const ac = new maps.places.Autocomplete(inputRef.current, {
+        types: ["geocode", "establishment"],
+      });
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace();
+        if (!place?.geometry?.location) return;
+        const lat = place.geometry.location.lat() as number;
+        const lng = place.geometry.location.lng() as number;
+        const address = place.formatted_address ?? place.name ?? "";
+        let city = "";
+        for (const comp of (place.address_components ?? []) as any[]) {
+          if (comp.types.includes("locality") || comp.types.includes("administrative_area_level_2")) {
+            city = comp.long_name;
+            break;
+          }
+        }
+        onChange(address);
+        onPlaceSelect({ address, city, lat, lng });
+      });
+    };
+
+    if (g?.maps?.places) {
+      attach();
+    } else {
+      const scriptId = "gm-places-script";
+      if (!document.getElementById(scriptId)) {
+        (window as any).__gmPlacesReady = attach;
+        const s = document.createElement("script");
+        s.id = scriptId;
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&callback=__gmPlacesReady`;
+        s.async = true;
+        document.head.appendChild(s);
+      } else {
+        // script already injected — poll until ready
+        const timer = setInterval(() => {
+          if ((window as any).google?.maps?.places) {
+            clearInterval(timer);
+            attach();
+          }
+        }, 150);
+        return () => clearInterval(timer);
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="relative">
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder ?? "Rechercher sur Google Maps…"}
+        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pr-9"
+      />
+      <Navigation className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+    </div>
+  );
+}
 
 const BRANCH_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft:            { label: "Brouillon",    color: "bg-slate-100 text-slate-600" },
@@ -393,7 +478,21 @@ export default function BranchesPage() {
               </div>
               <div className="col-span-2 space-y-1.5">
                 <Label>{t("address")}</Label>
-                <Input {...register("address")} placeholder="Adresse complète" />
+                <PlacesAutocompleteInput
+                  value={watch("address") ?? ""}
+                  onChange={(v) => setValue("address", v)}
+                  onPlaceSelect={(r) => {
+                    setValue("address", r.address);
+                    if (r.city) setValue("city", r.city);
+                    if (r.lat) setValue("lat", r.lat);
+                    if (r.lng) setValue("lng", r.lng);
+                  }}
+                  placeholder="Rechercher l'adresse sur Google Maps…"
+                />
+                <p className="text-[11px] text-slate-400 flex items-center gap-1">
+                  <Navigation className="h-3 w-3" />
+                  Sélectionnez une adresse dans la liste pour remplir automatiquement la position GPS
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>{t("city")}</Label>
@@ -404,11 +503,15 @@ export default function BranchesPage() {
                 <Input {...register("phone")} placeholder="+237 6XX XXX XXX" />
               </div>
               <div className="space-y-1.5">
-                <Label>Latitude</Label>
+                <Label className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5 text-slate-400" /> Latitude
+                </Label>
                 <Input {...register("lat")} type="number" step="any" placeholder="3.8480" />
               </div>
               <div className="space-y-1.5">
-                <Label>Longitude</Label>
+                <Label className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5 text-slate-400" /> Longitude
+                </Label>
                 <Input {...register("lng")} type="number" step="any" placeholder="11.5021" />
               </div>
             </div>
