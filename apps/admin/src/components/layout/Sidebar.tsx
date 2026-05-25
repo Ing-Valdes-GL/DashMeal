@@ -14,7 +14,7 @@ import {
   BarChart2, Bell, Settings, Building2, FileText,
   Users, Activity, Globe, ChevronRight, LogOut,
   UserCheck, Wallet, DollarSign, Megaphone, UsersRound,
-  Tag, LayoutGrid, ClipboardCheck, Download, MapPin, Video,
+  Tag, LayoutGrid, ClipboardCheck, Download, MapPin, Video, LayoutList,
 } from "lucide-react";
 
 interface NavItem {
@@ -76,6 +76,7 @@ export function Sidebar({ locale }: { locale: string }) {
   const superadminNav: NavItem[] = [
     { href: "/superadmin/platform",     label: t("platform"),     icon: Globe },
     { href: "/superadmin/brands",       label: t("brands"),       icon: Building2 },
+    { href: "/superadmin/catalogue",    label: t("catalogue"),    icon: LayoutList },
     { href: "/superadmin/applications", label: t("applications"), icon: FileText },
     { href: "/superadmin/users",        label: t("users"),        icon: Users },
     { href: "/superadmin/commissions",  label: t("commissions"),  icon: DollarSign },
