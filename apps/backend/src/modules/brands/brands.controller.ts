@@ -329,3 +329,45 @@ export async function suspendBrand(req: Request, res: Response, next: NextFuncti
     next(err);
   }
 }
+
+// ─── Catalogue superadmin ─────────────────────────────────────────────────────
+// Toutes les marques actives avec leurs agences complètes et 4 produits vedettes.
+
+export async function getCatalogue(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { data: brands, error } = await supabase
+      .from("brands")
+      .select(`
+        id, name, logo_url, description, is_active, created_at,
+        branches(id, name, address, city, lat, lng, is_active, is_live, category, image_url, phone)
+      `)
+      .eq("is_active", true)
+      .order("name");
+
+    if (error) throw new AppError(500, "FETCH_ERROR", "Erreur catalogue");
+
+    const result = await Promise.all(
+      (brands ?? []).map(async (brand) => {
+        const branchIds = (brand.branches as Array<{ id: string }>).map((b) => b.id);
+        let featured_products: Array<{ id: string; name: string; name_fr: string | null; price: number; image_url: string | null }> = [];
+
+        if (branchIds.length > 0) {
+          const { data: products } = await supabase
+            .from("products")
+            .select("id, name, name_fr, price, image_url")
+            .in("branch_id", branchIds)
+            .eq("is_hidden", false)
+            .order("avg_rating", { ascending: false })
+            .limit(4);
+          featured_products = products ?? [];
+        }
+
+        return { id: brand.id, name: brand.name, logo_url: brand.logo_url, description: brand.description, created_at: brand.created_at, branches: brand.branches, featured_products };
+      })
+    );
+
+    sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+}
