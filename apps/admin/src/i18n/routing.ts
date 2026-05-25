@@ -23,5 +23,6 @@ export const routing = defineRouting({
     "/superadmin/users": "/superadmin/users",
     "/superadmin/audit": "/superadmin/audit",
     "/superadmin/platform": "/superadmin/platform",
+    "/superadmin/catalogue": "/superadmin/catalogue",
   },
 });

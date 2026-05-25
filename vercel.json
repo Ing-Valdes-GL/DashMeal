@@ -2,5 +2,5 @@
   "buildCommand": "pnpm --filter @dash-meal/shared build && pnpm --filter @dash-meal/admin build",
   "outputDirectory": "apps/admin/.next",
   "installCommand": "pnpm install --frozen-lockfile",
-  "framework": null
+  "framework": "nextjs"
 }
