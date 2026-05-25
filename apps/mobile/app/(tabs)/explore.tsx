@@ -22,17 +22,17 @@ interface Product {
   product_images?: { url: string; is_primary: boolean }[];
 }
 
-const CATEGORIES = [
-  { key: "all",         label: "Tout",           icon: "grid-outline" as const,        bg: Colors.primaryLight, color: Colors.primary },
-  { key: "restaurant",  label: "Restaurants",    icon: "restaurant-outline" as const,  bg: "#FFF3E0", color: "#FF9800" },
-  { key: "supermarket", label: "Supermarché",    icon: "storefront-outline" as const,  bg: "#E3F2FD", color: "#2196F3" },
-  { key: "bakery",      label: "Boulangerie",    icon: "cafe-outline" as const,        bg: "#FFF8E1", color: "#FFC107" },
-  { key: "cafe",        label: "Cafés",          icon: "wine-outline" as const,        bg: "#EFEBE9", color: "#795548" },
-  { key: "pharmacy",    label: "Pharmacies",     icon: "medkit-outline" as const,      bg: "#E8F5E9", color: Colors.primary },
-  { key: "juice",       label: "Jus",            icon: "water-outline" as const,       bg: "#E0F7FA", color: "#00BCD4" },
-  { key: "african",     label: "Cuisine locale", icon: "globe-outline" as const,       bg: "#F3E5F5", color: "#9C27B0" },
-  { key: "fastfood",    label: "Fast-food",      icon: "fast-food-outline" as const,   bg: "#FFEBEE", color: "#F44336" },
-];
+const CATEGORY_META = [
+  { key: "all",         icon: "grid-outline" as const,        bg: Colors.primaryLight, color: Colors.primary },
+  { key: "restaurant",  icon: "restaurant-outline" as const,  bg: "#FFF3E0", color: "#FF9800" },
+  { key: "supermarket", icon: "storefront-outline" as const,  bg: "#E3F2FD", color: "#2196F3" },
+  { key: "bakery",      icon: "cafe-outline" as const,        bg: "#FFF8E1", color: "#FFC107" },
+  { key: "cafe",        icon: "wine-outline" as const,        bg: "#EFEBE9", color: "#795548" },
+  { key: "pharmacy",    icon: "medkit-outline" as const,      bg: "#E8F5E9", color: Colors.primary },
+  { key: "juice",       icon: "water-outline" as const,       bg: "#E0F7FA", color: "#00BCD4" },
+  { key: "african",     icon: "globe-outline" as const,       bg: "#F3E5F5", color: "#9C27B0" },
+  { key: "fastfood",    icon: "fast-food-outline" as const,   bg: "#FFEBEE", color: "#F44336" },
+] as const;
 
 function getProductImage(p: Product): string | undefined {
   if (p.image_url) return p.image_url;
@@ -52,6 +52,11 @@ export default function ExploreScreen() {
   const lang = i18n.language;
   const { category: initCategory, q: initQ } = useLocalSearchParams<{ category?: string; q?: string }>();
   const addItem = useCartStore((s) => s.addItem);
+
+  const CATEGORIES = CATEGORY_META.map((c) => ({
+    ...c,
+    label: t(`explore.cat${c.key.charAt(0).toUpperCase() + c.key.slice(1)}` as any),
+  }));
 
   const [search, setSearch] = useState(initQ ?? "");
   const [activeCategory, setActiveCategory] = useState(initCategory ?? "all");
@@ -88,7 +93,7 @@ export default function ExploreScreen() {
       <StatusBar style="dark" />
       <SafeAreaView style={s.safe} edges={["top"]}>
         <View style={s.header}>
-          <Text style={s.headerTitle}>Find Products</Text>
+          <Text style={s.headerTitle}>{t("explore.title")}</Text>
         </View>
 
         <View style={s.searchRow}>
@@ -96,7 +101,7 @@ export default function ExploreScreen() {
             <Ionicons name="search-outline" size={18} color={Colors.text3} />
             <TextInput
               style={s.searchInput}
-              placeholder="Search Store"
+              placeholder={t("explore.searchPlaceholder")}
               placeholderTextColor={Colors.text3}
               value={search}
               onChangeText={debounce}
@@ -139,9 +144,9 @@ export default function ExploreScreen() {
         ) : products.length === 0 ? (
           <View style={s.emptyWrap}>
             <Ionicons name="search-outline" size={48} color={Colors.text3} />
-            <Text style={s.emptyTitle}>Aucun produit trouvé</Text>
+            <Text style={s.emptyTitle}>{t("explore.noProducts")}</Text>
             <Text style={s.emptySub}>
-              {debouncedSearch ? `Aucun résultat pour "${debouncedSearch}"` : "Cette catégorie est vide pour l'instant"}
+              {debouncedSearch ? `${t("explore.noResultsFor")} "${debouncedSearch}"` : t("explore.emptyCategory")}
             </Text>
           </View>
         ) : (

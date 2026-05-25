@@ -24,6 +24,15 @@ router.post(
   validate(z.object({ supabase_token: z.string().min(1, "Token Supabase requis") })),
   controller.googleAuthSupabase
 );
+router.post(
+  "/user/apple",
+  validate(z.object({
+    id_token:   z.string().min(1, "Le token Apple est requis"),
+    first_name: z.string().optional(),
+    last_name:  z.string().optional(),
+  })),
+  controller.appleAuth
+);
 router.post("/user/register", validate(RegisterUserSchema), controller.registerUser);
 router.post("/user/verify-phone", validate(VerifyOtpSchema), controller.verifyPhone);
 router.post(

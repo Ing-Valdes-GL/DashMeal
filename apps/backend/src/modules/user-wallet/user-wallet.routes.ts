@@ -10,9 +10,10 @@ router.get("/shared-cart/:token", ctrl.getSharedCartHandler);
 // ── Authenticated user ────────────────────────────────────────────────────────
 router.use(authenticate);
 
-router.get("/",              ctrl.getMyWallet);
-router.get("/card-numbers",  ctrl.generateCardNumbers);
-router.get("/transactions",  ctrl.getMyTransactions);
+router.get("/",                          ctrl.getMyWallet);
+router.get("/card-numbers",              ctrl.generateCardNumbers);
+router.get("/transactions",              ctrl.getMyTransactions);
+router.get("/payment-status/:reference", ctrl.getPaymentStatus);
 router.post("/activate",     ctrl.activateWallet);
 router.post("/topup",        ctrl.topUpWallet);
 router.post("/verify-pin",   ctrl.verifyPinHandler);

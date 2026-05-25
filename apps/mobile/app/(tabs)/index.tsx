@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList,
-  ActivityIndicator, RefreshControl, Dimensions,
+  ActivityIndicator, RefreshControl, Dimensions, Platform,
 } from "react-native";
+import { Video, ResizeMode } from "expo-av";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
@@ -22,55 +23,29 @@ const { width: W } = Dimensions.get("window");
 interface Product {
   id: string; name: string; name_fr?: string; name_en?: string;
   price: number; original_price?: number; image_url?: string;
-  discount_pct?: number; branch?: { name: string }; unit?: string;
+  discount_pct?: number; branch?: { name: string; category?: string }; unit?: string;
   product_images?: { url: string; is_primary: boolean }[];
+}
+
+interface Ad {
+  id: string; title: string; image_url?: string; video_url?: string;
+  cta_url?: string; brand_id?: string;
 }
 
 interface Notification { id: string; is_read: boolean; }
 
-// ─── Catégories avec vraies images ───────────────────────────────────────────
-const CATEGORIES = [
-  {
-    key: "restaurant",
-    label: "Restaurants",
-    image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&q=80",
-    bg: "#FFF3E0",
-  },
-  {
-    key: "supermarket",
-    label: "Supermarché",
-    image: "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=300&q=80",
-    bg: "#E3F2FD",
-  },
-  {
-    key: "bakery",
-    label: "Boulangerie",
-    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&q=80",
-    bg: "#FFF8E1",
-  },
-  {
-    key: "cafe",
-    label: "Cafés & Bars",
-    image: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&q=80",
-    bg: "#EFEBE9",
-  },
-  {
-    key: "pharmacy",
-    label: "Pharmacies",
-    image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&q=80",
-    bg: "#E8F5E9",
-  },
-];
-
-const BANNERS = [
-  { id: "1", bg: Colors.primaryLight, title: "Légumes frais",     sub: "Jusqu'à 40% de réduction !", icon: "leaf-outline" as const,    iconColor: Colors.primary },
-  { id: "2", bg: "#FFF3E0",           title: "Flash Sales",       sub: "Offres limitées du jour",    icon: "flash-outline" as const,   iconColor: "#FF9800" },
-  { id: "3", bg: "#E3F2FD",           title: "Livraison offerte", sub: "Sur votre 1re commande",     icon: "bicycle-outline" as const, iconColor: "#2196F3" },
-];
+// ─── Catégories (images statiques, labels via i18n) ──────────────────────────
+const CATEGORY_IMAGES = [
+  { key: "restaurant", image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=300&q=80", bg: "#FFF3E0" },
+  { key: "supermarket", image: "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=300&q=80", bg: "#E3F2FD" },
+  { key: "bakery", image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&q=80", bg: "#FFF8E1" },
+  { key: "cafe", image: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300&q=80", bg: "#EFEBE9" },
+  { key: "pharmacy", image: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300&q=80", bg: "#E8F5E9" },
+] as const;
 
 // ─── Hook géolocalisation dynamique ──────────────────────────────────────────
-function useCurrentLocation() {
-  const [locationLabel, setLocationLabel] = useState<string>("Localisation...");
+function useCurrentLocation(locationLoadingLabel: string, locationUnknownLabel: string) {
+  const [locationLabel, setLocationLabel] = useState<string>(locationLoadingLabel);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -90,7 +65,7 @@ function useCurrentLocation() {
         if (!cancelled && place) {
           const city    = place.city || place.district || place.subregion || place.region || "";
           const country = place.country || "";
-          setLocationLabel(city && country ? `${city}, ${country}` : city || country || "Localisation inconnue");
+          setLocationLabel(city && country ? `${city}, ${country}` : city || country || locationUnknownLabel);
         }
       } catch {
         if (!cancelled) setLocationLabel("Yaoundé, Cameroun");
@@ -149,18 +124,20 @@ function ProductCard({ item, onPress, onAdd, lang }: {
   );
 }
 
+type BannerItem = { id: string; bg: string; title: string; sub: string; icon: React.ComponentProps<typeof Ionicons>["name"]; iconColor: string };
+
 // ─── Carrousel bannières ──────────────────────────────────────────────────────
-function BannerCarousel() {
+function BannerCarousel({ banners }: { banners: BannerItem[] }) {
   const scrollRef = useRef<ScrollView>(null);
   const [idx, setIdx] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => {
-      const next = (idx + 1) % BANNERS.length;
+    const timer = setInterval(() => {
+      const next = (idx + 1) % banners.length;
       scrollRef.current?.scrollTo({ x: next * (W - 32), animated: true });
       setIdx(next);
     }, 3500);
-    return () => clearInterval(t);
-  }, [idx]);
+    return () => clearInterval(timer);
+  }, [idx, banners.length]);
 
   return (
     <View>
@@ -171,7 +148,7 @@ function BannerCarousel() {
         onMomentumScrollEnd={(e) => setIdx(Math.round(e.nativeEvent.contentOffset.x / (W - 32)))}
         style={{ borderRadius: Radius.lg, overflow: "hidden" }}
       >
-        {BANNERS.map((b) => (
+        {banners.map((b) => (
           <View key={b.id} style={[bn.card, { backgroundColor: b.bg, width: W - 32 }]}>
             <View style={{ flex: 1 }}>
               <Text style={bn.title}>{b.title}</Text>
@@ -184,7 +161,7 @@ function BannerCarousel() {
         ))}
       </ScrollView>
       <View style={bn.dots}>
-        {BANNERS.map((_, i) => <View key={i} style={[bn.dot, i === idx && bn.dotActive]} />)}
+        {banners.map((_, i) => <View key={i} style={[bn.dot, i === idx && bn.dotActive]} />)}
       </View>
     </View>
   );
@@ -209,8 +186,39 @@ function ProductListSkeleton() {
 
 const CARD_W = (W - 48) / 2; // 16 padding × 2 + 16 gap
 
+// ─── Composant publicité (image ou vidéo) ────────────────────────────────────
+function AdCard({ ad }: { ad: Ad }) {
+  const AW = W - 64; // ~311px sur iPhone 375
+  if (ad.video_url) {
+    return (
+      <View style={[adS.wrap, { width: AW }]}>
+        <Video
+          source={{ uri: ad.video_url }}
+          style={adS.media}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay
+          isLooping
+          isMuted
+        />
+        {ad.title && <View style={adS.overlay}><Text style={adS.title} numberOfLines={2}>{ad.title}</Text></View>}
+      </View>
+    );
+  }
+  return (
+    <View style={[adS.wrap, { width: AW }]}>
+      {ad.image_url
+        ? <Image source={{ uri: ad.image_url }} style={adS.media} contentFit="cover" transition={300} />
+        : <View style={[adS.media, { backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center" }]}>
+            <Ionicons name="megaphone-outline" size={40} color={Colors.primary} />
+          </View>
+      }
+      {ad.title && <View style={adS.overlay}><Text style={adS.title} numberOfLines={2}>{ad.title}</Text></View>}
+    </View>
+  );
+}
+
 // ─── Composant catégorie ──────────────────────────────────────────────────────
-function CategoryCard({ item, onPress }: { item: typeof CATEGORIES[0]; onPress: () => void }) {
+function CategoryCard({ item, onPress }: { item: typeof CATEGORY_IMAGES[0] & { label: string }; onPress: () => void }) {
   return (
     <TouchableOpacity style={[cat.chip, { width: CARD_W }]} onPress={onPress} activeOpacity={0.8}>
       <View style={cat.imgWrap}>
@@ -234,19 +242,32 @@ export default function HomeScreen() {
   const addItem = useCartStore((s) => s.addItem);
   const { isAuthenticated } = useAuthStore();
 
-  const { locationLabel, loading: locLoading } = useCurrentLocation();
+  const CATEGORIES = CATEGORY_IMAGES.map((c) => ({
+    ...c,
+    label: t(`home.cat${c.key.charAt(0).toUpperCase() + c.key.slice(1)}` as any),
+  }));
 
-  // Produits promo
-  const { data: promoRes, isLoading: l1, refetch, isRefetching } = useQuery<{ data: Product[] }>({
-    queryKey: ["home-promo"],
-    queryFn: () => apiGet("/products/public", { promo: true, limit: 8 }),
+  const BANNERS: BannerItem[] = [
+    { id: "1", bg: Colors.primaryLight, title: t("home.bannerVeggies"),   sub: t("home.bannerVeggiesSub"),   icon: "leaf-outline",    iconColor: Colors.primary },
+    { id: "2", bg: "#FFF3E0",           title: t("home.bannerFlash"),     sub: t("home.bannerFlashSub"),     icon: "flash-outline",   iconColor: "#FF9800" },
+    { id: "3", bg: "#E3F2FD",           title: t("home.bannerDelivery"),  sub: t("home.bannerDeliverySub"),  icon: "bicycle-outline", iconColor: "#2196F3" },
+  ];
+
+  const { locationLabel, loading: locLoading } = useCurrentLocation(t("home.locationLoading"), t("home.locationUnknown"));
+
+  const [activeCategory, setActiveCategory] = useState(CATEGORY_IMAGES[0].key);
+
+  // Publicités actives
+  const { data: adsRes, isLoading: lAds, refetch, isRefetching } = useQuery<{ data: Ad[] }>({
+    queryKey: ["home-ads"],
+    queryFn: () => apiGet("/ads/public/active"),
     staleTime: 120_000,
   });
 
-  // Produits featured
-  const { data: featRes, isLoading: l2 } = useQuery<{ data: Product[] }>({
-    queryKey: ["home-featured"],
-    queryFn: () => apiGet("/products/public", { limit: 8 }),
+  // Best sellers par catégorie
+  const { data: bsRes, isLoading: lBs } = useQuery<{ data: Product[] }>({
+    queryKey: ["home-best-sellers", activeCategory],
+    queryFn: () => apiGet("/products/public/best-sellers", { category: activeCategory, limit: 5 }),
     staleTime: 120_000,
   });
 
@@ -258,10 +279,9 @@ export default function HomeScreen() {
     staleTime: 60_000,
   });
 
-  const unreadCount = (notifRes?.data ?? []).filter((n) => !n.is_read).length;
-
-  const promo    = promoRes?.data ?? [];
-  const featured = featRes?.data ?? [];
+  const unreadCount  = (notifRes?.data ?? []).filter((n) => !n.is_read).length;
+  const ads          = adsRes?.data ?? [];
+  const bestSellers  = bsRes?.data ?? [];
 
   const handleAdd = useCallback((p: Product) => addItem({
     product_id: p.id,
@@ -312,7 +332,7 @@ export default function HomeScreen() {
         {/* ─── Barre de recherche ───────────────────────────────────────── */}
         <TouchableOpacity style={s.searchBar} onPress={() => router.push("/(tabs)/explore" as any)}>
           <Ionicons name="search-outline" size={18} color={Colors.text3} />
-          <Text style={s.searchPlaceholder}>Search Store</Text>
+          <Text style={s.searchPlaceholder}>{t("explore.searchPlaceholder")}</Text>
           <View style={s.filterIcon}>
             <Ionicons name="options-outline" size={18} color="#fff" />
           </View>
@@ -328,38 +348,51 @@ export default function HomeScreen() {
       >
         {/* Bannières */}
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-          <BannerCarousel />
+          <BannerCarousel banners={BANNERS} />
         </View>
 
-        {/* Exclusive Offer */}
-        <Section title="Exclusive Offer" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
-          {l1 ? <ProductListSkeleton /> : promo.length === 0 ? null : (
-            <FlatList
-              horizontal data={promo} keyExtractor={(i) => i.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
-              renderItem={({ item }) => (
-                <View style={{ width: 160 }}>
-                  <ProductCard
-                    item={item} lang={lang}
-                    onPress={() => router.push({ pathname: "/product/[id]", params: { id: item.id } })}
-                    onAdd={() => handleAdd(item)}
-                  />
-                </View>
-              )}
-            />
-          )}
-        </Section>
+        {/* ── Exclusive Offer : publicités actives ──────────────────────── */}
+        {(lAds || ads.length > 0) && (
+          <Section title={t("home.exclusiveOffer")} onSeeAll={() => router.push("/(tabs)/explore" as any)}>
+            {lAds ? <ProductListSkeleton /> : (
+              <FlatList
+                horizontal data={ads} keyExtractor={(i) => i.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
+                renderItem={({ item }) => <AdCard ad={item} />}
+              />
+            )}
+          </Section>
+        )}
 
-        {/* Best Selling */}
-        <Section title="Best Selling" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
-          {l2 ? <ProductListSkeleton /> : featured.length === 0 ? (
+        {/* ── Best Selling : top 5 par catégorie ───────────────────────── */}
+        <Section title={t("home.bestSelling")} onSeeAll={() => router.push("/(tabs)/explore" as any)}>
+          {/* Onglets catégorie */}
+          <ScrollView
+            horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 12 }}
+          >
+            {CATEGORIES.map((c) => (
+              <TouchableOpacity
+                key={c.key}
+                style={[bs.tab, activeCategory === c.key && bs.tabActive]}
+                onPress={() => setActiveCategory(c.key)}
+                activeOpacity={0.8}
+              >
+                <Text style={[bs.tabText, activeCategory === c.key && bs.tabTextActive]}>
+                  {c.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {lBs ? <ProductListSkeleton /> : bestSellers.length === 0 ? (
             <View style={s.emptySection}>
-              <Text style={s.emptySectionText}>Aucun produit disponible</Text>
+              <Text style={s.emptySectionText}>{t("explore.noProducts")}</Text>
             </View>
           ) : (
             <FlatList
-              horizontal data={featured} keyExtractor={(i) => i.id}
+              horizontal data={bestSellers} keyExtractor={(i) => i.id}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}
               renderItem={({ item }) => (
@@ -376,7 +409,7 @@ export default function HomeScreen() {
         </Section>
 
         {/* Catégories — grille verticale 2 par ligne */}
-        <Section title="Catégories" onSeeAll={() => router.push("/(tabs)/explore" as any)}>
+        <Section title={t("home.categories")} onSeeAll={() => router.push("/(tabs)/explore" as any)}>
           <View style={cat.grid}>
             {CATEGORIES.map((item) => (
               <CategoryCard
@@ -393,11 +426,12 @@ export default function HomeScreen() {
 }
 
 function Section({ title, onSeeAll, children }: { title: string; onSeeAll: () => void; children: React.ReactNode }) {
+  const { t } = useTranslation();
   return (
     <View style={{ marginTop: 20 }}>
       <View style={s.sectionRow}>
         <Text style={s.sectionTitle}>{title}</Text>
-        <TouchableOpacity onPress={onSeeAll}><Text style={s.seeAll}>See all</Text></TouchableOpacity>
+        <TouchableOpacity onPress={onSeeAll}><Text style={s.seeAll}>{t("common.seeAll")}</Text></TouchableOpacity>
       </View>
       {children}
     </View>
@@ -484,6 +518,32 @@ const bn = StyleSheet.create({
   dots:       { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 10 },
   dot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.border },
   dotActive:  { width: 24, borderRadius: 4, backgroundColor: Colors.primary },
+});
+
+const adS = StyleSheet.create({
+  wrap:    {
+    height: 160, borderRadius: Radius.lg, overflow: "hidden",
+    backgroundColor: Colors.pageBg,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+  },
+  media:   { width: "100%", height: "100%" },
+  overlay: {
+    position: "absolute", bottom: 0, left: 0, right: 0,
+    backgroundColor: "rgba(0,0,0,0.45)", paddingHorizontal: 12, paddingVertical: 8,
+  },
+  title:   { color: "#fff", fontSize: 13, fontWeight: "700" },
+});
+
+const bs = StyleSheet.create({
+  tab: {
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.card,
+  },
+  tabActive:     { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  tabText:       { fontSize: 13, fontWeight: "600", color: Colors.text2 },
+  tabTextActive: { color: "#fff" },
 });
 
 const cat = StyleSheet.create({
