@@ -14,6 +14,7 @@ router.post("/apply", validate(BrandApplicationSchema), controller.applyForBrand
 // ─── Super Admin uniquement ───────────────────────────────────────────────────
 router.get("/", authenticate, requireRole("superadmin"), controller.listBrands);
 router.post("/", authenticate, requireRole("superadmin"), validate(CreateBrandSchema), controller.createBrand);
+router.get("/catalogue", authenticate, requireRole("superadmin"), controller.getCatalogue);
 router.get("/applications", authenticate, requireRole("superadmin"), controller.listApplications);
 router.get("/applications/:id", authenticate, requireRole("superadmin"), controller.getApplication);
 router.post("/applications/:id/review", authenticate, requireRole("superadmin"), validate(ReviewApplicationSchema), controller.reviewApplication);

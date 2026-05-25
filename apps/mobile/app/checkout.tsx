@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Colors, Radius, Shadow } from "@/lib/theme";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import { useTranslation } from "react-i18next";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TimeSlot {
@@ -40,26 +41,28 @@ function detectOperator(phone: string): PaymentMethod | null {
   return null;
 }
 
-function getNext7Days() {
+function getNext7Days(todayLabel: string, tomorrowLabel: string) {
   const days = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date();
     d.setDate(d.getDate() + i);
     days.push({
       iso: d.toISOString().slice(0, 10),
-      label: i === 0 ? "Aujourd'hui" : i === 1 ? "Demain" : d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }),
+      label: i === 0 ? todayLabel : i === 1 ? tomorrowLabel : d.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" }),
       short: d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" }),
     });
   }
   return days;
 }
-const DAYS = getNext7Days();
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 export default function CheckoutScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { items, getTotal, branch_id, branch_name, clear } = useCartStore();
+
+  const DAYS = getNext7Days(t("checkout.today"), t("checkout.tomorrow"));
 
   useEffect(() => {
     if (!branch_id || items.length === 0) router.replace("/(tabs)/cart");
@@ -179,7 +182,7 @@ export default function CheckoutScreen() {
     onError: (err: unknown) => {
       setPaymentPhase("form");
       const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
-      Alert.alert("Erreur de paiement", msg ?? "Impossible d'initier le paiement. Vérifiez votre connexion.");
+      Alert.alert(t("checkout.payError"), msg ?? t("checkout.payErrorMsg"));
     },
   });
 
@@ -190,11 +193,11 @@ export default function CheckoutScreen() {
 
   const handleConfirm = () => {
     Alert.alert(
-      "Confirmer le paiement",
-      `Une demande de ${formatCurrency(getTotal())} sera envoyée au ${paymentPhone} via ${OPERATORS.find((o) => o.id === paymentMethod)?.label}.\n\nVous recevrez une demande USSD sur votre téléphone. Entrez votre code PIN pour valider.`,
+      t("checkout.confirmTitle"),
+      `${formatCurrency(getTotal())} via ${paymentPhone} (${OPERATORS.find((o) => o.id === paymentMethod)?.label})`,
       [
-        { text: "Annuler", style: "cancel" },
-        { text: "Confirmer", onPress: () => { setPaymentPhase("processing"); orderMutation.mutate(); } },
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.confirm"), onPress: () => { setPaymentPhase("processing"); orderMutation.mutate(); } },
       ]
     );
   };
@@ -209,8 +212,8 @@ export default function CheckoutScreen() {
           <View style={styles.payIconWrap}>
             <ActivityIndicator size="large" color={Colors.primary} />
           </View>
-          <Text style={styles.payTitle}>Initialisation du paiement…</Text>
-          <Text style={styles.paySub}>Connexion à {op?.label ?? "Mobile Money"}{"\n"}Ne fermez pas l'application.</Text>
+          <Text style={styles.payTitle}>{t("checkout.initPay")}</Text>
+          <Text style={styles.paySub}>{t("checkout.connecting")} {op?.label ?? "Mobile Money"}{"\n"}{t("checkout.noCloseApp")}</Text>
           <View style={[styles.opBadge, { borderColor: op?.color ?? Colors.primary }]}>
             <Text style={[styles.opBadgeText, { color: op?.color ?? Colors.primary }]}>{op?.label}</Text>
           </View>
@@ -229,19 +232,19 @@ export default function CheckoutScreen() {
             <Ionicons name="radio-button-on-outline" size={52} color={Colors.primary} />
           </Animated.View>
           <Text style={styles.payAmount}>{formatCurrency(orderTotal)}</Text>
-          <Text style={styles.payTitle}>Confirmez le paiement</Text>
+          <Text style={styles.payTitle}>{t("checkout.confirmPayTitle")}</Text>
           <View style={[styles.opBadge, { borderColor: op?.color ?? Colors.primary }]}>
             <Text style={[styles.opBadgeText, { color: op?.color ?? Colors.primary }]}>{op?.label}</Text>
           </View>
           <View style={styles.stepsBox}>
             <View style={styles.stepRow}>
               <View style={styles.stepNum}><Text style={styles.stepNumText}>1</Text></View>
-              <Text style={styles.stepText}>Vérifiez votre téléphone{"\n"}<Text style={styles.stepPhone}>{paymentPhone}</Text></Text>
+              <Text style={styles.stepText}>{t("checkout.step1")}{"\n"}<Text style={styles.stepPhone}>{paymentPhone}</Text></Text>
             </View>
             <View style={styles.stepSep} />
             <View style={styles.stepRow}>
               <View style={styles.stepNum}><Text style={styles.stepNumText}>2</Text></View>
-              <Text style={styles.stepText}>Ouvrez la demande USSD et entrez votre code PIN</Text>
+              <Text style={styles.stepText}>{t("checkout.step2")}</Text>
             </View>
             <View style={styles.stepSep} />
             <View style={styles.stepRow}>
@@ -250,17 +253,17 @@ export default function CheckoutScreen() {
                   <Ionicons name="sync-outline" size={12} color={Colors.text3} />
                 </Animated.View>
               </View>
-              <Text style={[styles.stepText, { color: Colors.text3 }]}>En attente de confirmation…</Text>
+              <Text style={[styles.stepText, { color: Colors.text3 }]}>{t("checkout.waitingConfirm")}</Text>
             </View>
           </View>
           {ussdCode && (
             <View style={styles.ussdBox}>
-              <Text style={styles.ussdLabel}>Code USSD</Text>
-              <Text style={styles.ussdCode}>{ussdCode}</Text>
+              <Text style={styles.ussdLabel}>{t("checkout.ussdCode")}</Text>
+              <Text style={styles.ussdCodeText}>{ussdCode}</Text>
             </View>
           )}
           <TouchableOpacity style={styles.cancelPayBtn} onPress={() => { stopPolling(); setPaymentPhase("form"); }}>
-            <Text style={styles.cancelPayText}>Annuler</Text>
+            <Text style={styles.cancelPayText}>{t("common.cancel")}</Text>
           </TouchableOpacity>
         </SafeAreaView>
       </View>
@@ -275,10 +278,10 @@ export default function CheckoutScreen() {
           <View style={[styles.resultIconWrap, { backgroundColor: Colors.success + "18" }]}>
             <Ionicons name="checkmark-circle" size={64} color={Colors.success} />
           </View>
-          <Text style={styles.payTitle}>Paiement confirmé !</Text>
-          <Text style={styles.paySub}>Votre commande a bien été enregistrée.</Text>
+          <Text style={styles.payTitle}>{t("checkout.paySuccess")}</Text>
+          <Text style={styles.paySub}>{t("checkout.paySuccessMsg")}</Text>
           <TouchableOpacity style={styles.resultBtn} onPress={() => router.replace({ pathname: "/order/[id]", params: { id: orderId! } })}>
-            <Text style={styles.resultBtnText}>Voir ma commande</Text>
+            <Text style={styles.resultBtnText}>{t("checkout.viewOrder")}</Text>
             <Ionicons name="arrow-forward" size={18} color="#fff" />
           </TouchableOpacity>
         </SafeAreaView>
@@ -294,10 +297,10 @@ export default function CheckoutScreen() {
           <View style={[styles.resultIconWrap, { backgroundColor: Colors.error + "18" }]}>
             <Ionicons name="close-circle" size={64} color={Colors.error} />
           </View>
-          <Text style={styles.payTitle}>Paiement échoué</Text>
-          <Text style={styles.paySub}>La transaction n'a pas abouti.{"\n"}Vérifiez votre solde et réessayez.</Text>
+          <Text style={styles.payTitle}>{t("checkout.payFailed")}</Text>
+          <Text style={styles.paySub}>{t("checkout.payFailedMsg")}</Text>
           <TouchableOpacity style={[styles.resultBtn, { backgroundColor: Colors.error }]} onPress={() => setPaymentPhase("form")}>
-            <Text style={styles.resultBtnText}>Réessayer</Text>
+            <Text style={styles.resultBtnText}>{t("common.retry")}</Text>
           </TouchableOpacity>
         </SafeAreaView>
       </View>
@@ -313,7 +316,7 @@ export default function CheckoutScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={20} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Finaliser la commande</Text>
+          <Text style={styles.headerTitle}>{t("checkout.title")}</Text>
           <View style={{ width: 40 }} />
         </View>
       </SafeAreaView>
@@ -327,7 +330,7 @@ export default function CheckoutScreen() {
               <Ionicons name="storefront-outline" size={18} color={Colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.branchLabel}>AGENCE</Text>
+              <Text style={styles.branchLabel}>{t("checkout.branch").toUpperCase()}</Text>
               <Text style={styles.branchName}>{branch_name}</Text>
             </View>
             <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
@@ -336,7 +339,7 @@ export default function CheckoutScreen() {
 
         {/* Type de commande */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mode de récupération</Text>
+          <Text style={styles.sectionTitle}>{t("checkout.orderMode")}</Text>
           <View style={styles.typeRow}>
             {(["collect", "delivery"] as const).map((type) => (
               <TouchableOpacity
@@ -352,10 +355,10 @@ export default function CheckoutScreen() {
                   />
                 </View>
                 <Text style={[styles.typeLabel, orderType === type && styles.typeLabelActive]}>
-                  {type === "collect" ? "Retrait" : "Livraison"}
+                  {type === "collect" ? t("checkout.collectLabel") : t("checkout.deliveryLabel")}
                 </Text>
                 <Text style={styles.typeSubLabel}>
-                  {type === "collect" ? "Récupérer en agence" : "Livré chez vous"}
+                  {type === "collect" ? t("checkout.collectSub") : t("checkout.deliverySub")}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -365,7 +368,7 @@ export default function CheckoutScreen() {
         {/* Créneaux */}
         {orderType === "collect" && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Créneau de retrait</Text>
+            <Text style={styles.sectionTitle}>{t("checkout.slotTitle")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }} contentContainerStyle={{ gap: 8 }}>
               {DAYS.map((day) => (
                 <TouchableOpacity
@@ -384,7 +387,7 @@ export default function CheckoutScreen() {
               <View style={styles.emptySlots}>
                 <Ionicons name="time-outline" size={24} color={Colors.border} />
                 <Text style={styles.emptySlotsText}>
-                  Aucun créneau {DAYS.find((d) => d.iso === selectedDate)?.label?.toLowerCase() ?? "ce jour"}
+                  {t("checkout.noSlots")} {DAYS.find((d) => d.iso === selectedDate)?.label?.toLowerCase() ?? ""}
                 </Text>
               </View>
             ) : (
@@ -392,6 +395,7 @@ export default function CheckoutScreen() {
                 {slots.map((slot) => {
                   const full = slot.booked >= slot.capacity;
                   const active = selectedSlot === slot.id;
+                  const remaining = slot.capacity - slot.booked;
                   return (
                     <TouchableOpacity
                       key={slot.id}
@@ -403,9 +407,9 @@ export default function CheckoutScreen() {
                         {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
                       </Text>
                       {full
-                        ? <Text style={styles.slotFull}>Complet</Text>
+                        ? <Text style={styles.slotFull}>{t("checkout.full")}</Text>
                         : <Text style={[styles.slotRemaining, active && { color: Colors.primary }]}>
-                            {slot.capacity - slot.booked} place{slot.capacity - slot.booked > 1 ? "s" : ""}
+                            {remaining} {remaining > 1 ? t("checkout.spotsPlural") : t("checkout.spots")}
                           </Text>
                       }
                     </TouchableOpacity>
@@ -420,7 +424,7 @@ export default function CheckoutScreen() {
         {orderType === "delivery" && (
           <>
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Adresse de livraison</Text>
+              <Text style={styles.sectionTitle}>{t("checkout.deliveryAddressTitle")}</Text>
               <AddressAutocomplete
                 value={address}
                 onChangeText={setAddress}
@@ -432,8 +436,8 @@ export default function CheckoutScreen() {
               />
             </View>
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Téléphone du destinataire</Text>
-              <Text style={styles.fieldHint}>Le livreur appellera ce numéro</Text>
+              <Text style={styles.sectionTitle}>{t("checkout.recipientPhone")}</Text>
+              <Text style={styles.fieldHint}>{t("checkout.recipientPhoneHint")}</Text>
               <View style={styles.inputWrap}>
                 <Ionicons name="call-outline" size={18} color={Colors.text3} style={{ marginRight: 8 }} />
                 <TextInput
@@ -451,7 +455,7 @@ export default function CheckoutScreen() {
 
         {/* Paiement */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Moyen de paiement</Text>
+          <Text style={styles.sectionTitle}>{t("checkout.paymentTitle")}</Text>
           <View style={styles.payRow}>
             {OPERATORS.map((op) => (
               <TouchableOpacity
@@ -465,7 +469,7 @@ export default function CheckoutScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={[styles.fieldHint, { marginTop: 14, marginBottom: 6 }]}>Numéro Mobile Money</Text>
+          <Text style={[styles.fieldHint, { marginTop: 14, marginBottom: 6 }]}>{t("checkout.mobileMoneyLabel")}</Text>
           <View style={styles.inputWrap}>
             <Ionicons name="phone-portrait-outline" size={18} color={Colors.text3} style={{ marginRight: 8 }} />
             <TextInput
@@ -479,10 +483,9 @@ export default function CheckoutScreen() {
           </View>
           {paymentPhone.length > 0 && detectOperator(paymentPhone) !== paymentMethod && (
             <Text style={styles.warnText}>
-              Le numéro ne correspond pas à {OPERATORS.find((o) => o.id === paymentMethod)?.label}
+              {t("checkout.numberMismatch")} {OPERATORS.find((o) => o.id === paymentMethod)?.label}
             </Text>
           )}
-          {/* Sauvegarder comme paiement par défaut */}
           {paymentPhone.replace(/\D/g, "").length >= 9 &&
             paymentPhone !== profileResp?.data?.default_payment_phone && (
             <TouchableOpacity
@@ -490,22 +493,22 @@ export default function CheckoutScreen() {
               onPress={() => {
                 apiPost("/users/me/default-payment", { phone: paymentPhone.replace(/\s/g, ""), method: paymentMethod });
                 queryClient.invalidateQueries({ queryKey: ["profile"] });
-                Alert.alert("Enregistré", "Numéro de paiement par défaut mis à jour.");
+                Alert.alert(t("checkout.savedTitle"), t("checkout.savedMsg"));
               }}
             >
               <Ionicons name="bookmark-outline" size={14} color={Colors.primary} />
-              <Text style={styles.saveDefaultText}>Sauvegarder comme paiement par défaut</Text>
+              <Text style={styles.saveDefaultText}>{t("checkout.saveDefault")}</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {/* Note */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Note (optionnel)</Text>
+          <Text style={styles.sectionTitle}>{t("checkout.noteTitle")}</Text>
           <View style={styles.inputWrap}>
             <TextInput
               style={[styles.input, { minHeight: 60 }]}
-              placeholder="Instructions particulières..."
+              placeholder={t("checkout.notePh")}
               placeholderTextColor={Colors.text3}
               value={notes}
               onChangeText={setNotes}
@@ -516,7 +519,7 @@ export default function CheckoutScreen() {
 
         {/* Récapitulatif */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Récapitulatif</Text>
+          <Text style={styles.sectionTitle}>{t("checkout.summaryTitle")}</Text>
           <View style={styles.summaryCard}>
             {items.map((item) => (
               <View key={item.product_id} style={styles.summaryRow}>
@@ -526,13 +529,13 @@ export default function CheckoutScreen() {
             ))}
             {orderType === "delivery" && (
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryItemName}>Frais de livraison</Text>
+                <Text style={styles.summaryItemName}>{t("checkout.deliveryFee")}</Text>
                 <Text style={styles.summaryItemPrice}>{formatCurrency(5)}</Text>
               </View>
             )}
             <View style={styles.summaryDivider} />
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryTotalLabel}>Total</Text>
+              <Text style={styles.summaryTotalLabel}>{t("cart.total")}</Text>
               <Text style={styles.summaryTotalValue}>{formatCurrency(getTotal() + (orderType === "delivery" ? 5 : 0))}</Text>
             </View>
           </View>
@@ -542,7 +545,7 @@ export default function CheckoutScreen() {
       {/* Barre de confirmation */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomAmountRow}>
-          <Text style={styles.bottomLabel}>Total à payer</Text>
+          <Text style={styles.bottomLabel}>{t("checkout.totalToPay")}</Text>
           <Text style={styles.bottomTotal}>{formatCurrency(getTotal() + (orderType === "delivery" ? 5 : 0))}</Text>
         </View>
         <TouchableOpacity
@@ -554,15 +557,15 @@ export default function CheckoutScreen() {
             ? <ActivityIndicator color="#fff" />
             : <>
                 <Ionicons name="phone-portrait-outline" size={18} color="#fff" />
-                <Text style={styles.submitText}>Confirmer et payer</Text>
+                <Text style={styles.submitText}>{t("checkout.confirmAndPay")}</Text>
               </>
           }
         </TouchableOpacity>
         {!canSubmit && (
           <Text style={styles.hintText}>
-            {orderType === "collect" && !selectedSlot ? "Sélectionnez un créneau" :
-             orderType === "delivery" && address.trim().length < 5 ? "Entrez une adresse de livraison" :
-             paymentPhone.replace(/\D/g, "").length < 9 ? "Entrez le numéro Mobile Money" : ""}
+            {orderType === "collect" && !selectedSlot ? t("checkout.selectSlotHint") :
+             orderType === "delivery" && address.trim().length < 5 ? t("checkout.enterAddressHint") :
+             paymentPhone.replace(/\D/g, "").length < 9 ? t("checkout.enterPhoneHint") : ""}
           </Text>
         )}
       </View>
@@ -615,7 +618,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, paddingVertical: 12, alignItems: "center", gap: 4,
   },
   ussdLabel: { fontSize: 10, fontWeight: "700", color: Colors.primary, textTransform: "uppercase", letterSpacing: 0.8 },
-  ussdCode: { fontSize: 20, fontWeight: "700", color: Colors.primary, letterSpacing: 3 },
+  ussdCodeText: { fontSize: 20, fontWeight: "700", color: Colors.primary, letterSpacing: 3 },
   cancelPayBtn: { paddingVertical: 10 },
   cancelPayText: { fontSize: 14, color: Colors.text3 },
   resultIconWrap: { width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" },
