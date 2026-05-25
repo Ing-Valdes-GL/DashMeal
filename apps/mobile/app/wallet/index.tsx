@@ -261,7 +261,8 @@ function ActivateModal({
     setChecking(true);
     try {
       const res: any = await apiGet(`/user-wallet/payment-status/${reference}`);
-      const s: string = res?.status ?? "pending";
+      const s: string = res?.data?.status ?? res?.status ?? "pending";
+      console.log(`[wallet/checkNow] status="${s}"`, res);
       if (s === "completed") {
         stopPolling(); setPollStatus("completed");
         await consumeFromPool(selectedCard);
@@ -269,7 +270,9 @@ function ActivateModal({
       } else if (s === "failed") {
         stopPolling(); setPollStatus("failed");
       }
-    } catch {} finally {
+    } catch (err: any) {
+      console.warn("[wallet/checkNow] error:", err?.message);
+    } finally {
       setChecking(false);
     }
   };
@@ -287,8 +290,9 @@ function ActivateModal({
       console.log(`[wallet/poll] tick #${pollCount.current} — reference="${reference}"`);
       try {
         const res: any = await apiGet(`/user-wallet/payment-status/${reference}`);
-        const s: string = res?.status ?? "pending";
-        console.log(`[wallet/poll] tick #${pollCount.current} → status="${s}"`, res);
+        // apiGet retourne r.data = {success, data:{status,...}} → unwrap
+        const s: string = res?.data?.status ?? res?.status ?? "pending";
+        console.log(`[wallet/poll] tick #${pollCount.current} → status="${s}"`);
         if (s === "completed") {
           console.log("[wallet/poll] ✅ COMPLETED — activation confirmée");
           stopPolling();
@@ -326,8 +330,10 @@ function ActivateModal({
         initial_amount: Number(amount) || 10,
       });
       console.log("[wallet/activate] réponse complète du backend:", JSON.stringify(res));
-      const ref = res?.reference ?? null;
-      const ussd = res?.ussd_code ?? opInfo!.ussd;
+      // apiPost retourne r.data = {success, data:{...}} → on unwrap via res.data
+      const payload = res?.data ?? res;
+      const ref = payload?.reference ?? null;
+      const ussd = payload?.ussd_code ?? opInfo!.ussd;
       console.log(`[wallet/activate] reference="${ref}", ussd="${ussd}"`);
       if (!ref) {
         console.error("[wallet/activate] ⚠️ REFERENCE MANQUANTE — le polling ne démarrera pas !");
@@ -537,7 +543,7 @@ function TopUpModal({ visible, onClose, onSuccess }: { visible: boolean; onClose
     setChecking(true);
     try {
       const res: any = await apiGet(`/user-wallet/payment-status/${reference}`);
-      const s: string = res?.status ?? "pending";
+      const s: string = res?.data?.status ?? res?.status ?? "pending";
       if (s === "completed") { stopPolling(); setPollStatus("completed"); setTimeout(onSuccess, 1200); }
       else if (s === "failed") { stopPolling(); setPollStatus("failed"); }
     } catch {} finally { setChecking(false); }
@@ -550,7 +556,8 @@ function TopUpModal({ visible, onClose, onSuccess }: { visible: boolean; onClose
       pollCount.current += 1;
       try {
         const res: any = await apiGet(`/user-wallet/payment-status/${reference}`);
-        const s: string = res?.status ?? "pending";
+        // apiGet retourne r.data = {success, data:{status,...}} → unwrap
+        const s: string = res?.data?.status ?? res?.status ?? "pending";
         if (s === "completed") {
           stopPolling();
           setPollStatus("completed");
@@ -571,8 +578,10 @@ function TopUpModal({ visible, onClose, onSuccess }: { visible: boolean; onClose
     setLoading(true);
     try {
       const res: any = await apiPost("/user-wallet/topup", { amount: n, phone, payment_method: opInfo.method });
-      setUssdCode(res?.ussd_code ?? opInfo.ussd);
-      setReference(res?.reference ?? null);
+      // apiPost retourne r.data = {success, data:{...}} → unwrap
+      const payload = res?.data ?? res;
+      setUssdCode(payload?.ussd_code ?? opInfo.ussd);
+      setReference(payload?.reference ?? null);
       setWaiting(true);
       setPollStatus("pending");
     } catch (e: any) {
@@ -692,9 +701,12 @@ export default function WalletScreen() {
   const load = useCallback(async () => {
     try {
       const w: any = await apiGet("/user-wallet");
-      setWallet(w ?? null);
-      if (w) {
+      // apiGet retourne {success, data: wallet|null} → on unwrap
+      const walletData = w?.data !== undefined ? w.data : w;
+      setWallet(walletData ?? null);
+      if (walletData) {
         const tx: any = await apiGet("/user-wallet/transactions", { limit: 20 });
+        // cet endpoint retourne {success, transactions, pagination} (spread, pas de data)
         setTransactions(Array.isArray(tx?.transactions) ? tx.transactions : []);
       }
     } catch {
