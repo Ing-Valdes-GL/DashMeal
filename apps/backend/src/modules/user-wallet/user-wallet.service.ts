@@ -106,6 +106,7 @@ export async function initiateActivation(input: {
     .single();
 
   if (txErr || !tx) {
+    console.error("[wallet/activate] DB insert error:", txErr?.message, txErr?.details, txErr?.hint);
     throw new AppError(500, "INTENT_ERROR", "Impossible de préparer l'activation. Réessayez.");
   }
 
