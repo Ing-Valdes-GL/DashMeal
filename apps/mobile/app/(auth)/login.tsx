@@ -86,7 +86,11 @@ export default function LoginScreen() {
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
-      const res = await apiPost("/auth/user/apple", { id_token: credential.identityToken });
+      const res = await apiPost("/auth/user/apple", {
+        id_token:   credential.identityToken,
+        first_name: credential.fullName?.givenName  ?? undefined,
+        last_name:  credential.fullName?.familyName ?? undefined,
+      });
       const { user, tokens } = res.data;
       await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
       await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);

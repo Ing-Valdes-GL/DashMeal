@@ -1,7 +1,10 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiPost } from "./api";
+
+const PUSH_DENIED_KEY = "dm_push_denied";
 
 // Configuration globale : affichage des notifs même en premier plan
 Notifications.setNotificationHandler({
@@ -17,10 +20,11 @@ Notifications.setNotificationHandler({
 export async function registerForPushNotifications(): Promise<string | null> {
   // Les notifications push ne fonctionnent que sur un vrai appareil
   const isDevice = Constants.isDevice ?? true;
-  if (!isDevice) {
-    console.log("[Push] Simulateur — notifications désactivées");
-    return null;
-  }
+  if (!isDevice) return null;
+
+  // Ne pas re-demander si l'utilisateur a déjà refusé
+  const wasDenied = await AsyncStorage.getItem(PUSH_DENIED_KEY).catch(() => null);
+  if (wasDenied === "1") return null;
 
   // Canal Android (requis pour Android 8+)
   if (Platform.OS === "android") {
@@ -32,7 +36,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     });
   }
 
-  // Demander la permission
+  // Vérifier la permission existante sans re-demander
   const { status: existing } = await Notifications.getPermissionsAsync();
   let finalStatus = existing;
 
@@ -42,7 +46,8 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 
   if (finalStatus !== "granted") {
-    console.log("[Push] Permission refusée");
+    // Mémoriser le refus — ne plus spammer les logs ni re-demander
+    await AsyncStorage.setItem(PUSH_DENIED_KEY, "1").catch(() => {});
     return null;
   }
 

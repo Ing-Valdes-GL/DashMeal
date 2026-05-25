@@ -30,6 +30,7 @@ export default function ProfileScreen() {
   const MENU: MenuItem[][] = [
     [
       { key: "orders",   icon: "bag-check-outline",        label: t("profile.myOrders"),         route: "/orders" },
+      { key: "wallet",   icon: "wallet-outline",            label: t("wallet.title"),              route: "/wallet" },
       { key: "details",  icon: "person-outline",            label: t("profile.myInfo"),            route: "/profile/details" },
       { key: "address",  icon: "location-outline",          label: t("profile.deliveryAddresses"), route: "/profile/addresses" },
       { key: "payment",  icon: "card-outline",              label: t("profile.paymentMethods"),    route: "/profile/payment" },
