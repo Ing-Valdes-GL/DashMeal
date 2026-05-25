@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList,
-  ActivityIndicator, RefreshControl, Dimensions, Platform,
+  ActivityIndicator, RefreshControl, Dimensions, Platform, Image as RNImage,
 } from "react-native";
 import { Video, ResizeMode } from "expo-av";
 import { useRouter } from "expo-router";
@@ -234,13 +234,71 @@ function CategoryCard({ item, onPress }: { item: typeof CATEGORY_IMAGES[0] & { l
   );
 }
 
+// ─── Wallet mini-card (home) ──────────────────────────────────────────────────
+interface WalletSummary { balance: number; card_number: string; }
+
+function HomeWalletCard({ wallet, loading, onPress }: {
+  wallet: WalletSummary | null;
+  loading: boolean;
+  onPress: () => void;
+}) {
+  const { t } = useTranslation();
+  const activated = !!(wallet && wallet.card_number && wallet.balance !== undefined);
+
+  return (
+    <TouchableOpacity style={wc.card} onPress={onPress} activeOpacity={0.88}>
+      <View style={wc.circle1} />
+      <View style={wc.circle2} />
+      <View style={wc.circle3} />
+      <View style={[wc.content, !activated && { opacity: 0.28 }]}>
+        <View style={wc.topRow}>
+          <RNImage source={require("../../assets/logo2.png")} style={wc.logo} resizeMode="contain" />
+          <Text style={wc.cardLabel}>DashPay</Text>
+          <Ionicons name="card-outline" size={18} color="rgba(255,255,255,0.55)" />
+        </View>
+        <Text style={wc.balance}>
+          {loading ? "···" : activated ? `${(wallet!.balance ?? 0).toLocaleString("fr-FR")} FCFA` : "0 FCFA"}
+        </Text>
+        <View style={wc.bottomRow}>
+          <Text style={wc.cardNum}>
+            {activated && wallet!.card_number ? `•••• ${wallet!.card_number.slice(-4)}` : "•••• ••••"}
+          </Text>
+          <Text style={wc.tag}>Wallet</Text>
+        </View>
+      </View>
+      {!activated && !loading && (
+        <View style={wc.frosted}>
+          <Ionicons name="lock-closed-outline" size={28} color="rgba(255,255,255,0.9)" />
+          <Text style={wc.frostedText}>{t("wallet.activateTitle")}</Text>
+          <View style={wc.cta}>
+            <Text style={wc.ctaText}>{t("wallet.activate")}</Text>
+          </View>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 // ─── Écran principal ──────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const router = useRouter();
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const addItem = useCartStore((s) => s.addItem);
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const profileIncomplete = isAuthenticated && !user?.phone;
+
+  const [walletData, setWalletData] = useState<WalletSummary | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) { setWalletData(null); return; }
+    setWalletLoading(true);
+    apiGet("/user-wallet")
+      .then((d: any) => setWalletData(d ?? null))
+      .catch(() => setWalletData(null))
+      .finally(() => setWalletLoading(false));
+  }, [isAuthenticated]);
 
   const CATEGORIES = CATEGORY_IMAGES.map((c) => ({
     ...c,
@@ -350,6 +408,33 @@ export default function HomeScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
           <BannerCarousel banners={BANNERS} />
         </View>
+
+        {/* ── Profil incomplet (utilisateurs social) */}
+        {profileIncomplete && (
+          <TouchableOpacity
+            style={s.profileBanner}
+            onPress={() => router.push("/profile/personal" as any)}
+            activeOpacity={0.85}
+          >
+            <View style={s.profileBannerLeft}>
+              <Ionicons name="person-circle-outline" size={28} color="#92400e" />
+              <View>
+                <Text style={s.profileBannerTitle}>{t("homeProfile.banner")}</Text>
+                <Text style={s.profileBannerSub}>{t("homeProfile.bannerSub")}</Text>
+              </View>
+            </View>
+            <View style={s.profileBannerBtn}>
+              <Text style={s.profileBannerBtnText}>{t("homeProfile.bannerBtn")}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* ── Wallet mini-card ──────────────────────────────────────────── */}
+        <HomeWalletCard
+          wallet={walletData}
+          loading={walletLoading}
+          onPress={() => router.push("/wallet" as any)}
+        />
 
         {/* ── Exclusive Offer : publicités actives ──────────────────────── */}
         {(lAds || ads.length > 0) && (
@@ -482,6 +567,17 @@ const s = StyleSheet.create({
   seeAll:          { fontSize: 14, fontWeight: "600", color: Colors.primary },
   emptySection:    { paddingHorizontal: 16, paddingVertical: 20, alignItems: "center" },
   emptySectionText:{ fontSize: 14, color: Colors.text3 },
+  profileBanner: {
+    marginHorizontal: 16, marginTop: 12, borderRadius: Radius.lg,
+    backgroundColor: "#fef3c7", borderWidth: 1, borderColor: "#fde68a",
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingVertical: 12, paddingHorizontal: 14, gap: 10,
+  },
+  profileBannerLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  profileBannerTitle: { fontSize: 13, fontWeight: "700", color: "#92400e" },
+  profileBannerSub:   { fontSize: 11, color: "#78350f", marginTop: 2, lineHeight: 16 },
+  profileBannerBtn:   { backgroundColor: "#92400e", borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 6 },
+  profileBannerBtnText: { fontSize: 12, fontWeight: "700", color: "#fff" },
 });
 
 const pc = StyleSheet.create({
@@ -544,6 +640,31 @@ const bs = StyleSheet.create({
   tabActive:     { backgroundColor: Colors.primary, borderColor: Colors.primary },
   tabText:       { fontSize: 13, fontWeight: "600", color: Colors.text2 },
   tabTextActive: { color: "#fff" },
+});
+
+const CARD_H = Math.round((W - 32) / 1.586); // credit-card aspect ratio
+
+const wc = StyleSheet.create({
+  card: {
+    marginHorizontal: 16, marginTop: 16, height: CARD_H,
+    borderRadius: 18, backgroundColor: "#C0392B",
+    overflow: "hidden", position: "relative",
+  },
+  circle1: { position: "absolute", width: 260, height: 260, borderRadius: 130, backgroundColor: "#E74C3C", top: -80, right: -60, opacity: 0.7 },
+  circle2: { position: "absolute", width: 160, height: 160, borderRadius: 80, backgroundColor: "#FFC107", bottom: -60, left: 30, opacity: 0.45 },
+  circle3: { position: "absolute", width: 100, height: 100, borderRadius: 50, backgroundColor: "#F39C12", top: 20, left: -30, opacity: 0.3 },
+  content: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, paddingHorizontal: 22, paddingVertical: 20, justifyContent: "space-between" },
+  topRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  logo: { width: 28, height: 28, borderRadius: 6 },
+  cardLabel: { flex: 1, fontSize: 15, fontWeight: "800", color: "rgba(255,255,255,0.95)", letterSpacing: 0.8 },
+  balance: { fontSize: 28, fontWeight: "800", color: "#fff", letterSpacing: 0.5 },
+  bottomRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  cardNum: { fontSize: 15, color: "rgba(255,255,255,0.78)", letterSpacing: 3, fontWeight: "600" },
+  tag: { fontSize: 11, fontWeight: "700", color: "rgba(255,255,255,0.85)", backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99 },
+  frosted: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(10,10,10,0.58)", alignItems: "center", justifyContent: "center", gap: 10, paddingHorizontal: 24 },
+  frostedText: { color: "#fff", fontSize: 16, fontWeight: "700", textAlign: "center" },
+  cta: { backgroundColor: "#FFC107", paddingHorizontal: 28, paddingVertical: 11, borderRadius: 99, marginTop: 4 },
+  ctaText: { color: "#1A1A1A", fontSize: 14, fontWeight: "800" },
 });
 
 const cat = StyleSheet.create({
