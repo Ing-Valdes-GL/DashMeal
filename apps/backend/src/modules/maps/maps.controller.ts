@@ -113,18 +113,40 @@ export async function reverseGeocode(req: Request, res: Response, next: NextFunc
     const resp = await fetch(`${MAPS_BASE}/geocode/json?${params}`);
     if (!resp.ok) throw new AppError(502, "MAPS_ERROR", "Erreur Google Geocoding");
 
+    type AddressComponent = { long_name: string; short_name: string; types: string[] };
     const data = await resp.json() as {
       status: string;
-      results: Array<{ formatted_address: string }>;
+      results: Array<{ formatted_address: string; address_components: AddressComponent[] }>;
     };
 
     if (data.status !== "OK" || !data.results.length) {
-      sendSuccess(res, { formatted_address: null, lat: latNum, lng: lngNum });
+      sendSuccess(res, { formatted_address: null, neighborhood: null, route: null, lat: latNum, lng: lngNum });
       return;
     }
 
+    const result = data.results[0];
+    const components = result.address_components ?? [];
+
+    // Extraire les composants pertinents (quartier, rue, secteur)
+    const get = (...types: string[]) =>
+      components.find((c) => types.some((t) => c.types.includes(t)))?.long_name ?? null;
+
+    const neighborhood = get("sublocality_level_1", "sublocality", "neighborhood");
+    const route        = get("route", "premise");
+    const locality     = get("locality", "administrative_area_level_2");
+    const country      = get("country");
+
+    // Construire un label court et précis : "Quartier Bastos, Rue Kennedy, Yaoundé"
+    const parts = [neighborhood, route, locality].filter(Boolean);
+    const short_address = parts.length > 0 ? parts.join(", ") : result.formatted_address;
+
     sendSuccess(res, {
-      formatted_address: data.results[0].formatted_address,
+      formatted_address: result.formatted_address,
+      short_address,
+      neighborhood,
+      route,
+      locality,
+      country,
       lat: latNum,
       lng: lngNum,
     });

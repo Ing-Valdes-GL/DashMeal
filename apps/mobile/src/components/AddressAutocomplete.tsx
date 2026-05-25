@@ -125,35 +125,25 @@ export function AddressAutocomplete({
       });
       const { latitude: lat, longitude: lng } = loc.coords;
 
-      // 1ère tentative : reverse geocode via backend (clé API côté serveur)
-      let addr: string | null = null;
+      // Use backend reverse geocode (keeps API key server-side)
       try {
-        const resp = await apiGet("/maps/reverse", { lat: lat.toString(), lng: lng.toString() });
-        if (resp?.data?.formatted_address) {
-          addr = resp.data.formatted_address as string;
-        }
+        const resp = await apiGet("/maps/reverse", {
+          lat: lat.toString(),
+          lng: lng.toString(),
+        });
+        // Prefer the detailed short address (quartier, rue, commune) over the full formatted one
+        const addr: string =
+          resp?.data?.short_address ?? resp?.data?.formatted_address ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        onChangeText(addr);
+        onSelectAddress(addr, lat, lng);
       } catch {
-        // backend injoignable → on continue
+        // If backend unreachable, fall back to expo-location reverse geocode
+        const [geo] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        const parts = [geo?.streetNumber, geo?.street, geo?.district, geo?.city].filter(Boolean);
+        const addr = parts.join(", ") || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        onChangeText(addr);
+        onSelectAddress(addr, lat, lng);
       }
-
-      // 2ème tentative : expo-location reverse geocode (sans clé)
-      if (!addr) {
-        try {
-          const [geo] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-          const parts = [
-            geo?.streetNumber, geo?.street,
-            geo?.subregion ?? geo?.district, geo?.city, geo?.region,
-          ].filter(Boolean);
-          if (parts.length > 0) addr = parts.join(", ");
-        } catch {
-          // silent
-        }
-      }
-
-      // Dernier recours : ne jamais afficher les coordonnées brutes
-      const finalAddr = addr ?? "Ma position actuelle";
-      onChangeText(finalAddr);
-      onSelectAddress(finalAddr, lat, lng);
     } catch {
       Alert.alert("Erreur", "Impossible d'obtenir votre position.");
     } finally {
