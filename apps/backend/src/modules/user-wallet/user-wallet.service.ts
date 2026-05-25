@@ -32,27 +32,29 @@ export async function getWallet(userId: string): Promise<UserWallet | null> {
 // ─── Card number generation ────────────────────────────────────────────────────
 
 export async function generateUniqueCardNumbers(): Promise<string[]> {
-  const numbers: string[] = [];
-  let attempts = 0;
+  // Générer 12 candidats d'un coup, vérifier en une seule requête batch
+  const make = () => String(Math.floor(10000000 + Math.random() * 90000000));
 
-  while (numbers.length < 3 && attempts < 30) {
-    attempts++;
-    const candidate = String(Math.floor(10000000 + Math.random() * 90000000));
-    const { data } = await supabase
-      .from("user_wallets")
-      .select("id")
-      .eq("card_number", candidate)
-      .maybeSingle();
-    if (!data && !numbers.includes(candidate)) numbers.push(candidate);
-  }
+  const candidates = Array.from(new Set(Array.from({ length: 12 }, make)));
 
-  if (numbers.length < 3) throw new AppError(500, "CARD_GEN_ERROR", "Impossible de générer les numéros de carte");
-  return numbers;
+  const { data: taken } = await supabase
+    .from("user_wallets")
+    .select("card_number")
+    .in("card_number", candidates);
+
+  const takenSet = new Set((taken ?? []).map((r: any) => r.card_number));
+  const available = candidates.filter((c) => !takenSet.has(c));
+
+  if (available.length < 3) throw new AppError(500, "CARD_GEN_ERROR", "Impossible de générer les numéros de carte");
+  return available.slice(0, 3);
 }
 
 // ─── Wallet activation ─────────────────────────────────────────────────────────
-// Flow : client choisit un numéro, un PIN, et effectue un dépôt initial via Campay.
-// Cette fonction initie le paiement Campay — la création du wallet est confirmée par le webhook.
+// Flow identique au paiement de commande :
+//  1. Insérer la transaction pending EN PREMIER (obtenir un UUID unique)
+//  2. Appeler Campay avec cet UUID comme external_reference (évite les doublons)
+//  3. Si Campay échoue → supprimer la transaction (pas de ghost pending)
+//  4. Mettre à jour avec la vraie référence Campay
 
 export async function initiateActivation(input: {
   userId: string;
@@ -82,32 +84,51 @@ export async function initiateActivation(input: {
   if (existingWallet) throw new AppError(409, "WALLET_EXISTS", "Vous avez déjà un wallet actif");
 
   const pinHash = await bcrypt.hash(input.pin, 10);
+  const pendingMeta = { cardNumber: input.cardNumber, cardName: input.cardName, pinHash, phone: input.paymentPhone };
 
-  // Sauvegarder les infos en attente (dans les metadata de la transaction temporaire)
-  const pendingMeta = JSON.stringify({ cardNumber: input.cardNumber, cardName: input.cardName, pinHash });
+  // ── 1. Sauvegarder EN PREMIER pour obtenir un UUID unique (external_reference Campay)
+  const { data: tx, error: txErr } = await supabase
+    .from("user_wallet_transactions")
+    .insert({
+      wallet_id: null,
+      user_id: input.userId,
+      type: "activation",
+      amount: input.initialAmount,
+      fee_amount: 0,
+      balance_before: 0,
+      balance_after: input.initialAmount,
+      reference: `pending_${input.userId.slice(0, 8)}_${Date.now()}`,
+      description: "Activation wallet — en attente",
+      status: "pending",
+      metadata: pendingMeta,
+    } as any)
+    .select("id")
+    .single();
 
-  // Initier le paiement Campay
-  const campayData = await campayCollect({
-    amount: input.initialAmount,
-    phone: input.paymentPhone,
-    description: "Activation Wallet Dash Meal",
-    externalReference: `wallet-activation-${input.userId}`,
-  });
+  if (txErr || !tx) {
+    throw new AppError(500, "INTENT_ERROR", "Impossible de préparer l'activation. Réessayez.");
+  }
 
-  // Stocker l'intent en base (table wallet_activation_pending ou dans metadata)
-  await supabase.from("user_wallet_transactions").insert({
-    wallet_id: null,
-    user_id: input.userId,
-    type: "activation",
-    amount: input.initialAmount,
-    fee_amount: 0,
-    balance_before: 0,
-    balance_after: input.initialAmount,
-    reference: campayData.reference,
-    description: "Activation wallet — en attente",
-    status: "pending",
-    metadata: { ...JSON.parse(pendingMeta), phone: input.paymentPhone },
-  } as any);
+  // ── 2. Appeler Campay avec l'UUID de la transaction (jamais dupliqué)
+  let campayData;
+  try {
+    campayData = await campayCollect({
+      amount: input.initialAmount,
+      phone: input.paymentPhone,
+      description: "Activation Wallet Dash Meal",
+      externalReference: tx.id,
+      paymentMethod: input.paymentMethod,
+    });
+  } catch (campayErr) {
+    // Campay a échoué → supprimer la transaction pour ne pas bloquer l'utilisateur
+    await supabase.from("user_wallet_transactions").delete().eq("id", tx.id);
+    throw campayErr;
+  }
+
+  // ── 3. Mettre à jour avec la vraie référence Campay
+  await supabase.from("user_wallet_transactions")
+    .update({ reference: campayData.reference })
+    .eq("id", tx.id);
 
   return {
     reference: campayData.reference,
@@ -165,8 +186,9 @@ export async function initiateTopUp(input: {
   walletId: string;
   amount: number;
   phone: string;
+  paymentMethod?: "orange_money" | "mtn_mobile_money";
 }) {
-  if (input.amount < 100) throw new AppError(400, "MIN_TOPUP", "Le montant minimum de recharge est de 100 FCFA");
+  if (input.amount < 10) throw new AppError(400, "MIN_TOPUP", "Le montant minimum de recharge est de 10 FCFA");
 
   const { data: wallet } = await supabase
     .from("user_wallets")
@@ -175,27 +197,48 @@ export async function initiateTopUp(input: {
     .single();
   if (!wallet) throw new AppError(404, "WALLET_NOT_FOUND", "Wallet introuvable");
 
-  const campayData = await campayCollect({
-    amount: input.amount,
-    phone: input.phone,
-    description: "Recharge Wallet Dash Meal",
-    externalReference: `wallet-topup-${input.walletId}`,
-  });
+  // ── 1. Sauvegarder EN PREMIER (même pattern que le paiement de commande)
+  const { data: tx, error: txErr } = await supabase
+    .from("user_wallet_transactions")
+    .insert({
+      wallet_id: input.walletId,
+      user_id: wallet.user_id,
+      type: "topup",
+      amount: input.amount,
+      fee_amount: 0,
+      balance_before: wallet.balance,
+      balance_after: wallet.balance + input.amount,
+      reference: `pending_topup_${input.walletId.slice(0, 8)}_${Date.now()}`,
+      description: "Recharge Mobile Money",
+      status: "pending",
+      metadata: { phone: input.phone },
+    } as any)
+    .select("id")
+    .single();
 
-  // Enregistrer la transaction pending
-  await supabase.from("user_wallet_transactions").insert({
-    wallet_id: input.walletId,
-    user_id: wallet.user_id,
-    type: "topup",
-    amount: input.amount,
-    fee_amount: 0,
-    balance_before: wallet.balance,
-    balance_after: wallet.balance + input.amount,
-    reference: campayData.reference,
-    description: "Recharge Mobile Money",
-    status: "pending",
-    metadata: { phone: input.phone },
-  } as any);
+  if (txErr || !tx) {
+    throw new AppError(500, "INTENT_ERROR", "Impossible de préparer la recharge. Réessayez.");
+  }
+
+  // ── 2. Appeler Campay avec l'UUID (external_reference unique)
+  let campayData;
+  try {
+    campayData = await campayCollect({
+      amount: input.amount,
+      phone: input.phone,
+      description: "Recharge Wallet Dash Meal",
+      externalReference: tx.id,
+      paymentMethod: input.paymentMethod,
+    });
+  } catch (campayErr) {
+    await supabase.from("user_wallet_transactions").delete().eq("id", tx.id);
+    throw campayErr;
+  }
+
+  // ── 3. Mettre à jour avec la vraie référence Campay
+  await supabase.from("user_wallet_transactions")
+    .update({ reference: campayData.reference })
+    .eq("id", tx.id);
 
   return {
     reference: campayData.reference,

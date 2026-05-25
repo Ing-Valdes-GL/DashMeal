@@ -45,8 +45,8 @@ export async function topUpWallet(req: Request, res: Response, next: NextFunctio
       res.status(404).json({ success: false, error: { code: "NO_WALLET", message: "Activez votre wallet d'abord" } });
       return;
     }
-    const { amount, phone } = req.body;
-    const result = await svc.initiateTopUp({ walletId: wallet.id, amount, phone });
+    const { amount, phone, payment_method } = req.body;
+    const result = await svc.initiateTopUp({ walletId: wallet.id, amount, phone, paymentMethod: payment_method });
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }
@@ -80,6 +80,56 @@ export async function withdrawHandler(req: Request, res: Response, next: NextFun
     const { amount, phone, phone_confirm } = req.body;
     const result = await svc.initiateWithdrawal({ walletId: wallet.id, amount, phone, phoneConfirm: phone_confirm });
     res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
+// ── GET /user-wallet/payment-status/:reference ───────────────────────────────
+// Vérifie le statut en DB — si toujours pending, interroge Campay directement
+// et confirme la transaction sans attendre le webhook.
+export async function getPaymentStatus(req: Request, res: Response, next: NextFunction) {
+  try {
+    const reference = String(req.params.reference);
+    const { supabase } = await import("../../config/supabase.js");
+    const { campayTransactionStatus } = await import("../../services/campay.js");
+    const svc = await import("./user-wallet.service.js");
+
+    const { data: tx } = await supabase
+      .from("user_wallet_transactions")
+      .select("status, type, amount, user_id")
+      .eq("reference", reference)
+      .eq("user_id", req.user!.id)
+      .maybeSingle();
+
+    if (!tx) { res.status(404).json({ success: false, error: { code: "NOT_FOUND" } }); return; }
+
+    // Déjà résolu
+    if (tx.status !== "pending") {
+      res.json({ success: true, data: { status: tx.status, type: tx.type, amount: tx.amount } });
+      return;
+    }
+
+    // Interroger Campay directement pour ne pas dépendre du webhook
+    try {
+      const campay = await campayTransactionStatus(reference);
+      if (campay.status === "SUCCESSFUL") {
+        if (tx.type === "activation") {
+          await svc.confirmActivation(reference, campay.amount);
+        } else if (tx.type === "topup") {
+          await svc.confirmTopUp(reference, campay.amount);
+        }
+        res.json({ success: true, data: { status: "completed", type: tx.type, amount: campay.amount } });
+        return;
+      }
+      if (campay.status === "FAILED") {
+        await supabase.from("user_wallet_transactions").update({ status: "failed" }).eq("reference", reference);
+        res.json({ success: true, data: { status: "failed", type: tx.type, amount: tx.amount } });
+        return;
+      }
+    } catch {
+      // Campay injoignable → renvoyer le statut DB actuel
+    }
+
+    res.json({ success: true, data: { status: tx.status, type: tx.type, amount: tx.amount } });
   } catch (err) { next(err); }
 }
 
