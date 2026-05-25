@@ -47,13 +47,13 @@ export default function FavouritesScreen() {
     return (
       <View style={s.container}>
         <StatusBar style="dark" />
-        <SafeAreaView edges={["top"]}><View style={s.header}><Text style={s.headerTitle}>Favourite</Text></View></SafeAreaView>
+        <SafeAreaView edges={["top"]}><View style={s.header}><Text style={s.headerTitle}>{t("favorites.title")}</Text></View></SafeAreaView>
         <View style={s.authWall}>
           <View style={s.authIcon}><Ionicons name="heart-outline" size={56} color={Colors.text3} /></View>
-          <Text style={s.authTitle}>Vos favoris vous attendent</Text>
-          <Text style={s.authSub}>Connectez-vous pour sauvegarder vos produits préférés</Text>
+          <Text style={s.authTitle}>{t("favorites.authTitle")}</Text>
+          <Text style={s.authSub}>{t("favorites.authSub")}</Text>
           <TouchableOpacity style={s.loginBtn} onPress={() => router.push("/(auth)/login")}>
-            <Text style={s.loginBtnText}>Se connecter</Text>
+            <Text style={s.loginBtnText}>{t("favorites.loginBtn")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -66,7 +66,7 @@ export default function FavouritesScreen() {
     <View style={s.container}>
       <StatusBar style="dark" />
       <SafeAreaView style={s.safe} edges={["top"]}>
-        <View style={s.header}><Text style={s.headerTitle}>Favourite</Text></View>
+        <View style={s.header}><Text style={s.headerTitle}>{t("favorites.title")}</Text></View>
       </SafeAreaView>
 
       {isLoading ? (

@@ -21,38 +21,39 @@ interface MenuItem {
   badge?: string;
 }
 
-const MENU: MenuItem[][] = [
-  [
-    { key: "orders",   icon: "bag-check-outline",    label: "Mes commandes",         route: "/orders" },
-    { key: "details",  icon: "person-outline",        label: "Mes informations",       route: "/profile/details" },
-    { key: "address",  icon: "location-outline",      label: "Adresses de livraison",  route: "/profile/addresses" },
-    { key: "payment",  icon: "card-outline",          label: "Moyens de paiement",     route: "/profile/payment" },
-    { key: "promo",    icon: "pricetag-outline",      label: "Carte promo",            route: "/profile/promo" },
-  ],
-  [
-    { key: "notif",    icon: "notifications-outline", label: "Notifications",         toggle: true },
-    { key: "help",     icon: "help-circle-outline",   label: "Aide & Support",        route: "/help" },
-    { key: "about",    icon: "information-circle-outline", label: "À propos",         route: "/about" },
-  ],
-  [
-    { key: "logout",   icon: "log-out-outline",       label: "Se déconnecter",        danger: true },
-  ],
-];
-
 export default function ProfileScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { user, isAuthenticated, isGuest, logout } = useAuthStore();
   const [notifications, setNotifications] = useState(true);
 
+  const MENU: MenuItem[][] = [
+    [
+      { key: "orders",   icon: "bag-check-outline",        label: t("profile.myOrders"),         route: "/orders" },
+      { key: "wallet",   icon: "wallet-outline",            label: t("wallet.title"),              route: "/wallet" },
+      { key: "details",  icon: "person-outline",            label: t("profile.myInfo"),            route: "/profile/details" },
+      { key: "address",  icon: "location-outline",          label: t("profile.deliveryAddresses"), route: "/profile/addresses" },
+      { key: "payment",  icon: "card-outline",              label: t("profile.paymentMethods"),    route: "/profile/payment" },
+      { key: "promo",    icon: "pricetag-outline",          label: t("profile.promoCard"),         route: "/profile/promo" },
+    ],
+    [
+      { key: "notif",    icon: "notifications-outline",     label: t("profile.notifications"),    toggle: true },
+      { key: "help",     icon: "help-circle-outline",       label: t("profile.helpSupport"),      route: "/help" },
+      { key: "about",    icon: "information-circle-outline",label: t("profile.about"),            route: "/about" },
+    ],
+    [
+      { key: "logout",   icon: "log-out-outline",           label: t("profile.logout"),           danger: true },
+    ],
+  ];
+
   const handleLogout = () => {
     Alert.alert(
-      "Déconnexion",
-      "Voulez-vous vraiment vous déconnecter ?",
+      t("profile.logoutTitle"),
+      t("profile.logoutMsg"),
       [
-        { text: "Annuler", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Déconnecter",
+          text: t("profile.logoutBtn"),
           style: "destructive",
           onPress: async () => {
             await logout();
@@ -73,17 +74,17 @@ export default function ProfileScreen() {
       <View style={s.container}>
         <StatusBar style="dark" />
         <SafeAreaView edges={["top"]} style={s.safe}>
-          <View style={s.header}><Text style={s.headerTitle}>Account</Text></View>
+          <View style={s.header}><Text style={s.headerTitle}>{t("profile.title")}</Text></View>
         </SafeAreaView>
         <View style={s.authWall}>
           <View style={s.authIcon}><Ionicons name="person-outline" size={56} color={Colors.text3} /></View>
-          <Text style={s.authTitle}>Connectez-vous</Text>
-          <Text style={s.authSub}>Gérez vos commandes, adresses et plus encore</Text>
+          <Text style={s.authTitle}>{t("profile.authTitle")}</Text>
+          <Text style={s.authSub}>{t("profile.authSub")}</Text>
           <TouchableOpacity style={s.loginBtn} onPress={() => router.push("/(auth)/login")}>
-            <Text style={s.loginBtnText}>Se connecter</Text>
+            <Text style={s.loginBtnText}>{t("profile.loginBtn")}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.registerBtn} onPress={() => router.push("/(auth)/register")}>
-            <Text style={s.registerBtnText}>Créer un compte</Text>
+            <Text style={s.registerBtnText}>{t("profile.registerBtn")}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -94,7 +95,7 @@ export default function ProfileScreen() {
     <View style={s.container}>
       <StatusBar style="dark" />
       <SafeAreaView edges={["top"]} style={s.safe}>
-        <View style={s.header}><Text style={s.headerTitle}>Account</Text></View>
+        <View style={s.header}><Text style={s.headerTitle}>{t("profile.title")}</Text></View>
       </SafeAreaView>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
@@ -116,7 +117,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <View style={s.avatarInfo}>
-            <Text style={s.avatarName}>{user?.name ?? "Utilisateur"}</Text>
+            <Text style={s.avatarName}>{user?.name ?? t("profile.user")}</Text>
             <Text style={s.avatarMeta}>{user?.email ?? user?.phone ?? ""}</Text>
           </View>
           <TouchableOpacity style={s.editBtn} onPress={() => router.push("/profile/details" as any)}>

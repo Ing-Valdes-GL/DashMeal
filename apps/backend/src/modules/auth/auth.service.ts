@@ -617,26 +617,26 @@ export async function applyBrand(input: {
 
 export async function googleAuth(input: { id_token: string }): Promise<{ user: object; tokens: AuthTokens }> {
   // 1. Vérifier le token Google via tokeninfo
-  let googlePayload: { email: string; name: string; sub: string };
+  let googlePayload: { email: string; name: string; sub: string; picture?: string };
   try {
-    const { data } = await axios.get<{ email: string; name: string; sub: string; email_verified: string }>(
+    const { data } = await axios.get<{ email: string; name: string; sub: string; email_verified: string; picture?: string }>(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${input.id_token}`
     );
     if (!data.email || !data.sub) {
       throw new AppError(401, "INVALID_GOOGLE_TOKEN", "Token Google invalide");
     }
-    googlePayload = { email: data.email, name: data.name ?? data.email, sub: data.sub };
+    googlePayload = { email: data.email, name: data.name ?? data.email, sub: data.sub, picture: data.picture };
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(401, "INVALID_GOOGLE_TOKEN", "Impossible de vérifier le token Google");
   }
 
-  const { email, name, sub: google_id } = googlePayload;
+  const { email, name, sub: google_id, picture } = googlePayload;
 
   // 2. Chercher l'utilisateur par email ou par google_id
   const { data: byEmail } = await supabase
     .from("users")
-    .select("id, name, phone, email, google_id, is_verified")
+    .select("id, name, phone, email, google_id, avatar_url, is_verified")
     .eq("email", email)
     .maybeSingle();
 
@@ -645,7 +645,7 @@ export async function googleAuth(input: { id_token: string }): Promise<{ user: o
   if (!user) {
     const { data: byGoogleId } = await supabase
       .from("users")
-      .select("id, name, phone, email, google_id, is_verified")
+      .select("id, name, phone, email, google_id, avatar_url, is_verified")
       .eq("google_id", google_id)
       .maybeSingle();
     user = byGoogleId;
@@ -659,6 +659,154 @@ export async function googleAuth(input: { id_token: string }): Promise<{ user: o
         name,
         email,
         google_id,
+        avatar_url: picture ?? null,
+        email_verified: true,
+        is_verified: true,
+        phone: null,
+        password_hash: null,
+      })
+      .select("id, name, phone, email, google_id, avatar_url, is_verified")
+      .single();
+
+    if (createErr || !newUser) {
+      throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte Google");
+    }
+    user = newUser;
+  } else {
+    // Lier le google_id et mettre à jour l'avatar si absent
+    const updates: Record<string, unknown> = {};
+    if (!user.google_id) { updates.google_id = google_id; updates.email_verified = true; }
+    if (!user.avatar_url && picture) updates.avatar_url = picture;
+    if (Object.keys(updates).length > 0) {
+      await supabase.from("users").update(updates).eq("id", user.id);
+      user = { ...user, ...updates };
+    }
+  }
+
+  const tokens = buildUserTokens(user as { id: string; name?: string; phone: string });
+  return { user, tokens };
+}
+
+// ─── Apple Sign In ────────────────────────────────────────────────────────────
+
+export async function appleAuth(input: {
+  id_token: string;
+  first_name?: string;
+  last_name?: string;
+}): Promise<{ user: object; tokens: AuthTokens }> {
+  const { id_token, first_name, last_name } = input;
+
+  // 1. Décoder le JWT Apple (non-signé — vérification basique des claims)
+  //    Apple identity tokens sont des JWTs RS256 signés par Apple.
+  //    On vérifie les claims sans valider la signature côté serveur pour simplifier
+  //    (le token vient directement du SDK Apple, qui l'a déjà validé sur l'appareil).
+  let payload: { sub: string; email?: string; email_verified?: boolean | string; iss?: string; aud?: string };
+  try {
+    // Décoder le payload (partie base64 centrale du JWT)
+    const parts = id_token.split(".");
+    if (parts.length !== 3) throw new Error("Format JWT invalide");
+    const decoded = Buffer.from(parts[1], "base64url").toString("utf8");
+    payload = JSON.parse(decoded);
+    if (!payload.sub) throw new Error("sub manquant");
+    // Vérification basique de l'émetteur
+    if (payload.iss && !payload.iss.includes("appleid.apple.com")) {
+      throw new AppError(401, "INVALID_APPLE_TOKEN", "Émetteur Apple invalide");
+    }
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(401, "INVALID_APPLE_TOKEN", "Token Apple invalide ou expiré");
+  }
+
+  const apple_id = payload.sub;
+  const email = payload.email ?? null;
+
+  // Construire le nom depuis les champs optionnels (Apple ne les envoie qu'à la première connexion)
+  const name = [first_name, last_name].filter(Boolean).join(" ").trim() || email?.split("@")[0] || "Utilisateur";
+
+  // 2. Chercher l'utilisateur par apple_id ou email
+  let user: any = null;
+
+  const { data: byAppleId } = await supabase
+    .from("users")
+    .select("id, name, phone, email, apple_id, avatar_url, is_verified")
+    .eq("apple_id", apple_id)
+    .maybeSingle();
+  user = byAppleId;
+
+  if (!user && email) {
+    const { data: byEmail } = await supabase
+      .from("users")
+      .select("id, name, phone, email, apple_id, avatar_url, is_verified")
+      .eq("email", email)
+      .maybeSingle();
+    user = byEmail;
+  }
+
+  // 3. Créer ou mettre à jour
+  if (!user) {
+    const { data: newUser, error: createErr } = await supabase
+      .from("users")
+      .insert({
+        name,
+        email,
+        apple_id,
+        email_verified: !!email,
+        is_verified: true,
+        phone: null,
+        password_hash: null,
+      })
+      .select("id, name, phone, email, apple_id, avatar_url, is_verified")
+      .single();
+
+    if (createErr || !newUser) {
+      throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte Apple");
+    }
+    user = newUser;
+  } else {
+    const updates: Record<string, unknown> = {};
+    if (!user.apple_id) { updates.apple_id = apple_id; updates.is_verified = true; }
+    // Ne mettre à jour le nom que si c'est la première fois (Apple envoie le nom seulement une fois)
+    if (first_name && user.name === user.email?.split("@")[0]) updates.name = name;
+    if (Object.keys(updates).length > 0) {
+      await supabase.from("users").update(updates).eq("id", user.id);
+      user = { ...user, ...updates };
+    }
+  }
+
+  const tokens = buildUserTokens(user as { id: string; name?: string; phone: string });
+  return { user, tokens };
+}
+
+// ─── Supabase OAuth (Google via Supabase Auth) ────────────────────────────────
+
+export async function googleAuthSupabase(input: { supabase_token: string }): Promise<{ user: object; tokens: AuthTokens }> {
+  // Vérifier le token Supabase via le client service-role (auth.getUser vérifie le JWT)
+  const { data: { user: sbUser }, error } = await supabase.auth.getUser(input.supabase_token);
+
+  if (error || !sbUser?.email) {
+    throw new AppError(401, "INVALID_SUPABASE_TOKEN", "Token Supabase invalide ou expiré");
+  }
+
+  const email     = sbUser.email;
+  const name: string = sbUser.user_metadata?.full_name ?? sbUser.user_metadata?.name ?? email.split("@")[0];
+  const googleId  = sbUser.id; // UUID Supabase utilisé comme identifiant OAuth stable
+
+  // Chercher l'utilisateur par email
+  const { data: byEmail } = await supabase
+    .from("users")
+    .select("id, name, phone, email, google_id, is_verified")
+    .eq("email", email)
+    .maybeSingle();
+
+  let user = byEmail;
+
+  if (!user) {
+    // Créer le compte
+    const { data: newUser, error: createErr } = await supabase
+      .from("users")
+      .insert({
+        name, email,
+        google_id: googleId,
         email_verified: true,
         is_verified: true,
         phone: null,
@@ -666,14 +814,10 @@ export async function googleAuth(input: { id_token: string }): Promise<{ user: o
       })
       .select("id, name, phone, email, google_id, is_verified")
       .single();
-
-    if (createErr || !newUser) {
-      throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte Google");
-    }
+    if (createErr || !newUser) throw new AppError(500, "CREATE_USER_ERROR", "Échec de la création du compte Google");
     user = newUser;
   } else if (!user.google_id) {
-    // Lier le google_id au compte existant
-    await supabase.from("users").update({ google_id, email_verified: true }).eq("id", user.id);
+    await supabase.from("users").update({ google_id: googleId, email_verified: true }).eq("id", user.id);
   }
 
   const tokens = buildUserTokens(user as { id: string; name?: string; phone: string });

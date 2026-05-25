@@ -1,57 +1,82 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  useSharedValue, useAnimatedStyle,
+  withRepeat, withTiming, withSequence, Easing,
+} from "react-native-reanimated";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth";
 import { Colors, Radius } from "@/lib/theme";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const BG_IMAGE = require("../../assets/welcome-bg.jpg") as number;
+
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { continueAsGuest } = useAuthStore();
 
+  const floatY = useSharedValue(0);
+
+  useEffect(() => {
+    floatY.value = withRepeat(
+      withSequence(
+        withTiming(-10, { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0,   { duration: 1800, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    );
+  }, []);
+
+  const logoStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatY.value }],
+  }));
+
   return (
-    <View style={s.container}>
-      <StatusBar style="dark" />
+    <View style={s.root}>
+      <StatusBar style="light" />
 
-      {/* Green hero */}
-      <View style={s.hero}>
-        <View style={s.logoWrap}>
-          <Image
-            source={require("../../assets/logo.png")}
-            style={s.logo}
-            resizeMode="contain"
-          />
+      <Image
+        source={BG_IMAGE}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        transition={600}
+      />
+
+      <LinearGradient
+        colors={["rgba(0,0,0,0.18)", "rgba(0,0,0,0.55)", "rgba(0,0,0,0.82)"]}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <SafeAreaView style={s.safe} edges={["top"]}>
+        <View style={s.topBar}>
+          <Animated.View style={[s.logoWrap, logoStyle]}>
+            <Image
+              source={require("../../assets/logo2.png")}
+              style={s.logo}
+              contentFit="contain"
+            />
+          </Animated.View>
         </View>
-        <Text style={s.brand}>Dash Meal</Text>
-        <Text style={s.tagline}>Vos courses, livrées en un clin d'œil</Text>
+      </SafeAreaView>
 
-        {/* Illustration */}
-        <View style={s.illustrationWrap}>
-          <View style={s.illustrationCircle}>
-            <Ionicons name="basket-outline" size={80} color="#fff" />
-          </View>
-          <View style={[s.floatCard, s.floatCard1]}>
-            <Ionicons name="bicycle-outline" size={14} color={Colors.primary} />
-            <Text style={s.floatText}>Livraison rapide</Text>
-          </View>
-          <View style={[s.floatCard, s.floatCard2]}>
-            <Ionicons name="star" size={14} color="#FFC107" />
-            <Text style={s.floatText}>4.9 / 5 clients</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* CTA sheet */}
       <View style={s.sheet}>
-        <Text style={s.sheetTitle}>Bienvenue !</Text>
-        <Text style={s.sheetSub}>La meilleure nourriture de votre région, livrée en un instant.</Text>
+        <Text style={s.sheetTitle}>{t("welcome.title")}</Text>
+        <Text style={s.sheetSub}>{t("welcome.sub")}</Text>
 
         <TouchableOpacity
           style={s.btnPrimary}
           onPress={() => router.push("/(auth)/login")}
           activeOpacity={0.88}
         >
-          <Text style={s.btnPrimaryText}>Se connecter</Text>
+          <Text style={s.btnPrimaryText}>{t("welcome.login")}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -59,14 +84,14 @@ export default function WelcomeScreen() {
           onPress={() => router.push("/(auth)/register")}
           activeOpacity={0.88}
         >
-          <Text style={s.btnOutlineText}>Créer un compte</Text>
+          <Text style={s.btnOutlineText}>{t("welcome.register")}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={s.guestBtn}
           onPress={() => { continueAsGuest(); router.replace("/(tabs)"); }}
         >
-          <Text style={s.guestText}>Continuer sans compte</Text>
+          <Text style={s.guestText}>{t("welcome.guest")}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -74,49 +99,49 @@ export default function WelcomeScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.primary },
+  root: { flex: 1, backgroundColor: "#111" },
+  safe: { flex: 1 },
 
-  hero: {
-    flex: 1, alignItems: "center", justifyContent: "center",
-    paddingTop: 60, paddingHorizontal: 24,
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
+
   logoWrap: {
-    width: 72, height: 72, borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    alignItems: "center", justifyContent: "center", marginBottom: 12,
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
+    backgroundColor: "#fff",
   },
-  logo: { width: 52, height: 52 },
-  brand: { fontSize: 28, fontWeight: "800", color: "#fff", marginBottom: 4 },
-  tagline: { fontSize: 14, color: "rgba(255,255,255,0.75)", marginBottom: 28 },
-
-  illustrationWrap: { position: "relative", alignItems: "center" },
-  illustrationCircle: {
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    alignItems: "center", justifyContent: "center",
-  },
-  floatCard: {
-    position: "absolute", flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "#fff", borderRadius: Radius.full,
-    paddingHorizontal: 12, paddingVertical: 8,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 4,
-  },
-  floatCard1: { top: 10, right: -30 },
-  floatCard2: { bottom: 10, left: -30 },
-  floatText: { fontSize: 11, fontWeight: "700", color: Colors.text },
+  logo: { width: 64, height: 64 },
 
   sheet: {
-    backgroundColor: Colors.bg,
-    borderTopLeftRadius: 36, borderTopRightRadius: 36,
-    padding: 28, paddingBottom: 44,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    padding: 28,
+    paddingBottom: 48,
   },
   sheetTitle: { fontSize: 26, fontWeight: "800", color: Colors.text, marginBottom: 6 },
-  sheetSub: { fontSize: 14, color: Colors.text2, lineHeight: 22, marginBottom: 24 },
+  sheetSub:   { fontSize: 14, color: Colors.text2, lineHeight: 22, marginBottom: 28 },
 
   btnPrimary: {
-    height: 67, borderRadius: Radius.full, backgroundColor: Colors.primary,
+    height: 67, borderRadius: Radius.full,
+    backgroundColor: Colors.primary,
     alignItems: "center", justifyContent: "center", marginBottom: 14,
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 14, elevation: 6,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
   },
   btnPrimaryText: { color: "#fff", fontWeight: "700", fontSize: 16 },
 

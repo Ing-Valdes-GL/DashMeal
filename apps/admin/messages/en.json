@@ -66,7 +66,8 @@
     "reports": "Reports",
     "deliveryZones": "Delivery zones",
     "branchManagers": "Branch managers",
-    "logout": "Log out"
+    "logout": "Log out",
+    "catalogue": "Catalogue"
   },
   "auth": {
     "login": "Log in",
@@ -365,5 +366,12 @@
     "pendingApplications": "Pending applications",
     "onlineGMV": "Online GMV",
     "inpersonGMV": "In-person GMV"
+  },
+  "catalogue": {
+    "title": "Brand catalogue",
+    "subtitle": "All partner brands and their locations, sorted by proximity",
+    "searchPlaceholder": "Search a brand or category…",
+    "noBrands": "No active brands at the moment",
+    "errorLoading": "Failed to load the catalogue"
   }
 }

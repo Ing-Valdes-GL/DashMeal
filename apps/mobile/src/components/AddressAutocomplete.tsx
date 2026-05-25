@@ -131,8 +131,9 @@ export function AddressAutocomplete({
           lat: lat.toString(),
           lng: lng.toString(),
         });
+        // Prefer the detailed short address (quartier, rue, commune) over the full formatted one
         const addr: string =
-          resp?.data?.formatted_address ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          resp?.data?.short_address ?? resp?.data?.formatted_address ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
         onChangeText(addr);
         onSelectAddress(addr, lat, lng);
       } catch {

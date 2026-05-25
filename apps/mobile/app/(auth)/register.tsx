@@ -8,7 +8,17 @@ import { useMutation } from "@tanstack/react-query";
 import { apiPost } from "@/lib/api";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
+import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { useTranslation } from "react-i18next";
+import { useAuthStore } from "@/stores/auth";
 import { Colors, Radius, Shadow } from "@/lib/theme";
+
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
 function AuthDecoration() {
   return (
@@ -21,27 +31,95 @@ function AuthDecoration() {
 const deco = StyleSheet.create({
   wrap:   { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   circle: { position: "absolute", borderRadius: 999, borderWidth: 1 },
-  c1:     { width: 300, height: 300, top: -120, right: -80, backgroundColor: "rgba(255,122,47,0.06)", borderColor: "rgba(255,122,47,0.1)" },
-  c2:     { width: 180, height: 180, top: 60,   right: -50, backgroundColor: "transparent", borderColor: "rgba(255,255,255,0.05)" },
+  c1:     { width: 300, height: 300, top: -120, right: -80, backgroundColor: "rgba(83,177,117,0.06)", borderColor: "rgba(83,177,117,0.12)" },
+  c2:     { width: 180, height: 180, top: 60,   right: -50, backgroundColor: "transparent", borderColor: "rgba(83,177,117,0.08)" },
 });
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const [firstName, setFirstName] = useState("");
-  const [lastName,  setLastName]  = useState("");
-  const [email,     setEmail]     = useState("");
-  const [phone,     setPhone]     = useState("");
-  const [password,  setPassword]  = useState("");
-  const [confirm,   setConfirm]   = useState("");
-  const [showPwd,   setShowPwd]   = useState(false);
+  const { t } = useTranslation();
+  const { login } = useAuthStore();
+
+  const [firstName,  setFirstName]  = useState("");
+  const [lastName,   setLastName]   = useState("");
+  const [email,      setEmail]      = useState("");
+  const [phone,      setPhone]      = useState("");
+  const [password,   setPassword]   = useState("");
+  const [confirm,    setConfirm]    = useState("");
+  const [showPwd,    setShowPwd]    = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [acceptedTos, setAcceptedTos] = useState(false);
-  const [error, setError] = useState("");
+  const [error,      setError]      = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading,  setAppleLoading]  = useState(false);
 
-  const handleSocial = (provider: "google" | "apple") => {
-    Alert.alert("Bientôt disponible", `L'inscription via ${provider === "google" ? "Google" : "Apple"} sera disponible prochainement.`);
+  // ── Google OAuth ──────────────────────────────────────────────────────────────
+  const discovery   = AuthSession.useAutoDiscovery("https://accounts.google.com");
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: "dashmeal", path: "auth" });
+
+  const [request, , promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: GOOGLE_CLIENT_ID,
+      redirectUri,
+      scopes: ["openid", "profile", "email"],
+      responseType: AuthSession.ResponseType.IdToken,
+      usePKCE: false,
+    },
+    discovery,
+  );
+
+  const handleGoogleLogin = async () => {
+    if (!GOOGLE_CLIENT_ID) {
+      Alert.alert(t("common.error"), t("auth.googleError"));
+      return;
+    }
+    setGoogleLoading(true);
+    setError("");
+    try {
+      const result = await promptAsync();
+      if (result?.type === "success") {
+        const { id_token } = result.params;
+        const res = await apiPost("/auth/user/google", { id_token });
+        const { user, tokens } = res.data;
+        await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
+        await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
+        login(user, tokens.access_token, tokens.refresh_token);
+        router.replace("/(tabs)");
+      }
+    } catch (e: any) {
+      setError(e?.response?.data?.error?.message ?? t("auth.googleError"));
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
+  // ── Apple Sign In (iOS uniquement) ────────────────────────────────────────────
+  const handleAppleLogin = async () => {
+    setAppleLoading(true);
+    setError("");
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const res = await apiPost("/auth/user/apple", { id_token: credential.identityToken });
+      const { user, tokens } = res.data;
+      await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
+      await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
+      login(user, tokens.access_token, tokens.refresh_token);
+      router.replace("/(tabs)");
+    } catch (e: any) {
+      if (e.code !== "ERR_REQUEST_CANCELED") {
+        setError(e?.response?.data?.error?.message ?? t("auth.appleError"));
+      }
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
+  // ── Inscription email ─────────────────────────────────────────────────────────
   const registerMutation = useMutation({
     mutationFn: () => {
       const name = `${firstName.trim()} ${lastName.trim()}`.trim();
@@ -60,17 +138,17 @@ export default function RegisterScreen() {
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.error?.message;
-      if (!err?.response) setError("Impossible de joindre le serveur.");
-      else setError(msg ?? "Une erreur est survenue. Réessayez.");
+      if (!err?.response) setError(t("auth.serverError"));
+      else setError(msg ?? t("auth.genericError"));
     },
   });
 
   const validate = (): boolean => {
-    if (!firstName.trim() || !lastName.trim()) { setError("Le prénom et le nom sont requis."); return false; }
-    if (!email.trim() || !email.includes("@")) { setError("Adresse email invalide."); return false; }
-    if (password.length < 8) { setError("Le mot de passe doit contenir au moins 8 caractères."); return false; }
-    if (password !== confirm) { setError("Les mots de passe ne correspondent pas."); return false; }
-    if (!acceptedTos) { setError("Vous devez accepter les conditions d'utilisation."); return false; }
+    if (!firstName.trim() || !lastName.trim()) { setError(t("auth.nameRequired")); return false; }
+    if (!email.trim() || !email.includes("@")) { setError(t("auth.emailInvalid")); return false; }
+    if (password.length < 8) { setError(t("auth.passwordTooShort")); return false; }
+    if (password !== confirm) { setError(t("auth.passwordMismatch")); return false; }
+    if (!acceptedTos) { setError(t("auth.tosRequired")); return false; }
     return true;
   };
 
@@ -84,7 +162,7 @@ export default function RegisterScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <AuthDecoration />
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
@@ -94,24 +172,66 @@ export default function RegisterScreen() {
             <Ionicons name="arrow-back" size={20} color="#fff" />
           </TouchableOpacity>
 
-          <Text style={styles.title}>Créer un compte</Text>
-          <Text style={styles.subtitle}>Rejoignez Dash Meal dès maintenant</Text>
+          <Text style={styles.title}>{t("auth.registerTitle")}</Text>
+          <Text style={styles.subtitle}>{t("auth.registerSubtitle")}</Text>
 
-          {/* Social */}
-          <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocial("google")} activeOpacity={0.8}>
-              <Text style={styles.socialIcon}>G</Text>
-              <Text style={styles.socialText}>Google</Text>
+          {/* ── Boutons sociaux — adaptatifs par plateforme ── */}
+          {Platform.OS === "ios" ? (
+            // iOS : Apple + Google côte à côte
+            <View style={styles.socialRow}>
+              <TouchableOpacity
+                style={[styles.socialBtn, styles.appleSocialBtn]}
+                onPress={handleAppleLogin}
+                disabled={appleLoading}
+                activeOpacity={0.8}
+              >
+                {appleLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={18} color="#fff" />
+                    <Text style={[styles.socialText, { color: "#fff" }]}>Apple</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.socialBtn}
+                onPress={handleGoogleLogin}
+                disabled={googleLoading || !request}
+                activeOpacity={0.8}
+              >
+                {googleLoading ? (
+                  <ActivityIndicator color={Colors.text} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="logo-google" size={18} color="#EA4335" />
+                    <Text style={styles.socialText}>Google</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // Android : Google uniquement, pleine largeur
+            <TouchableOpacity
+              style={styles.socialBtnFull}
+              onPress={handleGoogleLogin}
+              disabled={googleLoading || !request}
+              activeOpacity={0.8}
+            >
+              {googleLoading ? (
+                <ActivityIndicator color={Colors.text} size="small" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={18} color="#EA4335" />
+                  <Text style={styles.socialText}>{t("auth.continueWithGoogle")}</Text>
+                </>
+              )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.socialBtn} onPress={() => handleSocial("apple")} activeOpacity={0.8}>
-              <Ionicons name="logo-apple" size={18} color="#fff" />
-              <Text style={styles.socialText}>Apple</Text>
-            </TouchableOpacity>
-          </View>
+          )}
 
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>ou créez un compte</Text>
+            <Text style={styles.dividerText}>{t("auth.orCreate")}</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -120,12 +240,12 @@ export default function RegisterScreen() {
             {/* Name row */}
             <View style={styles.nameRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>PRÉNOM</Text>
+                <Text style={styles.label}>{t("auth.firstName").toUpperCase()}</Text>
                 <View style={styles.inputWrap}>
                   <Ionicons name="person-outline" size={16} color={Colors.text3} style={styles.icon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Jean"
+                    placeholder={t("auth.firstNamePh")}
                     placeholderTextColor={Colors.text3}
                     autoCapitalize="words"
                     value={firstName}
@@ -134,11 +254,11 @@ export default function RegisterScreen() {
                 </View>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.label}>NOM</Text>
+                <Text style={styles.label}>{t("auth.lastName").toUpperCase()}</Text>
                 <View style={styles.inputWrap}>
                   <TextInput
                     style={styles.input}
-                    placeholder="Dupont"
+                    placeholder={t("auth.lastNamePh")}
                     placeholderTextColor={Colors.text3}
                     autoCapitalize="words"
                     value={lastName}
@@ -153,7 +273,7 @@ export default function RegisterScreen() {
               <Ionicons name="mail-outline" size={18} color={Colors.text3} style={styles.icon} />
               <TextInput
                 style={styles.input}
-                placeholder="exemple@email.com"
+                placeholder={t("auth.emailPh")}
                 placeholderTextColor={Colors.text3}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -163,12 +283,12 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <Text style={[styles.label, { marginTop: 14 }]}>TÉLÉPHONE <Text style={styles.optional}>(optionnel)</Text></Text>
+            <Text style={[styles.label, { marginTop: 14 }]}>{t("auth.phone").toUpperCase()} <Text style={styles.optional}>{t("common.optional")}</Text></Text>
             <View style={styles.inputWrap}>
               <Ionicons name="call-outline" size={18} color={Colors.text3} style={styles.icon} />
               <TextInput
                 style={styles.input}
-                placeholder="6 90 00 00 00"
+                placeholder={t("auth.phonePh")}
                 placeholderTextColor={Colors.text3}
                 keyboardType="phone-pad"
                 value={phone}
@@ -176,12 +296,12 @@ export default function RegisterScreen() {
               />
             </View>
 
-            <Text style={[styles.label, { marginTop: 14 }]}>MOT DE PASSE <Text style={styles.required}>*</Text></Text>
+            <Text style={[styles.label, { marginTop: 14 }]}>{t("auth.password").toUpperCase()} <Text style={styles.required}>*</Text></Text>
             <View style={styles.inputWrap}>
               <Ionicons name="lock-closed-outline" size={18} color={Colors.text3} style={styles.icon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
-                placeholder="8 caractères minimum"
+                placeholder={t("auth.passwordMin")}
                 placeholderTextColor={Colors.text3}
                 secureTextEntry={!showPwd}
                 value={password}
@@ -192,12 +312,12 @@ export default function RegisterScreen() {
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.label, { marginTop: 14 }]}>CONFIRMER LE MOT DE PASSE</Text>
+            <Text style={[styles.label, { marginTop: 14 }]}>{t("auth.confirmPassword").toUpperCase()}</Text>
             <View style={styles.inputWrap}>
               <Ionicons name="lock-closed-outline" size={18} color={Colors.text3} style={styles.icon} />
               <TextInput
                 style={[styles.input, { flex: 1 }]}
-                placeholder="••••••••"
+                placeholder={t("auth.passwordPlaceholder")}
                 placeholderTextColor={Colors.text3}
                 secureTextEntry={!showConfirm}
                 value={confirm}
@@ -225,7 +345,7 @@ export default function RegisterScreen() {
                   />
                 ))}
                 <Text style={styles.strengthLabel}>
-                  {password.length < 4 ? "Faible" : password.length < 8 ? "Moyen" : "Fort"}
+                  {password.length < 4 ? t("auth.passwordWeak") : password.length < 8 ? t("auth.passwordMedium") : t("auth.passwordStrong")}
                 </Text>
               </View>
             )}
@@ -240,10 +360,10 @@ export default function RegisterScreen() {
                 {acceptedTos && <Ionicons name="checkmark" size={12} color="#fff" />}
               </View>
               <Text style={styles.checkboxText}>
-                J'accepte les{" "}
-                <Text style={styles.link} onPress={() => {}}>Conditions d'utilisation</Text>
-                {" "}et la{" "}
-                <Text style={styles.link} onPress={() => {}}>Politique de confidentialité</Text>
+                {t("auth.tosAccept")}{" "}
+                <Text style={styles.link} onPress={() => {}}>{t("auth.tosLink")}</Text>
+                {" "}{t("auth.tosAnd")}{" "}
+                <Text style={styles.link} onPress={() => {}}>{t("auth.privacyLink")}</Text>
               </Text>
             </TouchableOpacity>
 
@@ -257,14 +377,14 @@ export default function RegisterScreen() {
             >
               {registerMutation.isPending
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.btnText}>CRÉER MON COMPTE</Text>
+                : <Text style={styles.btnText}>{t("auth.createBtn")}</Text>
               }
             </TouchableOpacity>
 
             <View style={styles.loginRow}>
-              <Text style={styles.loginText}>Déjà un compte ? </Text>
+              <Text style={styles.loginText}>{t("auth.hasAccount")} </Text>
               <TouchableOpacity onPress={() => router.replace("/(auth)/login")}>
-                <Text style={styles.loginLink}>Se connecter</Text>
+                <Text style={styles.loginLink}>{t("auth.loginButton")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -275,53 +395,62 @@ export default function RegisterScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.darkBg },
+  container: { flex: 1, backgroundColor: Colors.bg },
   scroll:    { flexGrow: 1, padding: 24, paddingTop: 52 },
 
   backBtn: {
     width: 40, height: 40, borderRadius: Radius.full,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: Colors.pageBg,
+    borderWidth: 1, borderColor: Colors.border,
     alignItems: "center", justifyContent: "center", marginBottom: 24,
   },
-  title:    { fontSize: 26, fontWeight: "800", color: "#fff", marginBottom: 6 },
-  subtitle: { fontSize: 14, color: Colors.textDark2, marginBottom: 24 },
+  title:    { fontSize: 26, fontWeight: "800", color: Colors.text, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: Colors.text2, marginBottom: 24 },
 
-  // Social
+  // Social buttons
   socialRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
   socialBtn: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
     height: 46, borderRadius: Radius.md,
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.12)",
+    backgroundColor: Colors.bg,
+    borderWidth: 1, borderColor: Colors.border,
   },
-  socialIcon: { fontSize: 18, fontWeight: "800", color: "#fff" },
-  socialText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+  appleSocialBtn: {
+    backgroundColor: "#000",
+    borderColor: "#000",
+  },
+  socialBtnFull: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
+    height: 52, borderRadius: Radius.full,
+    backgroundColor: Colors.bg,
+    borderWidth: 1.5, borderColor: Colors.border,
+    marginBottom: 20,
+  },
+  socialText: { color: Colors.text, fontSize: 14, fontWeight: "600" },
 
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 20 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.1)" },
-  dividerText: { color: Colors.textDark2, fontSize: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  dividerText: { color: Colors.text2, fontSize: 12 },
 
   // Form
   form:    { gap: 2 },
   nameRow: { flexDirection: "row", gap: 12 },
-  label:   { fontSize: 11, fontWeight: "600", color: Colors.textDark2, letterSpacing: 0.8, marginBottom: 8 },
+  label:   { fontSize: 11, fontWeight: "600", color: Colors.text2, letterSpacing: 0.8, marginBottom: 8 },
   required: { color: Colors.primary },
   optional: { color: Colors.text3, fontWeight: "400", fontSize: 10, letterSpacing: 0 },
   inputWrap: {
     flexDirection: "row", alignItems: "center",
-    backgroundColor: Colors.darkInput, borderRadius: Radius.md,
+    backgroundColor: Colors.inputBg, borderRadius: Radius.md,
+    borderWidth: 1, borderColor: Colors.border,
     paddingHorizontal: 14, height: 50,
   },
   icon:  { marginRight: 10 },
-  input: { flex: 1, color: "#fff", fontSize: 15 },
+  input: { flex: 1, color: Colors.text, fontSize: 15 },
 
   // Password strength
   strengthRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  strengthBar: {
-    flex: 1, height: 4, borderRadius: 2,
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
-  strengthLabel: { fontSize: 11, color: Colors.textDark2, minWidth: 36 },
+  strengthBar: { flex: 1, height: 4, borderRadius: 2, backgroundColor: Colors.border },
+  strengthLabel: { fontSize: 11, color: Colors.text2, minWidth: 36 },
 
   // Checkbox
   checkboxRow: {
@@ -330,15 +459,15 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     width: 20, height: 20, borderRadius: 6,
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.pageBg,
     alignItems: "center", justifyContent: "center", marginTop: 1,
   },
   checkboxChecked: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  checkboxText: { flex: 1, fontSize: 13, color: Colors.textDark2, lineHeight: 19 },
+  checkboxText: { flex: 1, fontSize: 13, color: Colors.text2, lineHeight: 19 },
   link: { color: Colors.primary, textDecorationLine: "underline" },
 
-  error: { color: "#FF6B6B", fontSize: 13, textAlign: "center", marginTop: 8 },
+  error: { color: "#EF4444", fontSize: 13, textAlign: "center", marginTop: 8 },
 
   btn: {
     height: 52, borderRadius: Radius.full,
@@ -350,6 +479,6 @@ const styles = StyleSheet.create({
   btnText: { color: "#fff", fontWeight: "700", fontSize: 15, letterSpacing: 1 },
 
   loginRow: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 20, marginBottom: 16 },
-  loginText: { color: Colors.textDark2, fontSize: 14 },
+  loginText: { color: Colors.text2, fontSize: 14 },
   loginLink: { color: Colors.primary, fontWeight: "700", fontSize: 14 },
 });

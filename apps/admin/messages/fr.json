@@ -66,7 +66,8 @@
     "reports": "Rapports",
     "deliveryZones": "Zones de livraison",
     "branchManagers": "Managers agence",
-    "logout": "Déconnexion"
+    "logout": "Déconnexion",
+    "catalogue": "Catalogue"
   },
   "auth": {
     "login": "Connexion",
@@ -365,5 +366,12 @@
     "pendingApplications": "Demandes en attente",
     "onlineGMV": "GMV en ligne",
     "inpersonGMV": "GMV présentiel"
+  },
+  "catalogue": {
+    "title": "Catalogue des marques",
+    "subtitle": "Toutes les marques partenaires et leurs agences, triées par proximité",
+    "searchPlaceholder": "Rechercher une marque ou une catégorie…",
+    "noBrands": "Aucune marque active pour le moment",
+    "errorLoading": "Impossible de charger le catalogue"
   }
 }

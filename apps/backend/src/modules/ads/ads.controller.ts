@@ -1,4 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
+import { supabase } from "../../config/supabase.js";
+import { AppError } from "../../middleware/errorHandler.js";
 import * as service from "./ads.service.js";
 
 // ─── Admin : initier paiement Campay pour une pub ────────────────────────────
@@ -87,6 +89,21 @@ export async function superadminWithdraw(req: Request, res: Response, next: Next
     }
     const data = await service.platformWithdraw(Number(amount), String(phone));
     res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+// ─── Mobile : toutes les pubs actives (public, pas d'auth) ───────────────────
+export async function getPublicActiveAds(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { data, error } = await supabase
+      .from("ads")
+      .select("id, title, image_url, video_url, cta_url, brand_id, created_at")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (error) throw new AppError(500, "FETCH_ERROR", error.message);
+    res.json({ success: true, data: data ?? [] });
   } catch (err) { next(err); }
 }
 

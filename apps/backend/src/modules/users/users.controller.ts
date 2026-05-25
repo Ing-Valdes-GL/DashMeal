@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { supabase } from "../../config/supabase.js";
 import { AppError } from "../../middleware/errorHandler.js";
 import { sendSuccess, sendCreated, sendPaginated } from "../../utils/response.js";
+import { verifyOtp, verifyEmailOtp } from "../../utils/otp.js";
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ export async function getMyProfile(req: Request, res: Response, next: NextFuncti
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, phone, is_verified, preferred_locale, created_at, avatar_url, default_payment_phone, default_payment_method")
+      .select("id, name, phone, email, is_verified, preferred_locale, created_at, avatar_url, default_payment_phone, default_payment_method, google_id, apple_id")
       .eq("id", req.user!.id)
       .single();
 
@@ -127,18 +128,39 @@ export async function updateMyProfile(req: Request, res: Response, next: NextFun
 
 export async function changePassword(req: Request, res: Response, next: NextFunction) {
   try {
-    const { current_password, new_password } = req.body;
+    const { method, current_password, new_password, contact, otp } = req.body as {
+      method?: "current" | "email" | "sms";
+      current_password?: string;
+      new_password: string;
+      contact?: string;
+      otp?: string;
+    };
 
-    const { data: user } = await supabase
-      .from("users")
-      .select("password_hash")
-      .eq("id", req.user!.id)
-      .single();
+    const resolvedMethod = method ?? "current";
 
-    if (!user) throw new AppError(404, "NOT_FOUND", "Utilisateur introuvable");
+    if (resolvedMethod === "current") {
+      const { data: user } = await supabase
+        .from("users")
+        .select("password_hash")
+        .eq("id", req.user!.id)
+        .single();
 
-    const valid = await bcrypt.compare(current_password, user.password_hash);
-    if (!valid) throw new AppError(401, "INVALID_PASSWORD", "Mot de passe actuel incorrect");
+      if (!user) throw new AppError(404, "NOT_FOUND", "Utilisateur introuvable");
+      if (!current_password) throw new AppError(400, "MISSING_FIELD", "Mot de passe actuel requis");
+
+      const valid = await bcrypt.compare(current_password, user.password_hash);
+      if (!valid) throw new AppError(401, "INVALID_PASSWORD", "Mot de passe actuel incorrect");
+    } else {
+      if (!contact || !otp) throw new AppError(400, "MISSING_FIELD", "Contact et code OTP requis");
+
+      let isValid = false;
+      if (resolvedMethod === "email") {
+        isValid = await verifyEmailOtp(contact.trim().toLowerCase(), otp);
+      } else {
+        isValid = await verifyOtp(contact.trim(), otp);
+      }
+      if (!isValid) throw new AppError(400, "INVALID_OTP", "Code OTP invalide ou expiré");
+    }
 
     const password_hash = await bcrypt.hash(new_password, 12);
     await supabase.from("users").update({ password_hash }).eq("id", req.user!.id);

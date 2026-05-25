@@ -18,9 +18,17 @@ import * as controller from "./products.controller.js";
 const router: import("express").Router = Router();
 
 // ─── Public (mobile) ─────────────────────────────────────────────────────────
-router.get("/search", validate(ProductSearchSchema, "query"), controller.searchProducts);
-router.get("/categories", controller.listCategories);
-router.get("/:id", controller.getProduct);
+router.get("/public/best-sellers", controller.listBestSellers);
+router.get("/public",              controller.listPublicProducts);
+router.get("/public/:id",          controller.getProduct);
+router.get("/search",              validate(ProductSearchSchema, "query"), controller.searchProducts);
+router.get("/categories",          controller.listCategories);
+
+// ─── Notation produit (utilisateurs authentifiés) ─────────────────────────────
+router.post("/:id/rate",       authenticate, controller.rateProduct);
+router.get("/:id/my-rating",   authenticate, controller.getUserProductRating);
+
+router.get("/:id",             controller.getProduct);
 
 // ─── Semi-public : accessible par mobile (filtre is_hidden auto) et admins ───
 router.get("/branch/:branch_id", optionalAuthenticate, controller.listByBranch);

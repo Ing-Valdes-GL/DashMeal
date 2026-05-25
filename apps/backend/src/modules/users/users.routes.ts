@@ -19,11 +19,15 @@ const avatarUpload = multer({
 const UpdateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   preferred_locale: z.enum(["fr", "en"]).optional(),
+  phone: z.string().regex(/^\+?[1-9]\d{7,14}$/).optional(),
 });
 
 const ChangePasswordSchema = z.object({
-  current_password: z.string().min(1),
+  method: z.enum(["current", "email", "sms"]).default("current"),
+  current_password: z.string().min(1).optional(),
   new_password: z.string().min(8).max(100),
+  contact: z.string().optional(),
+  otp: z.string().length(6).optional(),
 });
 
 const SavedAddressSchema = z.object({
