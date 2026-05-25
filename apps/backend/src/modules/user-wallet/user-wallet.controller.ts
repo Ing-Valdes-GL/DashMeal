@@ -100,33 +100,45 @@ export async function getPaymentStatus(req: Request, res: Response, next: NextFu
       .eq("user_id", req.user!.id)
       .maybeSingle();
 
-    if (!tx) { res.status(404).json({ success: false, error: { code: "NOT_FOUND" } }); return; }
+    if (!tx) {
+      console.log(`[getPaymentStatus] ❌ NOT_FOUND reference="${reference}" user="${req.user!.id}"`);
+      res.status(404).json({ success: false, error: { code: "NOT_FOUND" } }); return;
+    }
+
+    console.log(`[getPaymentStatus] reference="${reference}" status="${tx.status}" type="${tx.type}"`);
 
     // Déjà résolu
     if (tx.status !== "pending") {
+      console.log(`[getPaymentStatus] déjà résolu → status="${tx.status}"`);
       res.json({ success: true, data: { status: tx.status, type: tx.type, amount: tx.amount } });
       return;
     }
 
     // Interroger Campay directement pour ne pas dépendre du webhook
     try {
+      console.log(`[getPaymentStatus] interrogation Campay pour reference="${reference}"...`);
       const campay = await campayTransactionStatus(reference);
+      console.log(`[getPaymentStatus] Campay réponse: status="${campay.status}" amount=${campay.amount} raw=`, JSON.stringify(campay));
+
       if (campay.status === "SUCCESSFUL") {
         let confirmed = false;
         try {
           if (tx.type === "activation") {
+            console.log(`[getPaymentStatus] appel confirmActivation reference="${reference}" amount=${campay.amount}`);
             confirmed = await svc.confirmActivation(reference, campay.amount);
+            console.log(`[getPaymentStatus] confirmActivation retourne confirmed=${confirmed}`);
           } else if (tx.type === "topup") {
+            console.log(`[getPaymentStatus] appel confirmTopUp reference="${reference}" amount=${campay.amount}`);
             await svc.confirmTopUp(reference, campay.amount);
             confirmed = true;
           }
         } catch (confirmErr: any) {
-          // confirmActivation threw → wallet not yet created, keep polling
-          console.error("[getPaymentStatus] confirmActivation error:", confirmErr?.message);
+          console.error("[getPaymentStatus] ❌ confirmActivation a lancé une erreur:", confirmErr?.message, confirmErr?.code);
           res.json({ success: true, data: { status: "pending", type: tx.type, amount: tx.amount } });
           return;
         }
         if (confirmed) {
+          console.log(`[getPaymentStatus] ✅ activation confirmée → status=completed`);
           res.json({ success: true, data: { status: "completed", type: tx.type, amount: campay.amount } });
         } else {
           // Already processed (false) — re-read actual DB status
@@ -135,16 +147,20 @@ export async function getPaymentStatus(req: Request, res: Response, next: NextFu
             .select("status, amount")
             .eq("reference", reference)
             .maybeSingle();
+          console.log(`[getPaymentStatus] déjà traité → DB status="${txFresh?.status}"`);
           res.json({ success: true, data: { status: txFresh?.status ?? "completed", type: tx.type, amount: txFresh?.amount ?? campay.amount } });
         }
         return;
       }
       if (campay.status === "FAILED") {
+        console.log(`[getPaymentStatus] ❌ Campay FAILED → marquer transaction failed`);
         await supabase.from("user_wallet_transactions").update({ status: "failed" }).eq("reference", reference);
         res.json({ success: true, data: { status: "failed", type: tx.type, amount: tx.amount } });
         return;
       }
-    } catch {
+      console.log(`[getPaymentStatus] Campay status="${campay.status}" — toujours pending`);
+    } catch (campayErr: any) {
+      console.warn(`[getPaymentStatus] Campay injoignable:`, campayErr?.message ?? campayErr);
       // Campay injoignable → renvoyer le statut DB actuel
     }
 

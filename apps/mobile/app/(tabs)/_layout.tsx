@@ -106,6 +106,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="reels"       options={{ href: null }} />
       <Tabs.Screen name="marketplace" options={{ href: null }} />
       <Tabs.Screen name="orders"      options={{ href: null }} />
+      <Tabs.Screen name="catalog"     options={{ href: null }} />
     </Tabs>
   );
 }

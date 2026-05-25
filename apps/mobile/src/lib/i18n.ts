@@ -260,6 +260,12 @@ const fr = {
     registerBtn: "Créer un compte",
     user: "Utilisateur",
   },
+  catalog: {
+    title: "Catalogue",
+    subtitle: "Marques partenaires & agences",
+    empty: "Aucune marque disponible",
+    searchPlaceholder: "Rechercher une marque ou catégorie…",
+  },
   wallet: {
     title: "DashPay",
     activateTitle: "Wallet non activé",
@@ -780,6 +786,12 @@ const en: typeof fr = {
     loginBtn: "Log in",
     registerBtn: "Create account",
     user: "User",
+  },
+  catalog: {
+    title: "Catalogue",
+    subtitle: "Partner brands & stores",
+    empty: "No brands available",
+    searchPlaceholder: "Search brand or category…",
   },
   wallet: {
     title: "DashPay",

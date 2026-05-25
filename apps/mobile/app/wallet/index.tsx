@@ -276,26 +276,37 @@ function ActivateModal({
 
   // Lancer le polling après avoir obtenu la reference
   useEffect(() => {
-    if (!reference) return;
+    if (!reference) {
+      console.log("[wallet/activate] reference est null — polling non démarré");
+      return;
+    }
+    console.log(`[wallet/activate] ✅ polling démarré — reference="${reference}"`);
     pollCount.current = 0;
     pollRef.current = setInterval(async () => {
       pollCount.current += 1;
+      console.log(`[wallet/poll] tick #${pollCount.current} — reference="${reference}"`);
       try {
         const res: any = await apiGet(`/user-wallet/payment-status/${reference}`);
         const s: string = res?.status ?? "pending";
+        console.log(`[wallet/poll] tick #${pollCount.current} → status="${s}"`, res);
         if (s === "completed") {
+          console.log("[wallet/poll] ✅ COMPLETED — activation confirmée");
           stopPolling();
           setPollStatus("completed");
           await consumeFromPool(selectedCard);
           setTimeout(onSuccess, 1200);
         } else if (s === "failed") {
+          console.log("[wallet/poll] ❌ FAILED");
           stopPolling();
           setPollStatus("failed");
         } else if (pollCount.current >= MAX_POLLS) {
+          console.log("[wallet/poll] ⏱ TIMEOUT après", MAX_POLLS, "polls");
           stopPolling();
           setPollStatus("failed");
         }
-      } catch {}
+      } catch (err: any) {
+        console.warn(`[wallet/poll] tick #${pollCount.current} ERROR:`, err?.message ?? err);
+      }
     }, 3000);
     return stopPolling;
   }, [reference]);
@@ -314,11 +325,18 @@ function ActivateModal({
         payment_method: opInfo!.method,
         initial_amount: Number(amount) || 10,
       });
-      // Utiliser le code USSD de l'opérateur détecté si Campay n'en fournit pas
-      setUssdCode(res?.ussd_code ?? opInfo!.ussd);
-      setReference(res?.reference ?? null);
+      console.log("[wallet/activate] réponse complète du backend:", JSON.stringify(res));
+      const ref = res?.reference ?? null;
+      const ussd = res?.ussd_code ?? opInfo!.ussd;
+      console.log(`[wallet/activate] reference="${ref}", ussd="${ussd}"`);
+      if (!ref) {
+        console.error("[wallet/activate] ⚠️ REFERENCE MANQUANTE — le polling ne démarrera pas !");
+      }
+      setUssdCode(ussd);
+      setReference(ref);
       setStep("waiting");
     } catch (e: any) {
+      console.error("[wallet/activate] erreur:", e?.response?.data ?? e?.message);
       Alert.alert(t("common.error"), e?.response?.data?.error?.message ?? t("wallet.act.failed"));
     } finally {
       setLoading(false);

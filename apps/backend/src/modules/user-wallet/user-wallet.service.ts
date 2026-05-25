@@ -131,6 +131,8 @@ export async function initiateActivation(input: {
     .update({ reference: campayData.reference })
     .eq("id", tx.id);
 
+  console.log(`[initiateActivation] ✅ Campay OK — reference="${campayData.reference}" ussd="${campayData.ussd_code}" operator="${campayData.operator}"`);
+
   return {
     reference: campayData.reference,
     ussd_code: campayData.ussd_code ?? null,
@@ -144,7 +146,9 @@ export async function initiateActivation(input: {
 // Throws        → wallet insert failed (caller should NOT return "completed")
 
 export async function confirmActivation(reference: string, amount: number): Promise<boolean> {
-  const { data: pending } = await supabase
+  console.log(`[confirmActivation] cherche tx pending reference="${reference}" amount=${amount}`);
+
+  const { data: pending, error: fetchErr } = await supabase
     .from("user_wallet_transactions")
     .select("*")
     .eq("reference", reference)
@@ -152,7 +156,13 @@ export async function confirmActivation(reference: string, amount: number): Prom
     .eq("status", "pending")
     .maybeSingle();
 
-  if (!pending) return false; // déjà traité
+  if (fetchErr) console.error("[confirmActivation] erreur fetch DB:", fetchErr.message, fetchErr.details);
+
+  if (!pending) {
+    console.log(`[confirmActivation] aucun tx pending trouvé pour reference="${reference}" → retourne false`);
+    return false; // déjà traité
+  }
+  console.log(`[confirmActivation] tx trouvé: id="${pending.id}" user="${pending.user_id}"`);
 
   const { cardNumber, cardName, pinHash } = pending.metadata as { cardNumber: string; cardName: string; pinHash: string };
 
@@ -169,11 +179,13 @@ export async function confirmActivation(reference: string, amount: number): Prom
     .single();
 
   if (error || !wallet) {
-    console.error("[wallet/confirm-activation] wallet insert failed:", error?.message, error?.details, error?.hint);
+    console.error("[confirmActivation] ❌ wallet insert failed:", error?.message, error?.details, error?.hint, error?.code);
     throw new AppError(500, "WALLET_CREATE_ERROR", "Impossible de créer le wallet. Réessayez dans quelques secondes.");
   }
 
-  await supabase
+  console.log(`[confirmActivation] ✅ wallet créé id="${wallet.id}" — mise à jour transaction...`);
+
+  const { error: updateErr } = await supabase
     .from("user_wallet_transactions")
     .update({
       wallet_id: wallet.id,
@@ -182,6 +194,9 @@ export async function confirmActivation(reference: string, amount: number): Prom
       description: "Activation wallet — confirmé",
     })
     .eq("reference", reference);
+
+  if (updateErr) console.error("[confirmActivation] erreur update transaction:", updateErr.message);
+  else console.log(`[confirmActivation] ✅ transaction marquée completed`);
 
   return true;
 }
