@@ -31,7 +31,7 @@ export default function ProfileScreen() {
     [
       { key: "orders",   icon: "bag-check-outline",        label: t("profile.myOrders"),         route: "/orders" },
       { key: "wallet",   icon: "wallet-outline",            label: t("wallet.title"),              route: "/wallet" },
-      { key: "details",  icon: "person-outline",            label: t("profile.myInfo"),            route: "/profile/details" },
+      { key: "details",  icon: "person-outline",            label: t("profile.myInfo"),            route: "/profile/personal" },
       { key: "address",  icon: "location-outline",          label: t("profile.deliveryAddresses"), route: "/profile/addresses" },
       { key: "payment",  icon: "card-outline",              label: t("profile.paymentMethods"),    route: "/profile/payment" },
       { key: "promo",    icon: "pricetag-outline",          label: t("profile.promoCard"),         route: "/profile/promo" },
@@ -120,7 +120,7 @@ export default function ProfileScreen() {
             <Text style={s.avatarName}>{user?.name ?? t("profile.user")}</Text>
             <Text style={s.avatarMeta}>{user?.email ?? user?.phone ?? ""}</Text>
           </View>
-          <TouchableOpacity style={s.editBtn} onPress={() => router.push("/profile/details" as any)}>
+          <TouchableOpacity style={s.editBtn} onPress={() => router.push("/profile/personal" as any)}>
             <Ionicons name="create-outline" size={18} color={Colors.primary} />
           </TouchableOpacity>
         </View>
