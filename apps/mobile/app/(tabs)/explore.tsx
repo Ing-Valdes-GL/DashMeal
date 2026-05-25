@@ -18,7 +18,8 @@ import { Colors, Radius } from "@/lib/theme";
 interface Product {
   id: string; name: string; name_fr?: string; name_en?: string;
   price: number; original_price?: number; image_url?: string;
-  unit?: string; branch?: { name: string };
+  unit?: string; avg_rating?: number; ratings_count?: number;
+  branch?: { name: string };
   product_images?: { url: string; is_primary: boolean }[];
 }
 
@@ -71,7 +72,8 @@ export default function ExploreScreen() {
   const { data, isLoading } = useQuery<{ data: Product[] }>({
     queryKey: ["explore-products", activeCategory, debouncedSearch],
     queryFn: () => apiGet("/products/public", {
-      limit: 20,
+      limit: 40,
+      sort: "rating",
       ...(activeCategory !== "all" ? { category: activeCategory } : {}),
       ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
     }),
@@ -176,6 +178,15 @@ export default function ExploreScreen() {
                   <View style={s.cardBody}>
                     <Text style={s.cardName} numberOfLines={2}>{name}</Text>
                     {p.unit && <Text style={s.cardUnit}>{p.unit}</Text>}
+                    {(p.avg_rating ?? 0) > 0 && (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 2, marginBottom: 4 }}>
+                        <Ionicons name="star" size={11} color="#FFC107" />
+                        <Text style={{ fontSize: 11, color: Colors.text3 }}>
+                          {(p.avg_rating ?? 0).toFixed(1)}
+                          {(p.ratings_count ?? 0) > 0 ? ` (${p.ratings_count})` : ""}
+                        </Text>
+                      </View>
+                    )}
                     <View style={s.priceRow}>
                       <Text style={s.cardPrice}>{formatCurrency(p.price)}</Text>
                       {hasDiscount && <Text style={s.origPrice}>{formatCurrency(p.original_price!)}</Text>}

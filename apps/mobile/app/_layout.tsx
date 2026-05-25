@@ -6,9 +6,11 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/lib/i18n";
 import * as SecureStore from "expo-secure-store";
 import * as Notifications from "expo-notifications";
+import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useAuthStore } from "@/stores/auth";
 import { apiGet, apiPost } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { registerForPushNotifications } from "@/lib/notifications";
 import {
   Modal, View, Text, TextInput, TouchableOpacity,
@@ -126,11 +128,47 @@ const ratingStyles = StyleSheet.create({
 
 // ─── Root navigation ──────────────────────────────────────────────────────────
 function RootLayoutNav() {
-  const { setUser } = useAuthStore();
+  const { setUser, login } = useAuthStore();
   const router = useRouter();
   const notifListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const [ratingOrderId, setRatingOrderId] = useState<string | null>(null);
+
+  // ── Callback OAuth Supabase (Google) ──────────────────────────────────────────
+  // Supabase redirige vers exp://... ou dashmeal://auth?code=xxx (PKCE)
+  // Le Linking.addEventListener détecte le deep link et échange le code contre notre JWT custom
+  const handleOAuthUrl = async (url: string) => {
+    if (!url) return;
+    try {
+      if (url.includes("code=")) {
+        // PKCE : échanger le code contre une session Supabase
+        const { data: { session }, error } = await supabase.auth.exchangeCodeForSession(url);
+        if (error || !session) return;
+        const res = await apiPost("/auth/user/supabase-oauth", { supabase_token: session.access_token });
+        const { user, tokens } = res.data;
+        await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
+        await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
+        login(user, tokens.access_token, tokens.refresh_token);
+        router.replace("/(tabs)");
+      } else if (url.includes("access_token=")) {
+        // Fallback implicit : parser le fragment
+        const fragment = url.includes("#") ? url.split("#")[1] : url.split("?")[1] ?? "";
+        const params = new URLSearchParams(fragment);
+        const accessToken  = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+        if (!accessToken || !refreshToken) return;
+        await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        const res = await apiPost("/auth/user/supabase-oauth", { supabase_token: accessToken });
+        const { user, tokens } = res.data;
+        await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
+        await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
+        login(user, tokens.access_token, tokens.refresh_token);
+        router.replace("/(tabs)");
+      }
+    } catch {
+      // silent — l'utilisateur peut réessayer
+    }
+  };
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -146,6 +184,9 @@ function RootLayoutNav() {
       }
     };
     restoreSession();
+
+    // Vérifier si l'app a été ouverte depuis un deep link OAuth (cold start)
+    Linking.getInitialURL().then(url => { if (url) handleOAuthUrl(url); });
 
     notifListener.current = Notifications.addNotificationReceivedListener(() => {});
 
@@ -170,9 +211,13 @@ function RootLayoutNav() {
       }
     });
 
+    // Écouter les deep links entrants (app déjà ouverte au moment du callback OAuth)
+    const linkingSub = Linking.addEventListener("url", ({ url }) => handleOAuthUrl(url));
+
     return () => {
       notifListener.current?.remove();
       responseListener.current?.remove();
+      linkingSub.remove();
     };
   }, []);
 
@@ -194,6 +239,13 @@ function RootLayoutNav() {
         <Stack.Screen name="profile/favorites" options={{ presentation: "card" }} />
         <Stack.Screen name="profile/loyalty"   options={{ presentation: "card" }} />
         <Stack.Screen name="profile/settings"  options={{ presentation: "card" }} />
+        <Stack.Screen name="wallet/index"        options={{ presentation: "card" }} />
+        <Stack.Screen name="wallet/activate"     options={{ presentation: "card" }} />
+        <Stack.Screen name="wallet/topup"        options={{ presentation: "card" }} />
+        <Stack.Screen name="wallet/withdraw"     options={{ presentation: "card" }} />
+        <Stack.Screen name="wallet/transfer"     options={{ presentation: "card" }} />
+        <Stack.Screen name="wallet/transactions" options={{ presentation: "card" }} />
+        <Stack.Screen name="shared-cart/[token]" options={{ presentation: "card" }} />
       </Stack>
 
       <RatingModal orderId={ratingOrderId} onClose={() => setRatingOrderId(null)} />

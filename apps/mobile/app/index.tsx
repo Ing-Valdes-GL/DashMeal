@@ -8,11 +8,13 @@ export default function Index() {
   const { isAuthenticated, isGuest, isLoading } = useAuthStore();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    SecureStore.getItemAsync("dm_onboarded").then((v) => {
-      setOnboarded(v === "true");
-    });
-  }, []);
+
+useEffect(() => {
+  SecureStore.getItemAsync("dm_onboarded").then((v) => {
+    setOnboarded(v === "true");
+  });
+}, []);
+
 
   if (isLoading || onboarded === null) {
     return (
