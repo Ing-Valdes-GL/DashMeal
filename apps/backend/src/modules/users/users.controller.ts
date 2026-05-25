@@ -99,7 +99,7 @@ export async function getMyProfile(req: Request, res: Response, next: NextFuncti
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("id, name, phone, is_verified, preferred_locale, created_at, avatar_url, default_payment_phone, default_payment_method")
+      .select("id, name, phone, email, is_verified, preferred_locale, created_at, avatar_url, default_payment_phone, default_payment_method, google_id, apple_id")
       .eq("id", req.user!.id)
       .single();
 
