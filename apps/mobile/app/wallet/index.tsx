@@ -254,6 +254,26 @@ function ActivateModal({
     }
   }, [visible]);
 
+  const [checking, setChecking] = useState(false);
+
+  const checkNow = async () => {
+    if (!reference || checking || pollStatus !== "pending") return;
+    setChecking(true);
+    try {
+      const res: any = await apiGet(`/user-wallet/payment-status/${reference}`);
+      const s: string = res?.status ?? "pending";
+      if (s === "completed") {
+        stopPolling(); setPollStatus("completed");
+        await consumeFromPool(selectedCard);
+        setTimeout(onSuccess, 1200);
+      } else if (s === "failed") {
+        stopPolling(); setPollStatus("failed");
+      }
+    } catch {} finally {
+      setChecking(false);
+    }
+  };
+
   // Lancer le polling après avoir obtenu la reference
   useEffect(() => {
     if (!reference) return;
@@ -447,6 +467,16 @@ function ActivateModal({
                       </View>
                     )}
                     <Text style={m.waitHint}>{t("wallet.pay.hint")}</Text>
+                    <TouchableOpacity
+                      style={[m.checkBtn, checking && { opacity: 0.6 }]}
+                      onPress={checkNow}
+                      disabled={checking}
+                    >
+                      {checking
+                        ? <ActivityIndicator size="small" color={Colors.primary} />
+                        : <Text style={m.checkBtnText}>{t("wallet.pay.checkNow")}</Text>
+                      }
+                    </TouchableOpacity>
                   </>
                 )}
               </View>
@@ -468,6 +498,7 @@ function TopUpModal({ visible, onClose, onSuccess }: { visible: boolean; onClose
   const [ussdCode, setUssdCode]   = useState<string | null>(null);
   const [pollStatus, setPollStatus] = useState<"pending" | "completed" | "failed">("pending");
   const [waiting, setWaiting] = useState(false);
+  const [checking, setChecking] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollCount = useRef(0);
   const MAX_POLLS = 60;
@@ -480,8 +511,19 @@ function TopUpModal({ visible, onClose, onSuccess }: { visible: boolean; onClose
   };
 
   useEffect(() => {
-    if (!visible) { stopPolling(); setWaiting(false); setReference(null); setPollStatus("pending"); }
+    if (!visible) { stopPolling(); setWaiting(false); setReference(null); setPollStatus("pending"); setChecking(false); }
   }, [visible]);
+
+  const checkNow = async () => {
+    if (!reference || checking || pollStatus !== "pending") return;
+    setChecking(true);
+    try {
+      const res: any = await apiGet(`/user-wallet/payment-status/${reference}`);
+      const s: string = res?.status ?? "pending";
+      if (s === "completed") { stopPolling(); setPollStatus("completed"); setTimeout(onSuccess, 1200); }
+      else if (s === "failed") { stopPolling(); setPollStatus("failed"); }
+    } catch {} finally { setChecking(false); }
+  };
 
   useEffect(() => {
     if (!reference) return;
@@ -595,6 +637,16 @@ function TopUpModal({ visible, onClose, onSuccess }: { visible: boolean; onClose
                       </View>
                     )}
                     <Text style={m.waitHint}>{t("wallet.pay.hint")}</Text>
+                    <TouchableOpacity
+                      style={[m.checkBtn, checking && { opacity: 0.6 }]}
+                      onPress={checkNow}
+                      disabled={checking}
+                    >
+                      {checking
+                        ? <ActivityIndicator size="small" color={Colors.primary} />
+                        : <Text style={m.checkBtnText}>{t("wallet.pay.checkNow")}</Text>
+                      }
+                    </TouchableOpacity>
                   </>
                 )}
               </View>
@@ -833,6 +885,8 @@ const m = StyleSheet.create({
   ussdBox:   { marginTop: 20, backgroundColor: Colors.pageBg, borderRadius: Radius.lg, padding: 20, alignItems: "center", width: "100%", borderWidth: 1, borderColor: Colors.border },
   ussdLabel: { fontSize: 12, color: Colors.text2, marginBottom: 8, fontWeight: "600", letterSpacing: 0.5 },
   ussdCode:  { fontSize: 26, fontWeight: "800", color: Colors.text, letterSpacing: 3 },
+  checkBtn:  { marginTop: 16, height: 44, paddingHorizontal: 28, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.primary, alignItems: "center", justifyContent: "center" },
+  checkBtnText: { fontSize: 14, fontWeight: "700", color: Colors.primary },
 });
 
 const s = StyleSheet.create({

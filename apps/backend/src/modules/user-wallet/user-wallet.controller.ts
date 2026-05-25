@@ -112,12 +112,31 @@ export async function getPaymentStatus(req: Request, res: Response, next: NextFu
     try {
       const campay = await campayTransactionStatus(reference);
       if (campay.status === "SUCCESSFUL") {
-        if (tx.type === "activation") {
-          await svc.confirmActivation(reference, campay.amount);
-        } else if (tx.type === "topup") {
-          await svc.confirmTopUp(reference, campay.amount);
+        let confirmed = false;
+        try {
+          if (tx.type === "activation") {
+            confirmed = await svc.confirmActivation(reference, campay.amount);
+          } else if (tx.type === "topup") {
+            await svc.confirmTopUp(reference, campay.amount);
+            confirmed = true;
+          }
+        } catch (confirmErr: any) {
+          // confirmActivation threw → wallet not yet created, keep polling
+          console.error("[getPaymentStatus] confirmActivation error:", confirmErr?.message);
+          res.json({ success: true, data: { status: "pending", type: tx.type, amount: tx.amount } });
+          return;
         }
-        res.json({ success: true, data: { status: "completed", type: tx.type, amount: campay.amount } });
+        if (confirmed) {
+          res.json({ success: true, data: { status: "completed", type: tx.type, amount: campay.amount } });
+        } else {
+          // Already processed (false) — re-read actual DB status
+          const { data: txFresh } = await supabase
+            .from("user_wallet_transactions")
+            .select("status, amount")
+            .eq("reference", reference)
+            .maybeSingle();
+          res.json({ success: true, data: { status: txFresh?.status ?? "completed", type: tx.type, amount: txFresh?.amount ?? campay.amount } });
+        }
         return;
       }
       if (campay.status === "FAILED") {

@@ -138,10 +138,12 @@ export async function initiateActivation(input: {
   };
 }
 
-// ─── Confirm activation (appelé par webhook Campay) ───────────────────────────
+// ─── Confirm activation (appelé par polling ou webhook Campay) ────────────────
+// Returns true  → wallet created + transaction completed
+// Returns false → already processed (idempotent, transaction was not pending)
+// Throws        → wallet insert failed (caller should NOT return "completed")
 
-export async function confirmActivation(reference: string, amount: number) {
-  // Trouver la transaction pending
+export async function confirmActivation(reference: string, amount: number): Promise<boolean> {
   const { data: pending } = await supabase
     .from("user_wallet_transactions")
     .select("*")
@@ -150,11 +152,10 @@ export async function confirmActivation(reference: string, amount: number) {
     .eq("status", "pending")
     .maybeSingle();
 
-  if (!pending) return; // déjà traité
+  if (!pending) return false; // déjà traité
 
   const { cardNumber, cardName, pinHash } = pending.metadata as { cardNumber: string; cardName: string; pinHash: string };
 
-  // Créer le wallet
   const { data: wallet, error } = await supabase
     .from("user_wallets")
     .insert({
@@ -167,9 +168,11 @@ export async function confirmActivation(reference: string, amount: number) {
     .select("id")
     .single();
 
-  if (error || !wallet) return;
+  if (error || !wallet) {
+    console.error("[wallet/confirm-activation] wallet insert failed:", error?.message, error?.details, error?.hint);
+    throw new AppError(500, "WALLET_CREATE_ERROR", "Impossible de créer le wallet. Réessayez dans quelques secondes.");
+  }
 
-  // Mettre à jour la transaction
   await supabase
     .from("user_wallet_transactions")
     .update({
@@ -179,6 +182,8 @@ export async function confirmActivation(reference: string, amount: number) {
       description: "Activation wallet — confirmé",
     })
     .eq("reference", reference);
+
+  return true;
 }
 
 // ─── Top-up (recharge via Mobile Money) ───────────────────────────────────────

@@ -310,6 +310,7 @@ const fr = {
       successSub: "Votre DashPay est maintenant actif.",
       failed: "Paiement échoué",
       failedSub: "Le paiement n'a pas abouti. Vérifiez votre solde Mobile Money et réessayez.",
+      checkNow: "Vérifier maintenant",
     },
   },
   favorites: {
@@ -830,6 +831,7 @@ const en: typeof fr = {
       successSub: "Your DashPay is now active.",
       failed: "Payment failed",
       failedSub: "The payment did not go through. Check your Mobile Money balance and try again.",
+      checkNow: "Check now",
     },
   },
   favorites: {
