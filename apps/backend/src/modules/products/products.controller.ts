@@ -327,20 +327,25 @@ export async function deleteCategory(req: Request, res: Response, next: NextFunc
 // ─── Public mobile : liste des produits visibles ──────────────────────────────
 export async function listPublicProducts(req: Request, res: Response, next: NextFunction) {
   try {
-    const { promo, flash, limit = "12", category, branch_id, search } = req.query as Record<string, string>;
+    const { promo, flash, limit = "12", category, branch_id, search, sort } = req.query as Record<string, string>;
 
     let query = supabase
       .from("products")
       .select(`
         id, name, name_fr, name_en, price, original_price, image_url,
-        discount_pct, unit, is_hidden,
+        discount_pct, unit, is_hidden, avg_rating, ratings_count,
         branches!inner ( id, name, category, is_active ),
         product_images ( url, is_primary )
       `)
       .eq("is_hidden", false)
       .eq("branches.is_active", true)
-      .order("created_at", { ascending: false })
       .limit(Number(limit));
+
+    if (sort === "rating") {
+      query = query.order("avg_rating", { ascending: false });
+    } else {
+      query = query.order("created_at", { ascending: false });
+    }
 
     if (promo === "true") query = query.not("original_price", "is", null);
     if (flash === "true") query = query.eq("is_flash", true);
@@ -351,6 +356,52 @@ export async function listPublicProducts(req: Request, res: Response, next: Next
     const { data, error } = await query;
     if (error) throw new AppError(500, "FETCH_ERROR", error.message);
     sendSuccess(res, data ?? []);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Public mobile : noter un produit (upsert) ────────────────────────────────
+export async function rateProduct(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const user_id = req.user!.id;
+    const rating = Number(req.body.rating);
+
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      throw new AppError(400, "INVALID_RATING", "La note doit être entre 1 et 5");
+    }
+
+    const { data, error } = await supabase
+      .from("product_ratings")
+      .upsert(
+        { product_id: id, user_id, rating, updated_at: new Date().toISOString() },
+        { onConflict: "product_id,user_id" }
+      )
+      .select()
+      .single();
+
+    if (error) throw new AppError(500, "RATE_ERROR", error.message);
+    sendSuccess(res, data, "Note enregistrée");
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── Public mobile : note de l'utilisateur connecté pour un produit ───────────
+export async function getUserProductRating(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params;
+    const user_id = req.user!.id;
+
+    const { data } = await supabase
+      .from("product_ratings")
+      .select("rating")
+      .eq("product_id", id)
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    sendSuccess(res, { rating: data?.rating ?? null });
   } catch (err) {
     next(err);
   }

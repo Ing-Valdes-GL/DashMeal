@@ -197,6 +197,12 @@ export async function campayCollect(params: {
 
   const headers = await authHeader();
 
+  // Campay accepte "MTN Mobile Money" | "Orange Money" comme payment_method
+  const campayPaymentMethod =
+    operator === "MTN"    ? "MTN Mobile Money" :
+    operator === "Orange" ? "Orange Money"      :
+    undefined;
+
   const res = await fetch(`${baseUrl()}/api/collect/`, {
     method: "POST",
     headers,
@@ -206,6 +212,7 @@ export async function campayCollect(params: {
       from: normalizePhone(params.phone),
       description: params.description,
       external_reference: params.externalReference,
+      ...(campayPaymentMethod ? { payment_method: campayPaymentMethod } : {}),
     }),
   });
 

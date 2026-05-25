@@ -8,13 +8,16 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
-import * as Linking from "expo-linking";
+import * as AuthSession from "expo-auth-session";
 import * as AppleAuthentication from "expo-apple-authentication";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/stores/auth";
 import { apiPost } from "@/lib/api";
-import { supabase } from "@/lib/supabase";
 import { Colors, Radius, Shadow } from "@/lib/theme";
+
+WebBrowser.maybeCompleteAuthSession();
+
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
 type Mode = "email" | "phone";
 
@@ -32,20 +35,39 @@ export default function LoginScreen() {
   const [appleLoading, setAppleLoading]   = useState(false);
   const [error, setError]             = useState("");
 
-  // ── Google OAuth via Supabase Auth ───────────────────────────────────────────
-  // Ouvre le navigateur → Google → Supabase callback → deep link → _layout.tsx prend le relais
+  // ── Google OAuth ──────────────────────────────────────────────────────────────
+  const discovery  = AuthSession.useAutoDiscovery("https://accounts.google.com");
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: "dashmeal", path: "auth" });
+
+  const [request, , promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: GOOGLE_CLIENT_ID,
+      redirectUri,
+      scopes: ["openid", "profile", "email"],
+      responseType: AuthSession.ResponseType.IdToken,
+      usePKCE: false,
+    },
+    discovery,
+  );
+
   const handleGoogleLogin = async () => {
+    if (!GOOGLE_CLIENT_ID) {
+      Alert.alert(t("common.error"), t("auth.googleError"));
+      return;
+    }
     setGoogleLoading(true);
     setError("");
     try {
-      const redirectTo = Linking.createURL("/--/auth");
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: { redirectTo, skipBrowserRedirect: true },
-      });
-      if (oauthError || !data.url) throw oauthError ?? new Error("No OAuth URL");
-      // openBrowserAsync : le navigateur se ferme tout seul quand le deep link arrive
-      await WebBrowser.openBrowserAsync(data.url);
+      const result = await promptAsync();
+      if (result?.type === "success") {
+        const { id_token } = result.params;
+        const res = await apiPost("/auth/user/google", { id_token });
+        const { user, tokens } = res.data;
+        await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
+        await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
+        login(user, tokens.access_token, tokens.refresh_token);
+        router.replace("/(tabs)");
+      }
     } catch (e: any) {
       setError(e?.response?.data?.error?.message ?? t("auth.googleError"));
     } finally {
@@ -64,7 +86,11 @@ export default function LoginScreen() {
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
-      const res = await apiPost("/auth/user/apple", { id_token: credential.identityToken });
+      const res = await apiPost("/auth/user/apple", {
+        id_token:   credential.identityToken,
+        first_name: credential.fullName?.givenName  ?? undefined,
+        last_name:  credential.fullName?.familyName ?? undefined,
+      });
       const { user, tokens } = res.data;
       await SecureStore.setItemAsync("dm_access_token", tokens.access_token);
       await SecureStore.setItemAsync("dm_refresh_token", tokens.refresh_token);
@@ -211,7 +237,7 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={[s.googleBtn, Platform.OS === "ios" && { marginTop: 12 }]}
             onPress={handleGoogleLogin}
-            disabled={googleLoading}
+            disabled={googleLoading || !request}
             activeOpacity={0.85}
           >
             {googleLoading ? (

@@ -146,6 +146,24 @@ export async function googleAuth(req: Request, res: Response, next: NextFunction
   }
 }
 
+export async function googleAuthSupabase(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.googleAuthSupabase(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function appleAuth(req: Request, res: Response, next: NextFunction) {
+  try {
+    const result = await authService.appleAuth(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function sendDriverOtp(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await authService.sendDriverOtp(req.body.phone);

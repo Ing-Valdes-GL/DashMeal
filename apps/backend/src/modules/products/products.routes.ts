@@ -23,7 +23,12 @@ router.get("/public",              controller.listPublicProducts);
 router.get("/public/:id",          controller.getProduct);
 router.get("/search",              validate(ProductSearchSchema, "query"), controller.searchProducts);
 router.get("/categories",          controller.listCategories);
-router.get("/:id",                 controller.getProduct);
+
+// ─── Notation produit (utilisateurs authentifiés) ─────────────────────────────
+router.post("/:id/rate",       authenticate, controller.rateProduct);
+router.get("/:id/my-rating",   authenticate, controller.getUserProductRating);
+
+router.get("/:id",             controller.getProduct);
 
 // ─── Semi-public : accessible par mobile (filtre is_hidden auto) et admins ───
 router.get("/branch/:branch_id", optionalAuthenticate, controller.listByBranch);

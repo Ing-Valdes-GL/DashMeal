@@ -22,7 +22,6 @@ interface TimeSlot {
 }
 interface ApiResponse<T> { success: boolean; data: T }
 type PaymentMethod = "orange_money" | "mtn_mobile_money";
-type PaymentType = "momo" | "wallet";
 type PaymentStatus = "pending" | "paid" | "failed";
 
 // ─── Constantes opérateurs ────────────────────────────────────────────────────
@@ -61,12 +60,7 @@ export default function CheckoutScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const {
-    items, getTotal, getDiscount, getDiscountedTotal,
-    branch_id, branch_name,
-    promo_code, promo_pct, promo_label,
-    clear,
-  } = useCartStore();
+  const { items, getTotal, branch_id, branch_name, clear } = useCartStore();
 
   const DAYS = getNext7Days(t("checkout.today"), t("checkout.tomorrow"));
 
@@ -80,15 +74,9 @@ export default function CheckoutScreen() {
   const [address, setAddress] = useState("");
   const [addressCoords, setAddressCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [deliveryPhone, setDeliveryPhone] = useState("");
-  const [paymentType, setPaymentType] = useState<PaymentType>("momo");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("orange_money");
   const [paymentPhone, setPaymentPhone] = useState("");
   const [notes, setNotes] = useState("");
-  const [walletBalance, setWalletBalance] = useState<number | null>(null);
-
-  useEffect(() => {
-    apiGet("/user-wallet").then((r) => setWalletBalance(r.data?.balance ?? null)).catch(() => {});
-  }, []);
 
   // ── Pré-remplissage depuis le paiement par défaut ────────────────────────
   const { data: profileResp } = useQuery<ApiResponse<{ default_payment_phone?: string; default_payment_method?: string }>>({
@@ -169,104 +157,49 @@ export default function CheckoutScreen() {
 
   // ── Soumission ───────────────────────────────────────────────────────────────
   const orderMutation = useMutation({
-    mutationFn: () => {
-      if (paymentType === "wallet") {
-        return apiPost<ApiResponse<{ order_id: string; total: number }>>(
-          "/payments/initiate-order",
-          {
-            branch_id, type: orderType,
-            items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
-            ...(orderType === "collect" ? { slot_id: selectedSlot } : {
-              delivery_address: address, delivery_phone: deliveryPhone || undefined,
-            }),
-            payment_method: "wallet",
-            notes: notes || undefined,
-          }
-        );
+    mutationFn: () => apiPost<ApiResponse<{ reference: string; ussd_code: string | null; operator: string | null; total: number }>>(
+      "/payments/initiate-order",
+      {
+        branch_id, type: orderType,
+        items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+        ...(orderType === "collect" ? { slot_id: selectedSlot } : {
+          delivery_address: address, delivery_phone: deliveryPhone || undefined,
+        }),
+        payment_method: paymentMethod,
+        payment_phone: paymentPhone.replace(/\s/g, ""),
+        notes: notes || undefined,
       }
-      return apiPost<ApiResponse<{ reference: string; ussd_code: string | null; operator: string | null; total: number }>>(
-        "/payments/initiate-order",
-        {
-          branch_id, type: orderType,
-          items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
-          ...(orderType === "collect" ? { slot_id: selectedSlot } : {
-            delivery_address: address, delivery_phone: deliveryPhone || undefined,
-          }),
-          payment_method: paymentMethod,
-          payment_phone: paymentPhone.replace(/\s/g, ""),
-          notes: notes || undefined,
-        }
-      );
-    },
-    onSuccess: (resp: any) => {
+    ),
+    onSuccess: (resp) => {
       const d = resp?.data;
       if (!d) return;
-      if (paymentType === "wallet") {
-        // Wallet: paiement instantané → succès direct
-        setOrderId(d.order_id);
-        setOrderTotal(finalTotal);
-        setPaymentPhase("success");
-        clear();
-        queryClient.invalidateQueries({ queryKey: ["my-orders"] });
-        queryClient.invalidateQueries({ queryKey: ["order", d.order_id] });
-      } else {
-        setUssdCode(d.ussd_code ?? null);
-        setPaymentRef(d.reference);
-        setOrderTotal(d.total);
-        setPaymentPhase("waiting");
-        startPolling(d.reference);
-      }
+      setUssdCode(d.ussd_code ?? null);
+      setPaymentRef(d.reference);
+      setOrderTotal(d.total);
+      setPaymentPhase("waiting");
+      startPolling(d.reference);
     },
     onError: (err: unknown) => {
       setPaymentPhase("form");
-      const code = (err as any)?.response?.data?.error?.code;
-      const msg = (err as any)?.response?.data?.error?.message;
-      if (code === "INSUFFICIENT_BALANCE") {
-        Alert.alert(t("wallet.insufficientBalance"), msg ?? t("checkout.payErrorMsg"));
-      } else {
-        Alert.alert(t("checkout.payError"), msg ?? t("checkout.payErrorMsg"));
-      }
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
+      Alert.alert(t("checkout.payError"), msg ?? t("checkout.payErrorMsg"));
     },
   });
 
-  const baseTotal = getDiscountedTotal();
-  const walletTotal = Math.floor(baseTotal * 0.99);
-  const walletSaving = baseTotal - walletTotal;
-  const finalTotal = paymentType === "wallet" ? walletTotal : baseTotal;
-
-  const canSubmitMomo =
+  const canSubmit =
     items.length > 0 &&
     paymentPhone.replace(/\D/g, "").length >= 9 &&
     (orderType === "collect" ? !!selectedSlot : address.trim().length >= 5);
 
-  const canSubmitWallet =
-    items.length > 0 &&
-    walletBalance !== null &&
-    walletBalance >= walletTotal &&
-    (orderType === "collect" ? !!selectedSlot : address.trim().length >= 5);
-
-  const canSubmit = paymentType === "wallet" ? canSubmitWallet : canSubmitMomo;
-
   const handleConfirm = () => {
-    if (paymentType === "wallet") {
-      Alert.alert(
-        t("checkout.confirmTitle"),
-        `${formatCurrency(finalTotal)} depuis votre wallet Dash Meal`,
-        [
-          { text: t("common.cancel"), style: "cancel" },
-          { text: t("common.confirm"), onPress: () => { setPaymentPhase("processing"); orderMutation.mutate(); } },
-        ]
-      );
-    } else {
-      Alert.alert(
-        t("checkout.confirmTitle"),
-        `${formatCurrency(finalTotal)} via ${paymentPhone} (${OPERATORS.find((o) => o.id === paymentMethod)?.label})`,
-        [
-          { text: t("common.cancel"), style: "cancel" },
-          { text: t("common.confirm"), onPress: () => { setPaymentPhase("processing"); orderMutation.mutate(); } },
-        ]
-      );
-    }
+    Alert.alert(
+      t("checkout.confirmTitle"),
+      `${formatCurrency(getTotal())} via ${paymentPhone} (${OPERATORS.find((o) => o.id === paymentMethod)?.label})`,
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.confirm"), onPress: () => { setPaymentPhase("processing"); orderMutation.mutate(); } },
+      ]
+    );
   };
 
   // ── Écrans paiement ──────────────────────────────────────────────────────────
@@ -520,110 +453,52 @@ export default function CheckoutScreen() {
           </>
         )}
 
-        {/* Paiement — type selector */}
+        {/* Paiement */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t("checkout.paymentTitle")}</Text>
-
-          {/* Toggle Mobile Money vs Wallet */}
-          <View style={styles.payTypeRow}>
-            <TouchableOpacity
-              style={[styles.payTypeBtn, paymentType === "momo" && styles.payTypeBtnActive]}
-              onPress={() => setPaymentType("momo")}
-            >
-              <Ionicons name="phone-portrait-outline" size={18} color={paymentType === "momo" ? Colors.primary : Colors.text3} />
-              <Text style={[styles.payTypeLabel, paymentType === "momo" && styles.payTypeLabelActive]}>Mobile Money</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.payTypeBtn, paymentType === "wallet" && styles.payTypeBtnActive]}
-              onPress={() => setPaymentType("wallet")}
-            >
-              <Ionicons name="wallet-outline" size={18} color={paymentType === "wallet" ? Colors.primary : Colors.text3} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.payTypeLabel, paymentType === "wallet" && styles.payTypeLabelActive]}>
-                  Wallet {walletBalance !== null ? `— ${formatCurrency(walletBalance)}` : ""}
-                </Text>
-                <Text style={styles.payTypeDiscount}>-1% sur le total</Text>
-              </View>
-            </TouchableOpacity>
+          <View style={styles.payRow}>
+            {OPERATORS.map((op) => (
+              <TouchableOpacity
+                key={op.id}
+                style={[styles.payCard, paymentMethod === op.id && styles.payCardActive]}
+                onPress={() => setPaymentMethod(op.id)}
+              >
+                <View style={[styles.payDot, { backgroundColor: op.color }]} />
+                <Text style={[styles.payLabel, paymentMethod === op.id && styles.payLabelActive]}>{op.label}</Text>
+                <Text style={styles.payPrefix}>{op.prefix}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-
-          {/* Wallet: balance status */}
-          {paymentType === "wallet" && (
-            <>
-              {walletBalance === null ? (
-                <TouchableOpacity style={styles.walletNoBalance} onPress={() => router.push("/wallet" as any)}>
-                  <Ionicons name="alert-circle-outline" size={18} color={Colors.warning} />
-                  <Text style={styles.walletNoBalanceText}>{t("wallet.noWallet")} — {t("wallet.activateNow")}</Text>
-                  <Ionicons name="chevron-forward" size={14} color={Colors.warning} />
-                </TouchableOpacity>
-              ) : walletBalance < walletTotal ? (
-                <TouchableOpacity style={styles.walletInsufficient} onPress={() => router.push("/wallet/topup" as any)}>
-                  <Ionicons name="warning-outline" size={18} color={Colors.error} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.walletInsufficientText}>{t("wallet.insufficientBalance")}</Text>
-                    <Text style={styles.walletInsufficientSub}>
-                      {t("wallet.insufficientMsg", { balance: formatCurrency(walletBalance), missing: formatCurrency(walletTotal - walletBalance) })}
-                    </Text>
-                  </View>
-                  <Ionicons name="add-circle-outline" size={20} color={Colors.error} />
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.walletOk}>
-                  <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-                  <Text style={styles.walletOkText}>Solde suffisant — {formatCurrency(walletBalance)}</Text>
-                </View>
-              )}
-            </>
+          <Text style={[styles.fieldHint, { marginTop: 14, marginBottom: 6 }]}>{t("checkout.mobileMoneyLabel")}</Text>
+          <View style={styles.inputWrap}>
+            <Ionicons name="phone-portrait-outline" size={18} color={Colors.text3} style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.input}
+              placeholder="+237 6XX XXX XXX"
+              placeholderTextColor={Colors.text3}
+              value={paymentPhone}
+              onChangeText={handlePaymentPhoneChange}
+              keyboardType="phone-pad"
+            />
+          </View>
+          {paymentPhone.length > 0 && detectOperator(paymentPhone) !== paymentMethod && (
+            <Text style={styles.warnText}>
+              {t("checkout.numberMismatch")} {OPERATORS.find((o) => o.id === paymentMethod)?.label}
+            </Text>
           )}
-
-          {/* MoMo options */}
-          {paymentType === "momo" && (
-            <>
-              <View style={[styles.payRow, { marginTop: 14 }]}>
-                {OPERATORS.map((op) => (
-                  <TouchableOpacity
-                    key={op.id}
-                    style={[styles.payCard, paymentMethod === op.id && styles.payCardActive]}
-                    onPress={() => setPaymentMethod(op.id)}
-                  >
-                    <View style={[styles.payDot, { backgroundColor: op.color }]} />
-                    <Text style={[styles.payLabel, paymentMethod === op.id && styles.payLabelActive]}>{op.label}</Text>
-                    <Text style={styles.payPrefix}>{op.prefix}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={[styles.fieldHint, { marginTop: 14, marginBottom: 6 }]}>{t("checkout.mobileMoneyLabel")}</Text>
-              <View style={styles.inputWrap}>
-                <Ionicons name="phone-portrait-outline" size={18} color={Colors.text3} style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="+237 6XX XXX XXX"
-                  placeholderTextColor={Colors.text3}
-                  value={paymentPhone}
-                  onChangeText={handlePaymentPhoneChange}
-                  keyboardType="phone-pad"
-                />
-              </View>
-              {paymentPhone.length > 0 && detectOperator(paymentPhone) !== paymentMethod && (
-                <Text style={styles.warnText}>
-                  {t("checkout.numberMismatch")} {OPERATORS.find((o) => o.id === paymentMethod)?.label}
-                </Text>
-              )}
-              {paymentPhone.replace(/\D/g, "").length >= 9 &&
-                paymentPhone !== profileResp?.data?.default_payment_phone && (
-                <TouchableOpacity
-                  style={styles.saveDefaultBtn}
-                  onPress={() => {
-                    apiPost("/users/me/default-payment", { phone: paymentPhone.replace(/\s/g, ""), method: paymentMethod });
-                    queryClient.invalidateQueries({ queryKey: ["profile"] });
-                    Alert.alert(t("checkout.savedTitle"), t("checkout.savedMsg"));
-                  }}
-                >
-                  <Ionicons name="bookmark-outline" size={14} color={Colors.primary} />
-                  <Text style={styles.saveDefaultText}>{t("checkout.saveDefault")}</Text>
-                </TouchableOpacity>
-              )}
-            </>
+          {paymentPhone.replace(/\D/g, "").length >= 9 &&
+            paymentPhone !== profileResp?.data?.default_payment_phone && (
+            <TouchableOpacity
+              style={styles.saveDefaultBtn}
+              onPress={() => {
+                apiPost("/users/me/default-payment", { phone: paymentPhone.replace(/\s/g, ""), method: paymentMethod });
+                queryClient.invalidateQueries({ queryKey: ["profile"] });
+                Alert.alert(t("checkout.savedTitle"), t("checkout.savedMsg"));
+              }}
+            >
+              <Ionicons name="bookmark-outline" size={14} color={Colors.primary} />
+              <Text style={styles.saveDefaultText}>{t("checkout.saveDefault")}</Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -652,31 +527,16 @@ export default function CheckoutScreen() {
                 <Text style={styles.summaryItemPrice}>{formatCurrency(item.unit_price * item.quantity)}</Text>
               </View>
             ))}
-            {promo_pct && promo_pct > 0 ? (
-              <>
-                <View style={styles.summaryDivider} />
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryItemName}>{t("cart.subtotal")}</Text>
-                  <Text style={styles.summaryItemPrice}>{formatCurrency(getTotal())}</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryItemName, { color: Colors.primary }]}>
-                    {promo_code}{promo_label ? ` — ${promo_label}` : ""} (−{promo_pct}%)
-                  </Text>
-                  <Text style={[styles.summaryItemPrice, { color: Colors.primary }]}>−{formatCurrency(getDiscount())}</Text>
-                </View>
-              </>
-            ) : null}
-            <View style={styles.summaryDivider} />
-            {paymentType === "wallet" && (
+            {orderType === "delivery" && (
               <View style={styles.summaryRow}>
-                <Text style={[styles.summaryItemName, { color: Colors.primary }]}>{t("wallet.walletDiscount")}</Text>
-                <Text style={[styles.summaryItemPrice, { color: Colors.primary }]}>−{formatCurrency(walletSaving)}</Text>
+                <Text style={styles.summaryItemName}>{t("checkout.deliveryFee")}</Text>
+                <Text style={styles.summaryItemPrice}>{formatCurrency(5)}</Text>
               </View>
             )}
+            <View style={styles.summaryDivider} />
             <View style={styles.summaryRow}>
               <Text style={styles.summaryTotalLabel}>{t("cart.total")}</Text>
-              <Text style={styles.summaryTotalValue}>{formatCurrency(finalTotal)}</Text>
+              <Text style={styles.summaryTotalValue}>{formatCurrency(getTotal() + (orderType === "delivery" ? 5 : 0))}</Text>
             </View>
           </View>
         </View>
@@ -686,7 +546,7 @@ export default function CheckoutScreen() {
       <View style={styles.bottomBar}>
         <View style={styles.bottomAmountRow}>
           <Text style={styles.bottomLabel}>{t("checkout.totalToPay")}</Text>
-          <Text style={styles.bottomTotal}>{formatCurrency(finalTotal)}</Text>
+          <Text style={styles.bottomTotal}>{formatCurrency(getTotal() + (orderType === "delivery" ? 5 : 0))}</Text>
         </View>
         <TouchableOpacity
           style={[styles.submitBtn, !canSubmit && styles.submitBtnDisabled]}
@@ -696,7 +556,7 @@ export default function CheckoutScreen() {
           {orderMutation.isPending
             ? <ActivityIndicator color="#fff" />
             : <>
-                <Ionicons name={paymentType === "wallet" ? "wallet-outline" : "phone-portrait-outline"} size={18} color="#fff" />
+                <Ionicons name="phone-portrait-outline" size={18} color="#fff" />
                 <Text style={styles.submitText}>{t("checkout.confirmAndPay")}</Text>
               </>
           }
@@ -705,8 +565,7 @@ export default function CheckoutScreen() {
           <Text style={styles.hintText}>
             {orderType === "collect" && !selectedSlot ? t("checkout.selectSlotHint") :
              orderType === "delivery" && address.trim().length < 5 ? t("checkout.enterAddressHint") :
-             paymentType === "momo" && paymentPhone.replace(/\D/g, "").length < 9 ? t("checkout.enterPhoneHint") :
-             paymentType === "wallet" && (walletBalance ?? 0) < walletTotal ? t("wallet.insufficientBalance") : ""}
+             paymentPhone.replace(/\D/g, "").length < 9 ? t("checkout.enterPhoneHint") : ""}
           </Text>
         )}
       </View>
@@ -844,21 +703,6 @@ const styles = StyleSheet.create({
     padding: 14, minHeight: 52,
   },
   input: { flex: 1, color: Colors.text, fontSize: 14, lineHeight: 20 },
-
-  // Payment type toggle
-  payTypeRow: { flexDirection: "row", gap: 10, marginBottom: 4 },
-  payTypeBtn: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, padding: 14, borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.border, backgroundColor: Colors.bg },
-  payTypeBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  payTypeLabel: { fontSize: 13, fontWeight: "700", color: Colors.text3, flex: 1 },
-  payTypeLabelActive: { color: Colors.primary },
-  payTypeDiscount: { fontSize: 10, color: Colors.success, fontWeight: "600" },
-  walletOk: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: Colors.primaryLight, borderRadius: Radius.md, padding: 10, marginTop: 8 },
-  walletOkText: { fontSize: 13, color: Colors.success, fontWeight: "600" },
-  walletNoBalance: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFF8E1", borderRadius: Radius.md, padding: 12, marginTop: 8 },
-  walletNoBalanceText: { flex: 1, fontSize: 13, color: Colors.warning, fontWeight: "600" },
-  walletInsufficient: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFEBEE", borderRadius: Radius.md, padding: 12, marginTop: 8 },
-  walletInsufficientText: { fontSize: 13, color: Colors.error, fontWeight: "700" },
-  walletInsufficientSub: { fontSize: 11, color: Colors.error, marginTop: 2 },
 
   // Payment method
   payRow: { flexDirection: "row", gap: 10 },
