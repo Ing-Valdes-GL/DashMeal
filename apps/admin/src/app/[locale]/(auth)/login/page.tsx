@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-import { Eye, EyeOff, Mail, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, ArrowLeft, Home } from "lucide-react";
 import Image from "next/image";
 import logo from "@/assets/logo.png";
 
@@ -121,9 +121,24 @@ export default function LoginPage({
     }
   };
 
+  // Composant réutilisable pour le bouton d'accueil
+  const HomeButton = () => (
+    <div className="mb-6 flex justify-start">
+      <Link
+        href={`/${locale}`}
+        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900"
+      >
+        <Home className="h-3.5 w-3.5 text-slate-500" />
+        <span>Accueil</span>
+      </Link>
+    </div>
+  );
+
   if (step === "otp") {
     return (
       <div className="mx-auto max-w-sm w-full">
+        <HomeButton />
+
         <div className="flex flex-col items-center mb-8">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/10 border border-brand-500/30 mb-4">
             <Mail className="h-7 w-7 text-brand-500" />
@@ -191,6 +206,8 @@ export default function LoginPage({
 
   return (
     <div className="mx-auto max-w-sm w-full">
+      <HomeButton />
+
       <div className="flex flex-col items-center mb-8">
         <Image
           src={logo}
